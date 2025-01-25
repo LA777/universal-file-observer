@@ -1,0 +1,112 @@
+.example-tree-invisible {
+    display: none;
+}
+
+.example-tree ul,
+.example-tree li {
+  margin-top: 0;
+  margin-bottom: 0;
+  list-style-type: none;
+}
+
+/* This padding sets alignment of the nested nodes. */
+.example-tree .mat-nested-tree-node div[role="group"] {
+  padding-left: 20px;
+}
+
+.example-tree div[role="group"] > .mat-nested-tree-node {
+  padding-left: 0px;
+}
+
+.example-tree div[role="group"] > .mat-tree-node {
+  padding-left: 20px;
+}
+
+h1,
+h3 {
+  color: green;
+  font-family: "Roboto", sans-serif;
+  text-align: left;
+}
+
+.mat-tree {
+  background: transparent;
+}
+
+.mat-tree-node {
+  color: green;
+  min-height: 8px;
+
+}
+
+.mat-nested-tree-node {
+  color: blue;
+  min-height: 8px;
+}
+
+.mat-icon-rtl-mirror {
+
+}
+
+.folder-tree-panel {
+  height: 100%;
+  width: 40%;
+  min-width: 10%;
+  max-width: 90%;
+  float: left;
+  /* border: red solid 2px; */
+  background-color: rgb(162, 126, 171);
+  /* display: flex; */
+  /* flex: 1; */
+  /* display: block; */
+  resize: horizontal;
+}
+
+.inter-panel-area {
+  height: 100%;
+  width: 0.4%;
+  float: left;
+  background-color: rgb(130, 186, 177);
+  /* display: block; */
+}
+
+.folder-details-panel {
+  height: 100%;
+  width: 100%;
+  float: left;
+  resize: horizontal;
+  background-color: rgb(138, 142, 142);
+  /* display: block; */
+}
+
+.inter-panel-area:hover {
+  cursor: w-resize;
+}
+
+.folder-panel-wrapper {
+  height: 600px;
+  width: 100%;
+  background-color: rgb(120, 130, 131);
+  display: flex;
+}
+
+table {
+  width: 100%;
+}
+
+th.mat-sort-header-sorted {
+  color: black;
+}
+
+.mat-header-row {
+  height: 24px; /* Set your desired height */
+}
+
+.mat-mdc-row {
+  height: 12px; /* Set your desired height */
+}
+
+/* Optional: Adjust cell padding to match the new height */
+.mat-cell, .mat-header-cell {
+  padding: 0 8px; /* Adjust padding as needed */
+}

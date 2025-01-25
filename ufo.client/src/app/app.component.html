@@ -1,24 +1,19 @@
-﻿<h1 id="tableLabel">Weather forecast</h1>
+<h1 id="tableLabel">Hello APP</h1>
+<p>This component demonstrates App.</p>
 
-<p>This component demonstrates fetching data from the server.</p>
-
-<p *ngIf="!forecasts"><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationangular">https://aka.ms/jspsintegrationangular</a> for more details.</em></p>
-
-<table *ngIf="forecasts">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Temp. (C)</th>
-            <th>Temp. (F)</th>
-            <th>Summary</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr *ngFor="let forecast of forecasts">
-            <td>{{ forecast.date }}</td>
-            <td>{{ forecast.temperatureC }}</td>
-            <td>{{ forecast.temperatureF }}</td>
-            <td>{{ forecast.summary }}</td>
-        </tr>
-    </tbody>
-</table>
+<mat-tab-group #tabGroup [selectedIndex]="0">
+  <mat-tab label="Files">
+    <app-files></app-files>
+  </mat-tab>
+  <mat-tab label="Snapshots">
+    <app-snapshots (tabChange)="onTabChange($event)"></app-snapshots>
+  </mat-tab>
+  <mat-tab label="Snapshot Tree">
+    <app-snapshot></app-snapshot>
+  </mat-tab>
+  <mat-tab label="Forecast">
+    <app-forecast></app-forecast>
+  </mat-tab>
+  <mat-tab label="About">
+  </mat-tab>
+</mat-tab-group>

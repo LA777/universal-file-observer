@@ -1,5 +1,5 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, Input, ViewChild } from '@angular/core';
+import { MatTabGroup } from '@angular/material/tabs';
 
 interface WeatherForecast {
   date: string;
@@ -15,23 +15,16 @@ interface WeatherForecast {
 })
 export class AppComponent implements OnInit {
   public forecasts: WeatherForecast[] = [];
+  title = 'ufo.client';
+  @Input() selectedIndex: number | 0;// The index of the active tab.
+  @ViewChild('tabGroup') tabGroup: MatTabGroup;
 
-  constructor(private http: HttpClient) {}
+  constructor() {}
 
   ngOnInit() {
-    this.getForecasts();
   }
 
-  getForecasts() {
-    this.http.get<WeatherForecast[]>('/weatherforecast').subscribe(
-      (result) => {
-        this.forecasts = result;
-      },
-      (error) => {
-        console.error(error);
-      }
-    );
+  onTabChange(index: number) {
+    this.tabGroup.selectedIndex = index;
   }
-
-  title = 'ufo.client';
 }

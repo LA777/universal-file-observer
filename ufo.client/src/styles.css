@@ -1,1 +1,22 @@
-/* You can add global styles to this file, and also import other style files */
+.mat-tooltip-storage-drive {
+  white-space: pre-line;
+  min-width: 400px;
+  width:400px;
+}
+
+.mat-tooltip {
+  min-width: 400px;
+  width:400px;
+}
+
+.mat-mdc-row:nth-child(even){
+  background-color: #FFF;
+}
+
+.mat-mdc-row:nth-child(odd){
+  background-color: #DDD;
+}
+
+.mat-mdc-row:hover {
+  background-color: rgb(129, 172, 233);
+}

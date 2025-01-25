@@ -7,4 +7,8 @@
     <!-- Folder where production build objects will be placed -->
     <BuildOutputFolder>$(MSBuildProjectDirectory)\dist\ufo.client\</BuildOutputFolder>
   </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="src\app\components\forecast\" />
+    <Folder Include="src\app\components\dialog\" />
+  </ItemGroup>
 </Project>

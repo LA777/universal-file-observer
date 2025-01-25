@@ -1,4 +1,4 @@
-namespace Ufo.Server
+namespace Ufo.Server.Models
 {
     public class WeatherForecast
     {

@@ -1,0 +1,78 @@
+<p>Snapshot works!</p>
+<p *ngIf="!snapshots"><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
+
+
+
+
+<div class="folder-panel-wrapper">
+  <div class="folder-details-panel">
+
+    <table mat-table [dataSource]="snapshots" matSort (matSortChange)="announceSortChange($event)"
+      class="mat-elevation-z8">
+
+      <ng-container matColumnDef="PcName">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Pc Name">
+          Pc Name
+        </th>
+        <td mat-cell *matCellDef="let element"> {{element.volumeInfo.volume.storageDrive.pcs[0].name}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="StorageDriveName">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Storage Drive Name">
+          Storage Drive Name
+        </th>
+        <td mat-cell *matCellDef="let element">
+          {{element.volumeInfo.volume.storageDrive.name}}
+          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
+            [matTooltip]="getStorageDriveTooltip(element.volumeInfo.volume.storageDrive)"
+            matTooltipPosition="above">table_view</mat-icon>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="VolumeDriveLetter">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Volume Drive Letter">
+          Volume Drive Letter
+        </th>
+        <td mat-cell *matCellDef="let element">
+          {{element.volumeInfo.volume.driveLetter}}
+          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
+            [matTooltip]="getVolumeInfoTooltip(element.volumeInfo)" matTooltipPosition="above">table_view</mat-icon>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="SnapshotGuid">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Guid">
+          Snapshot Guid
+        </th>
+        <td mat-cell *matCellDef="let element"> {{element.guid}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="SnapshotTimestamp">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Timestamp">
+          Snapshot Timestamp
+        </th>
+        <td mat-cell *matCellDef="let element"> {{element.timestamp}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="RootFolderName">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Name">
+          RootFolder Name
+        </th>
+        <td mat-cell *matCellDef="let element"> {{element.rootFolder.name}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="RootFolderSize">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Size">
+          RootFolder Size
+        </th>
+        <td mat-cell *matCellDef="let element"> {{element.rootFolder.size}} </td>
+      </ng-container>
+
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"></tr>
+
+    </table>
+
+  </div>
+</div>
