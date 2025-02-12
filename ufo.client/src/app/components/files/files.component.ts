@@ -1,12 +1,14 @@
 import { Component, OnInit, Injectable, ElementRef, HostListener, Renderer2, ViewChild, OnDestroy } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import {LiveAnnouncer} from '@angular/cdk/a11y';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatTreeNestedDataSource } from '@angular/material/tree';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatDialog } from '@angular/material/dialog';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { Folder, File, FsItem, SnapshotData, FileSystemRoot, DialogData } from '../../models/models';
 import { DialogComponent } from '../dialog/dialog.component';
+import { FileService } from '../../services/file.service';
+import { SnapshotService } from '../../services/snapshot.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-files',
@@ -26,8 +28,12 @@ export class FilesComponent implements OnInit {
   selectedFolder: Folder;
   folderData: FsItem[];
   displayedColumns: string[] = ['Name', 'Extension', 'Size'];
+  private subscriptionRoot: Subscription;
+  private subscriptionFolder: Subscription;
+  private subscriptionCreateSnapshot: Subscription;
 
-  constructor(private http: HttpClient, private renderer: Renderer2, private _liveAnnouncer: LiveAnnouncer, public dialog: MatDialog) {}
+  constructor(private renderer: Renderer2, private _liveAnnouncer: LiveAnnouncer,
+    public dialog: MatDialog, private fileService: FileService, private snapshotService: SnapshotService) {}
 
   ngOnInit() {
     this.getRoot();
@@ -36,29 +42,164 @@ export class FilesComponent implements OnInit {
   ngOnDestroy() {
     this.unlistenMouseMove();
     this.unlistenMouseUp();
+
+    if (this.subscriptionRoot) {
+      this.subscriptionRoot.unsubscribe();
+    }
+
+    if (this.subscriptionFolder) {
+      this.subscriptionFolder.unsubscribe();
+    }
+
+    if (this.subscriptionCreateSnapshot) {
+      this.subscriptionCreateSnapshot.unsubscribe();
+    }
   }
 
   getRoot() {
-    this.http.get<FileSystemRoot>('/api/filesystem/root').subscribe(
-      (result) => {
-        this.fileSystemRoot = result;
-        this.dataSource.data = [result.folder];
-        this.selectedFolder = result.folder;
-        this.handleButtonClick(result.folder);
-        console.log(result);
-      },
-      (error) => {
-        const dialogData: DialogData = {
-          title: 'Error',
-          message: error.error
-        };
-        this.dialog.open(DialogComponent, { data: dialogData });
-        console.error(error);
-      }
-    );
+    this.subscriptionRoot = this.fileService.getRoot().subscribe({
+        next: (result) => {
+          this.fileSystemRoot = result;
+          this.dataSource.data = [result.folder];
+          this.selectedFolder = result.folder;
+          this.initiateFolder(result.folder);
+          console.log(result);
+        },
+        error: (error) => {
+          this.showErrorDialog(error);
+        },
+        complete: () => {}
+      });
   }
 
   hasChild = (_: number, node: Folder) => !!node.childFolders && node.childFolders.length > 0;
+
+  initiateFolder(folder: Folder){
+    this.selectedFolder = folder;
+    this.folderData = [] as FsItem[];
+
+    if (folder.parentFolder) {
+      const folderItem: FsItem = {
+        name: "..",
+        size: undefined,
+        isFile: false,
+        fileExtension: '<DIR>',
+        sha256Hash: '',
+        guid: '',
+        fullPath: folder.fullPath,
+        isHidden: false,
+        parentFolder: folder?.parentFolder
+      };
+      this.folderData.push(folderItem);
+    }
+
+    folder.childFolders.forEach(element => {
+      const folderItem: FsItem = {
+        name: element.name,
+        size: element?.size,
+        isFile: false,
+        fileExtension: '<DIR>',
+        sha256Hash: element?.sha256Hash,
+        guid: element?.guid,
+        fullPath: element.fullPath,
+        isHidden: element?.isHidden,
+        parentFolder: element?.parentFolder
+      };
+      this.folderData.push(folderItem);
+    });
+
+    folder.files.forEach(element => {
+      const folderItem: FsItem = {
+        name: element.name,
+        size: element?.size,
+        isFile: true,
+        fileExtension: element.fileExtension,
+        sha256Hash: element?.sha256Hash,
+        guid: element?.guid,
+        fullPath: element.fullPath,
+        isHidden: element?.isHidden,
+        parentFolder: element?.parentFolder
+      };
+      this.folderData.push(folderItem);
+    });
+  }
+
+  navigateToPath(path?: string) {
+    this.subscriptionRoot = this.fileService.getFolder(path).subscribe({
+      next: (result) => {
+        //this.dataSource.data = [result];
+        this.initiateFolder(result);
+        console.log(result);
+      },
+      error: (error) => {
+        this.showErrorDialog(error);
+      },
+      complete: () => {}
+    });
+  }
+
+  createSnapshot() {
+    this.subscriptionCreateSnapshot = this.snapshotService.createSnapshot(this.selectedFolder.fullPath).subscribe({
+      next: (result) => {
+        this.showInfoDialog(result);
+      },
+      error: (error) => {
+        this.showErrorDialog(error);
+      },
+      complete: () => {}
+    });
+  }
+
+  onRowDoubleClick(fsItem: FsItem) {
+    if (fsItem.isFile) {
+      return;
+    }
+
+    if (fsItem.name === "..") {
+      this.navigateToPath(fsItem.parentFolder?.fullPath);
+     }
+    else {
+      this.navigateToPath(fsItem.fullPath);
+    }
+  }
+
+  announceSortChange(sortState: Sort) {
+    // This example uses English messages. If your application supports
+    // multiple language, you would internationalize these strings.
+    // Furthermore, you can customize the message to add additional
+    // details about the values being sorted.
+    if (sortState.direction) {
+      this._liveAnnouncer.announce(`Sorted ${sortState.direction}ending`);
+    } else {
+      this._liveAnnouncer.announce('Sorting cleared');
+    }
+  }
+
+  navigateBackward() {
+    console.log("navigateBackward");
+  }
+
+  navigateForward() {
+    console.log("navigateForward");
+  }
+
+  showInfoDialog(result: any){
+    const dialogData: DialogData = {
+      title: 'Info',
+      message: result
+    };
+    this.dialog.open(DialogComponent, { data: dialogData });
+    console.log(result);
+  }
+
+  showErrorDialog(error: any){
+    const dialogData: DialogData = {
+      title: 'Error',
+      message: error.error
+    };
+    this.dialog.open(DialogComponent, { data: dialogData });
+    console.error(error);
+  }
 
   onMouseDown(event: Event) {
     return;
@@ -93,190 +234,5 @@ export class FilesComponent implements OnInit {
   onMouseUp(event: MouseEvent) {
     this.unlistenMouseMove();
     this.unlistenMouseUp();
-  }
-
-  handleButtonClick(folder: Folder){
-    this.selectedFolder = folder;
-    this.folderData = [] as FsItem[];
-
-    if (folder.hasParent) {
-      const folderItem: FsItem = {
-        name: "..",
-        size: undefined,
-        isFile: false,
-        fileExtension: '<DIR>',
-        sha256Hash: '',
-        guid: '',
-        fullPath: folder.fullPath,
-        hasParent: true,
-        isHidden: false
-      };
-      this.folderData.push(folderItem);
-    }
-
-    folder.childFolders.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: false,
-        fileExtension: '<DIR>',
-        sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
-        fullPath: element.fullPath,
-        hasParent: true,
-        isHidden: element?.isHidden
-      };
-      this.folderData.push(folderItem);
-    });
-    folder.files.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: true,
-        fileExtension: element.fileExtension,
-        sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
-        fullPath: element.fullPath,
-        hasParent: true,
-        isHidden: element?.isHidden
-      };
-      this.folderData.push(folderItem);
-    });
-  }
-
-  mapRootFolder(folder: Folder) {
-    this.selectedFolder = folder;
-    this.folderData = [] as FsItem[];
-
-    folder.childFolders.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: false,
-        fileExtension: '<DIR>',
-        sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
-        fullPath: element.fullPath,
-        hasParent: true,
-        isHidden: element?.isHidden
-      };
-      this.folderData.push(folderItem);
-    });
-    folder.files.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: true,
-        fileExtension: element.fileExtension,
-        sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
-        fullPath: element.fullPath,
-        hasParent: true,
-        isHidden: element?.isHidden
-      };
-      this.folderData.push(folderItem);
-    });
-  }
-
-  handleDriveButtonClick(path: string) {
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'accept': 'text/plain'
-    });
-
-    const body = `"${path}\\"`;
-
-    this.http.post<Folder>('/api/filesystem/folder', { path: path }, { headers }).subscribe(
-      (result) => {
-        //this.dataSource.data = [result];
-        this.handleButtonClick(result);
-        console.log(result);
-      },
-      (error) => {
-        const dialogData: DialogData = {
-          title: 'Error',
-          message: error.error
-        };
-        this.dialog.open(DialogComponent, { data: dialogData });
-        console.error(error);
-      }
-    );
-  }
-
-  handleHomeButtonClick() {
-    this.handleButtonClick(this.fileSystemRoot.folder);
-  }
-
-  createSnapshotButtonClick() {
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'accept': 'text/plain'
-    });
-
-    this.http.post<string>('/api/snapshot/create', { path: this.selectedFolder.fullPath }, { headers }).subscribe(
-      (result) => {
-        const dialogData: DialogData = {
-          title: 'Info',
-          message: result
-        };
-        this.dialog.open(DialogComponent, { data: dialogData });
-        console.log(result);
-      },
-      (error) => {
-        const dialogData: DialogData = {
-          title: 'Error',
-          message: error.error
-        };
-        this.dialog.open(DialogComponent, { data: dialogData });
-        console.error(error);
-      }
-    );
-  }
-
-  onRowDoubleClick(fsItem: FsItem) {
-    if (fsItem.isFile) {
-      return;
-    }
-
-    const headers = new HttpHeaders({
-      'Content-Type': 'application/json',
-      'accept': 'text/plain'
-    });
-
-    let url = '';
-
-    if (fsItem.name === "..") {
-      url = '/api/filesystem/parent';    }
-    else {
-      url = '/api/filesystem/folder';
-    }
-
-    this.http.post<Folder>(url, { path: fsItem.fullPath }, { headers }).subscribe(
-      (result) => {
-        //this.dataSource.data = [result];
-        this.handleButtonClick(result);
-        console.log(result);
-      },
-      (error) => {
-        const dialogData: DialogData = {
-          title: 'Error',
-          message: error.error
-        };
-        this.dialog.open(DialogComponent, { data: dialogData });
-        console.error(error);
-      }
-    );
-  }
-
-  announceSortChange(sortState: Sort) {
-    // This example uses English messages. If your application supports
-    // multiple language, you would internationalize these strings.
-    // Furthermore, you can customize the message to add additional
-    // details about the values being sorted.
-    if (sortState.direction) {
-      this._liveAnnouncer.announce(`Sorted ${sortState.direction}ending`);
-    } else {
-      this._liveAnnouncer.announce('Sorting cleared');
-    }
   }
 }

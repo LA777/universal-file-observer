@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Concurrent;
+using System.IO;
 using System.Runtime.InteropServices;
-using Ufo.Abstractions.Database.Entities;
+using System.Threading.Tasks;
 using Ufo.Server.Models;
 
 namespace Ufo.Server.Controllers
@@ -10,6 +12,8 @@ namespace Ufo.Server.Controllers
     public class FileSystemController : ControllerBase
     {
         private readonly ILogger<FileSystemController> _logger;
+        //private readonly BlockingCollection<DirectoryInfo> dirCollection = new BlockingCollection<DirectoryInfo>();
+        //private readonly BlockingCollection<FileInfo> fileCollection = new BlockingCollection<FileInfo>();
 
         public FileSystemController(ILogger<FileSystemController> logger)
         {
@@ -36,19 +40,83 @@ namespace Ufo.Server.Controllers
             return fileSystemRoot;
         }
 
+        //private void CollectFolders(DirectoryInfo directoryInfo)
+        //{
+        //    try
+        //    {
+        //        foreach (var subDirectoryInfo in directoryInfo.EnumerateDirectories("*", SearchOption.AllDirectories))
+        //        {
+        //            dirCollection.Add(subDirectoryInfo);
+        //        }
+        //    }
+        //    finally
+        //    {
+        //        dirCollection.CompleteAdding();
+        //    }
+        //}
+
+        //private void CollectFiles(DirectoryInfo directoryInfo)
+        //{
+        //    try
+        //    {
+        //        foreach (var fileInfo in directoryInfo.EnumerateFiles("*", SearchOption.AllDirectories))
+        //        {
+        //            fileCollection.Add(fileInfo);
+        //        }
+        //    }
+        //    finally
+        //    {
+        //        fileCollection.CompleteAdding();
+        //    }
+        //}
+
         [HttpPost("folder")]
-        public async Task<FsFolderEntity> GetFolderInfoAsync([FromBody] PathModel folderPath, CancellationToken cancellationToken)
+        public async Task<FsFolder> GetFolderInfoAsync([FromBody] PathModel folderPath, CancellationToken cancellationToken)
         {
             // Get subfolders and files
-            var folderEntity = new FsFolderEntity();
+            var folderEntity = new FsFolder();
+            var dirInfo = new DirectoryInfo(folderPath.Path);
+
+            //var crawlDirectoriesTask = Task.Factory.StartNew(() => CollectFolders(dirInfo), cancellationToken);
+            //var crawlFilesTask = Task.Factory.StartNew(() => CollectFiles(dirInfo), cancellationToken);
+            //await Task.WhenAll(crawlDirectoriesTask, crawlFilesTask);
+
+            //foreach (var directoryInfo in dirCollection.GetConsumingEnumerable())
+            //{
+            //    var subfolderEntity = new FsFolder
+            //    {
+            //        Name = directoryInfo.Name,
+            //        FullPath = directoryInfo.FullName,
+            //        HasParent = directoryInfo.Parent != null,
+            //        IsHidden = directoryInfo.Attributes.HasFlag(FileAttributes.Hidden),
+            //        Size = null
+            //    };
+
+            //    folderEntity.ChildFolders.Add(subfolderEntity);
+            //}
+
+            //foreach (var fileInfo in fileCollection.GetConsumingEnumerable())
+            //{
+            //    var file = new FsFile
+            //    {
+            //        Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
+            //        Size = fileInfo.Length,
+            //        FileExtension = fileInfo.Extension,
+            //        FullPath = fileInfo.FullName,
+            //        HasParent = true,
+            //        IsHidden = fileInfo.Attributes.HasFlag(FileAttributes.Hidden)
+            //    };
+
+            //    folderEntity.Files.Add(file);
+            //}
+
 
             foreach (var subfolderPath in Directory.EnumerateDirectories(folderPath.Path))
             {
-                var subfolderEntity = new FsFolderEntity();
+                var subfolderEntity = new FsFolder();
                 var directoryInfo = new DirectoryInfo(subfolderPath);
                 subfolderEntity.Name = directoryInfo.Name;
                 subfolderEntity.FullPath = subfolderPath;
-                subfolderEntity.HasParent = directoryInfo.Parent != null;
                 subfolderEntity.IsHidden = directoryInfo.Attributes.HasFlag(FileAttributes.Hidden);
                 subfolderEntity.Size = null;
 
@@ -58,29 +126,29 @@ namespace Ufo.Server.Controllers
             foreach (var filePath in Directory.EnumerateFiles(folderPath.Path))
             {
                 var fileInfo = new FileInfo(filePath);
-                var file = new FsFileEntity
+                var file = new FsFile
                 {
                     Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
                     Size = fileInfo.Length,
                     FileExtension = fileInfo.Extension,
                     FullPath = filePath,
-                    HasParent = true,
                     IsHidden = fileInfo.Attributes.HasFlag(FileAttributes.Hidden)
                 };
 
                 folderEntity.Files.Add(file);
             }
-            var dirInfo = new DirectoryInfo(folderPath.Path);
+
             folderEntity.Name = dirInfo.Name;
             folderEntity.FullPath = folderPath.Path;
-            folderEntity.HasParent = dirInfo.Parent != null;
+            folderEntity.ParentFolder = dirInfo.Parent == null ? null : new FsFolder() { FullPath = dirInfo.Parent?.FullName };
 
             return folderEntity;
         }
 
         [HttpPost("parent")]
-        public async Task<FsFolderEntity> GetParentFolderInfoAsync([FromBody] PathModel folderPath, CancellationToken cancellationToken)
+        public async Task<FsFolder> GetParentFolderInfoAsync([FromBody] PathModel folderPath, CancellationToken cancellationToken)
         {
+            // TODO - Remove it
             // Get subfolders and files
             string parent = new DirectoryInfo(folderPath?.Path)?.Parent?.FullName;
             var pathModel = new PathModel { Path = parent };

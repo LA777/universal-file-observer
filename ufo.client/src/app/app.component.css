@@ -1,15 +1,16 @@
 ﻿:host {
-    max-width: 1280px;
-    padding: 2rem;
+    /* max-width: 1280px; */
+    /* padding: 2rem; */
     text-align: center;
+    width: 100%;
 }
 
 tr:nth-child(even) {
-    background: #F2F2F2;
+    background: #dd7a7a;
 }
 
 tr:nth-child(odd) {
-    background: #FFF;
+    background-color: #5a2727;
 }
 
 th, td {
@@ -19,4 +20,46 @@ th, td {
 
 table {
     margin: 0 auto;
+}
+
+.mat-tab-group {
+    margin: 0px;
+    background-color: rgb(145, 100, 63);
+ }
+
+ .mat-tab-label {
+  min-width: 20px; /* Adjust this value as needed */
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-mdc-tab-label-container {
+  min-width: 20px; /* Adjust this value as needed */
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-mdc-tab-header {
+  min-width: 20px; /* Adjust this value as needed */
+  padding: 0 0px;
+  font-size: 10px;
+  --mdc-secondary-navigation-tab-container-height: 12px;
+}
+
+.mat-mdc-tab-labels {
+  min-width: 20px; /* Adjust this value as needed */
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-mdc-tab-list {
+  min-width: 20px; /* Adjust this value as needed */
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-tab-header {
+  &.mat-mdc-tab-header {
+    --mdc-secondary-navigation-tab-container-height: 12px;
+  }
 }

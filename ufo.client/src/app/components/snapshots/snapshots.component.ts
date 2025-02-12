@@ -1,10 +1,10 @@
 import { Component, OnInit, Injectable, ElementRef, ViewChild, ViewContainerRef, Output, EventEmitter } from '@angular/core';
 import { Overlay, OverlayRef } from '@angular/cdk/overlay';
-import { HttpClient } from '@angular/common/http';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { Snapshot, StorageDrive, VolumeInfo } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-snapshots',
@@ -21,11 +21,18 @@ export class SnapshotsComponent implements OnInit {
   @ViewChild('tooltipOrigin') tooltipOrigin: ElementRef;
   @Output() tabChange = new EventEmitter<number>();
   //@Output() snapshotChange = new EventEmitter<Snapshot>();
+private subscriptionAllSnapshots: Subscription;
 
-  constructor(private http: HttpClient, private _liveAnnouncer: LiveAnnouncer, private snapshotService: SnapshotService) {}
+  constructor(private _liveAnnouncer: LiveAnnouncer, private snapshotService: SnapshotService) {}
 
   ngOnInit() {
     this.getAllSnapshots(); // with backend
+  }
+
+  ngOnDestroy() {
+    if (this.subscriptionAllSnapshots) {
+      this.subscriptionAllSnapshots.unsubscribe();
+    }
   }
 
   // ngAfterViewInit() {
@@ -42,15 +49,16 @@ export class SnapshotsComponent implements OnInit {
   // }
 
   getAllSnapshots() {
-    this.http.get<Snapshot[]>('/api/snapshot/all').subscribe(
-      (result) => {
+    this.subscriptionAllSnapshots = this.snapshotService.getAllSnapshots().subscribe({
+      next: (result) => {
         this.snapshots = result;
         console.log(result);
       },
-      (error) => {
+      error: (error) => {
         console.error(error);
-      }
-    );
+      },
+      complete: () => {}
+    });
   }
 
   getStorageDriveTooltip(element: StorageDrive): string{

@@ -1,4 +1,4 @@
-import { Component, OnInit, Input, ViewChild } from '@angular/core';
+import { Component, OnInit, Input, ViewChild, ViewEncapsulation  } from '@angular/core';
 import { MatTabGroup } from '@angular/material/tabs';
 
 interface WeatherForecast {
@@ -11,7 +11,8 @@ interface WeatherForecast {
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+  styleUrl: './app.component.css',
+  encapsulation: ViewEncapsulation.Emulated
 })
 export class AppComponent implements OnInit {
   public forecasts: WeatherForecast[] = [];

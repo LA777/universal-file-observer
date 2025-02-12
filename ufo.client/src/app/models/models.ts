@@ -6,8 +6,8 @@ export interface FsItem {
   name: string;
   isFile: boolean;
   fullPath: string;
-  hasParent: boolean;
   isHidden: boolean;
+  parentFolder?: Folder;
 }
 
 export interface File extends FsItem {

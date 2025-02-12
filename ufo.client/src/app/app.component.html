@@ -1,19 +1,18 @@
-<h1 id="tableLabel">Hello APP</h1>
-<p>This component demonstrates App.</p>
-
-<mat-tab-group #tabGroup [selectedIndex]="0">
-  <mat-tab label="Files">
-    <app-files></app-files>
-  </mat-tab>
-  <mat-tab label="Snapshots">
-    <app-snapshots (tabChange)="onTabChange($event)"></app-snapshots>
-  </mat-tab>
-  <mat-tab label="Snapshot Tree">
-    <app-snapshot></app-snapshot>
-  </mat-tab>
-  <mat-tab label="Forecast">
-    <app-forecast></app-forecast>
-  </mat-tab>
-  <mat-tab label="About">
-  </mat-tab>
-</mat-tab-group>
+<div>
+  <mat-tab-group #tabGroup [selectedIndex]="0" class="mat-tab-group">
+    <mat-tab label="Files">
+      <app-files></app-files>
+    </mat-tab>
+    <mat-tab label="Snapshots">
+      <app-snapshots (tabChange)="onTabChange($event)"></app-snapshots>
+    </mat-tab>
+    <mat-tab label="Snapshot Tree">
+      <app-snapshot></app-snapshot>
+    </mat-tab>
+    <mat-tab label="Forecast">
+      <app-forecast></app-forecast>
+    </mat-tab>
+    <mat-tab label="About">
+    </mat-tab>
+  </mat-tab-group>
+</div>

@@ -1,3 +1,7 @@
+html {
+  background-color: aquamarine;
+}
+
 .mat-tooltip-storage-drive {
   white-space: pre-line;
   min-width: 400px;
@@ -9,14 +13,24 @@
   width:400px;
 }
 
+.mat-mdc-header-row {
+  background-color: #3f51b5 !important; /* Example: Material blue */
+  color: white !important;
+}
+
 .mat-mdc-row:nth-child(even){
-  background-color: #FFF;
+  background-color: #9fe29e;
 }
 
 .mat-mdc-row:nth-child(odd){
-  background-color: #DDD;
+  background-color: #dfa4a4;
 }
 
 .mat-mdc-row:hover {
   background-color: rgb(129, 172, 233);
+}
+
+.app-root {
+  margin: 0px;
+  /* padding: 0 !important; */
 }

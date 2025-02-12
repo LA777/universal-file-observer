@@ -43,8 +43,8 @@ h3 {
   min-height: 8px;
 }
 
-.mat-icon-rtl-mirror {
-}
+/* .mat-icon-rtl-mirror {
+} */
 
 .folder-tree-panel {
   height: 100%;
@@ -53,7 +53,7 @@ h3 {
   max-width: 90%;
   float: left;
   /* border: red solid 2px; */
-  background-color: rgb(162, 126, 171);
+  background-color: rgb(205, 228, 51);
   /* display: flex; */
   /* flex: 1; */
   /* display: block; */
@@ -73,7 +73,7 @@ h3 {
   width: 100%;
   float: left;
   resize: horizontal;
-  background-color: rgb(138, 142, 142);
+  background-color: rgb(40, 219, 219);
   /* display: block; */
 }
 
@@ -84,7 +84,7 @@ h3 {
 .folder-panel-wrapper {
   height: 600px;
   width: 100%;
-  background-color: rgb(120, 130, 131);
+  background-color: rgb(93, 125, 195);
   display: flex;
 }
 
@@ -93,7 +93,7 @@ table {
 }
 
 th.mat-sort-header-sorted {
-  color: black;
+  color: rgb(63, 95, 69);
 }
 
 .mat-header-row {
@@ -108,3 +108,13 @@ th.mat-sort-header-sorted {
 .mat-cell, .mat-header-cell {
   padding: 0 8px; /* Adjust padding as needed */
 }
+
+.drive-list button
+{
+  margin-right: 5px;
+}
+
+.navigation-buttons button {
+  margin: 5px;
+}
+
