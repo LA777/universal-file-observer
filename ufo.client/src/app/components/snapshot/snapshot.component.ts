@@ -8,9 +8,10 @@ import { Folder, FsItem, SnapshotData, Snapshot } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
 
 @Component({
-  selector: 'app-snapshot',
-  templateUrl: './snapshot.component.html',
-  styleUrl: './snapshot.component.css'
+    selector: 'app-snapshot',
+    templateUrl: './snapshot.component.html',
+    styleUrl: './snapshot.component.css',
+    standalone: false
 })
 @Injectable()
 export class SnapshotComponent implements OnInit {

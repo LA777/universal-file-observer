@@ -7,9 +7,10 @@ import { SnapshotService } from '../../services/snapshot.service';
 import { Subscription } from 'rxjs';
 
 @Component({
-  selector: 'app-snapshots',
-  templateUrl: './snapshots.component.html',
-  styleUrl: './snapshots.component.css'
+    selector: 'app-snapshots',
+    templateUrl: './snapshots.component.html',
+    styleUrl: './snapshots.component.css',
+    standalone: false
 })
 @Injectable()
 export class SnapshotsComponent implements OnInit {

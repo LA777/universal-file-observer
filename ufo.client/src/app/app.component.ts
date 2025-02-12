@@ -9,10 +9,11 @@ interface WeatherForecast {
 }
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
-  encapsulation: ViewEncapsulation.Emulated
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.css',
+    encapsulation: ViewEncapsulation.Emulated,
+    standalone: false
 })
 export class AppComponent implements OnInit {
   public forecasts: WeatherForecast[] = [];

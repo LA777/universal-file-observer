@@ -11,9 +11,10 @@ import { SnapshotService } from '../../services/snapshot.service';
 import { Subscription } from 'rxjs';
 
 @Component({
-  selector: 'app-files',
-  templateUrl: './files.component.html',
-  styleUrl: './files.component.css'
+    selector: 'app-files',
+    templateUrl: './files.component.html',
+    styleUrl: './files.component.css',
+    standalone: false
 })
 @Injectable()
 export class FilesComponent implements OnInit {
