@@ -1,4 +1,4 @@
-import { HttpClientModule } from '@angular/common/http';
+import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
@@ -54,66 +54,58 @@ import { FilesComponent } from './components/files/files.component';
 import { DialogComponent } from './components/dialog/dialog.component';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 
-@NgModule({
-  declarations: [
-    AppComponent,
-    ForecastComponent,
-    SnapshotComponent,
-    SnapshotsComponent,
-    FilesComponent,
-    DialogComponent
-  ],
-  imports: [
-    BrowserModule,
-    HttpClientModule,
-
-    CdkStepperModule,
-    CdkTableModule,
-    CdkTreeModule,
-    DragDropModule,
-    PortalModule,
-    ScrollingModule,
-    OverlayModule,
-
-    //MatAutocompleteModule,
-    //MatBadgeModule,
-    //MatBottomSheetModule,
-    MatButtonModule,
-    MatButtonToggleModule,
-    //MatCardModule,
-    //MatCheckboxModule,
-    //MatChipsModule,
-    //MatStepperModule,
-    //MatDatepickerModule,
-    MatDialogModule,
-    //MatDividerModule,
-    //MatExpansionModule,
-    MatGridListModule,
-    MatIconModule,
-    MatInputModule,
-    MatListModule,
-   // MatMenuModule,
-    MatNativeDateModule,
-    //MatPaginatorModule,
-    //MatProgressBarModule,
-    //MatProgressSpinnerModule,
-    //MatRadioModule,
-    MatRippleModule,
-    MatSelectModule,
-    //MatSidenavModule,
-    //MatSliderModule,
-    //MatSlideToggleModule,
-    //MatSnackBarModule,
-    MatSortModule,
-    MatTableModule,
-    MatTabsModule,
-    //MatToolbarModule,
-    MatTooltipModule,
-    MatTreeModule
-  ],
-  providers: [
-    provideAnimationsAsync()
-  ],
-  bootstrap: [AppComponent]
-})
+@NgModule({ declarations: [
+        AppComponent,
+        ForecastComponent,
+        SnapshotComponent,
+        SnapshotsComponent,
+        FilesComponent,
+        DialogComponent
+    ],
+    bootstrap: [AppComponent], imports: [BrowserModule,
+        CdkStepperModule,
+        CdkTableModule,
+        CdkTreeModule,
+        DragDropModule,
+        PortalModule,
+        ScrollingModule,
+        OverlayModule,
+        //MatAutocompleteModule,
+        //MatBadgeModule,
+        //MatBottomSheetModule,
+        MatButtonModule,
+        MatButtonToggleModule,
+        //MatCardModule,
+        //MatCheckboxModule,
+        //MatChipsModule,
+        //MatStepperModule,
+        //MatDatepickerModule,
+        MatDialogModule,
+        //MatDividerModule,
+        //MatExpansionModule,
+        MatGridListModule,
+        MatIconModule,
+        MatInputModule,
+        MatListModule,
+        // MatMenuModule,
+        MatNativeDateModule,
+        //MatPaginatorModule,
+        //MatProgressBarModule,
+        //MatProgressSpinnerModule,
+        //MatRadioModule,
+        MatRippleModule,
+        MatSelectModule,
+        //MatSidenavModule,
+        //MatSliderModule,
+        //MatSlideToggleModule,
+        //MatSnackBarModule,
+        MatSortModule,
+        MatTableModule,
+        MatTabsModule,
+        //MatToolbarModule,
+        MatTooltipModule,
+        MatTreeModule], providers: [
+        provideAnimationsAsync(),
+        provideHttpClient(withInterceptorsFromDi())
+    ] })
 export class AppModule { }
