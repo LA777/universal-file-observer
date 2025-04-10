@@ -7,10 +7,20 @@ How to run:
 
 
 
+Material tree
+https://www.geeksforgeeks.org/angular-material-tree/
+https://material.angular.io/components/tree/overview
+https://material.angular.io/components/tree/examples
 
+https://stackblitz.com/edit/mat-tree?file=app%2Ftree-flat-overview-example.html
+https://github.com/jamesonsaunders/mat-tree-simple/blob/master/src/app/app.component.html
+
+https://medium.com/@vag/angular-material-tree-26adccadc63b
+https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
++ optimize JSON view - folder name at bottom
 - Finish FolderTree component
 - Search inside Snapshot/Snapshots
 - Add Spinner while data is loading

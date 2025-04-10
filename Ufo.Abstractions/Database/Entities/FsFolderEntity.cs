@@ -1,6 +1,6 @@
-﻿using Newtonsoft.Json;
-using SQLite;
+﻿using SQLite;
 using SQLiteNetExtensions.Attributes;
+using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Database.Entities
 {
@@ -11,9 +11,11 @@ namespace Ufo.Abstractions.Database.Entities
         [ManyToMany(typeof(FoldersToFoldersEntity))]
         public IList<SnapshotEntity> Snapshots { get; set; } = new List<SnapshotEntity>();
 
+        [JsonPropertyOrder(100)]
         [ManyToMany(typeof(FilesToFoldersEntity))]
         public  IList<FsFileEntity> Files { get; set; } = new List<FsFileEntity>();
 
+        [JsonPropertyOrder(99)]
         [ManyToMany(typeof(FoldersToFoldersEntity))]
         public  IList<FsFolderEntity> ChildFolders { get; set; } = new List<FsFolderEntity>();
 

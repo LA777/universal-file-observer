@@ -6,8 +6,8 @@ using Ufo.Abstractions.Options;
 using Ufo.Database.Extensions;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
-using Microsoft.AspNetCore.Mvc.NewtonsoftJson;
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 
 Console.WriteLine("App started. Version: 0.0.1");
 
@@ -29,19 +29,12 @@ builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
 builder.Services.AddTransient<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
 DependencyExtension.AddDataLayer(builder.Services);
 
-
-
 builder.Services.AddControllers()
-    .AddNewtonsoftJson((options) => {
-        options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
-        options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore;
-        options.SerializerSettings.ContractResolver = new Newtonsoft.Json.Serialization.CamelCasePropertyNamesContractResolver();
+    .AddJsonOptions((options) => {
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
-    //.AddJsonOptions(options =>
-    //{
-    //   // options.JsonSerializerOptions.Loop
-    //});
-
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
