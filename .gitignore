@@ -397,4 +397,4 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 /ufo.client/package-lock.json
-/Ufo.Server/indexed-file-system.db
+*.db

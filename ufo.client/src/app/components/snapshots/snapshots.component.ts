@@ -1,10 +1,13 @@
-import { Component, OnInit, Injectable, ElementRef, ViewChild, ViewContainerRef, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Injectable, ElementRef, ViewChild, ViewContainerRef, Output, EventEmitter, Input } from '@angular/core';
 import { Overlay, OverlayRef } from '@angular/cdk/overlay';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
-import { Snapshot, StorageDrive, VolumeInfo } from '../../models/models';
+import { Snapshot, StorageDrive, VolumeInfo, DialogData } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
+import { MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
+import { TabChangeService } from '../../services/tab-change.service';
+import { DialogComponent } from '../dialog/dialog.component';
 
 @Component({
     selector: 'app-snapshots',
@@ -15,24 +18,36 @@ import { Subscription } from 'rxjs';
 @Injectable()
 export class SnapshotsComponent implements OnInit {
   public snapshots: Snapshot[];
-  displayedColumns: string[] = ['PcName', 'StorageDriveName', 'VolumeDriveLetter', 'SnapshotGuid', 'SnapshotTimestamp', 'RootFolderName', 'RootFolderSize'];
+  displayedColumns: string[] = ['PcName', 'StorageDriveName', 'VolumeDriveLetter', 'SnapshotId', 'SnapshotTimestamp', 'RootFolderName', 'RootFolderSize'];
   data: StorageDrive[] = [];
   isOpen = false;
+  selectedSnapshot: Snapshot;
+  @Input() tabIndex: number;
+  private tabChangeSubscription: Subscription;
 
   @ViewChild('tooltipOrigin') tooltipOrigin: ElementRef;
   @Output() tabChange = new EventEmitter<number>();
   //@Output() snapshotChange = new EventEmitter<Snapshot>();
 private subscriptionAllSnapshots: Subscription;
 
-  constructor(private _liveAnnouncer: LiveAnnouncer, private snapshotService: SnapshotService) {}
+  constructor(private _liveAnnouncer: LiveAnnouncer, private snapshotService: SnapshotService, private tabChangeService: TabChangeService, public dialog: MatDialog) {}
 
   ngOnInit() {
+    this.tabChangeSubscription = this.tabChangeService.tabChanged$.subscribe(index => {
+      if (index === this.tabIndex) {
+        this.getAllSnapshots();
+      }
+    });
     this.getAllSnapshots(); // with backend
   }
 
   ngOnDestroy() {
     if (this.subscriptionAllSnapshots) {
       this.subscriptionAllSnapshots.unsubscribe();
+    }
+
+    if (this.tabChangeSubscription) {
+      this.tabChangeSubscription.unsubscribe();
     }
   }
 
@@ -62,6 +77,40 @@ private subscriptionAllSnapshots: Subscription;
     });
   }
 
+  selectSnapshot(snapshot: Snapshot){
+    this.selectedSnapshot = snapshot;
+  }
+
+  showInfoDialog(result: any){
+    const dialogData: DialogData = {
+      title: 'Info',
+      message: result
+    };
+    this.dialog.open(DialogComponent, { data: dialogData });
+    console.log(result);
+  }
+
+  showErrorDialog(error: any){
+    const dialogData: DialogData = {
+      title: 'Error',
+      message: error.error
+    };
+    this.dialog.open(DialogComponent, { data: dialogData });
+    console.error(error);
+  }
+
+  deleteSnapshot(id: string){
+    this.subscriptionAllSnapshots = this.snapshotService.deleteSnapshot(id).subscribe({
+      next: (result) => {
+        console.log(result);
+      },
+      error: (error) => {
+        console.error(error);
+      },
+      complete: () => {}
+    });
+  }
+
   getStorageDriveTooltip(element: StorageDrive): string{
     return `Device ID: ${element.deviceId}\r\n
             Serial number: ${element.serialNumber}\r\n
@@ -81,7 +130,7 @@ private subscriptionAllSnapshots: Subscription;
   }
 
   onRowDoubleClick(snapshot: Snapshot){
-    console.log("onRowDoubleClick - SnapshotsComponent " + snapshot.guid);
+    console.log("onRowDoubleClick - SnapshotsComponent " + snapshot.id);
     this.tabChange.emit(2);
     this.snapshotService.setSnapshot(snapshot);
   }

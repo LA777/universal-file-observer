@@ -1,20 +1,26 @@
-﻿using SQLite;
+﻿using Cysharp.Serialization.Json;
+using SQLite;
 using SQLiteNetExtensions.Attributes;
+using System.Text.Json.Serialization;
 
-namespace Ufo.Abstractions.Database.Entities
+namespace Ufo.Abstractions.Database.Entities;
+
+[Table("Snapshots")]
+public class SnapshotEntity
 {
-    [Table("Snapshots")]
-    public class SnapshotEntity
-    {
-        [PrimaryKey]
-        public Guid Guid { get; set; } = Guid.NewGuid();
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(0)]
+    [PrimaryKey]
+    public Ulid Id { get; set; } = Ulid.NewUlid();
 
-        public DateTime Timestamp { get; set; } = DateTime.Now;
+    [JsonPropertyOrder(5)]
+    public DateTime Timestamp { get; set; } = DateTime.Now;
 
-        [OneToOne(nameof(FsFolderEntity))]
-        public FsFolderEntity RootFolder { get; set; }
+    [JsonPropertyOrder(10)]
+    [OneToOne(nameof(FsFolderEntity))]
+    public FsFolderEntity? RootFolder { get; set; }
 
-        [OneToOne(nameof(VolumeInfoEntity))]
-        public VolumeInfoEntity VolumeInfo { get; set; }
-    }
+    [JsonPropertyOrder(20)]
+    [OneToOne(nameof(VolumeInfoEntity))]
+    public VolumeInfoEntity? VolumeInfo { get; set; }
 }

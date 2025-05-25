@@ -1,4 +1,4 @@
-﻿namespace Ufo.Server.Models;
+﻿namespace Ufo.Abstractions.Responses;
 
 public class FileSystemRoot
 {

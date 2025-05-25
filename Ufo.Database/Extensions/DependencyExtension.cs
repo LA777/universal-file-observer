@@ -1,29 +1,32 @@
 ﻿using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Ufo.Abstractions.Database.Repositories;
+using Ufo.Database.Contexts;
 using Ufo.Database.Handlers;
 using Ufo.Database.Repositories;
 
-namespace Ufo.Database.Extensions
+namespace Ufo.Database.Extensions;
+
+public static class DependencyExtension
 {
-    public static class DependencyExtension
+    public static async Task AddDataLayerAsync(IServiceCollection services, string? connectionString)
     {
-        public static void AddDataLayer(IServiceCollection services)
-        {
-            //services.AddScoped<IFileSystemSqLiteRepository>(serviceProvider =>
-            //{
-            //    var logger = serviceProvider.GetService<ILogger<FileSystemSqLiteRepository>>();
-            //    var dapperDataContext = new FileSystemSqLiteRepository(connectionString, logger);
+        services.AddScoped<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
 
-            //    return dapperDataContext;
-            //});
+        SqlMapper.AddTypeHandler(new SqlUlidTypeHandler());
+        SqlMapper.AddTypeHandler(new SqlNullableUlidTypeHandler());
+        //SqlMapper.AddTypeHandler(new SqlGuidTypeHandler());
+        //SqlMapper.AddTypeHandler(new SqlNullableGuidTypeHandler());
+        //SqlMapper.RemoveTypeMap(typeof(Guid));
+        //SqlMapper.RemoveTypeMap(typeof(Guid?));
+        SqlMapper.RemoveTypeMap(typeof(Ulid));
+        SqlMapper.RemoveTypeMap(typeof(Ulid?));
 
-            services.AddScoped<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
 
-            SqlMapper.AddTypeHandler(new SqlGuidTypeHandler());
-            SqlMapper.AddTypeHandler(new SqlNullableGuidTypeHandler());
-            SqlMapper.RemoveTypeMap(typeof(Guid));
-            SqlMapper.RemoveTypeMap(typeof(Guid?));
-        }
+        var Tim = TimeProvider.System.GetUtcNow();
+
+
+
+        await DapperDataContext.InitiateDatabaseAsync(connectionString);
     }
 }

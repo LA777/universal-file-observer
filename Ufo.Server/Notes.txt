@@ -20,23 +20,31 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
+- Add Indexes to DB
++ Use ULID instead of Guid
+- Fix - Create Snapshot
+- Delete Snapshot
+- Delete Snapshot Folder
+- Delete Snapshot File
 + optimize JSON view - folder name at bottom
-- Finish FolderTree component
+- [UI] Finish FolderTree Angular component
+- [UI] Change UI for Snapshot Tree MatTree
 - Search inside Snapshot/Snapshots
-- Add Spinner while data is loading
-+ Split Entites (Entity for DB and Entity for UI)
+- [UI] Add Spinner while data is loading
+- Split Entites (Entity for DB and Entity for UI)
 - Split Entites (UI)
-- Make Snapshot tree browsable
++ [UI] Make Snapshot tree browsable
 - add PIN to enter the APP
 - add Encryption for all fields in DB
-- Remove Forecast Controller and UI tab
-- Create navigation for Forward and Backward
-- Ability to edit text files
-- Ability to View Photo, Video nd TXT files
-- Ability to Download files
-- Copy, Move, Delete files
-- View file Hash
-- Make Two panel file view
+- [UI] Remove Forecast Controller and UI tab
+- [UI] Create navigation for Forward and Backward
+- [UI] Ability to edit text files
+- [UI] Ability to View Photo, Video and TXT files
+- [UI] Ability to Download files
+- [UI] Copy, Move, Delete files
+- [UI] View file Hash
+- [UI] Make Two panel file view
+- Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 
 
 
@@ -46,6 +54,128 @@ DirectoryNotFoundException
 
 
 Windows LINK/DIR https://stackoverflow.com/questions/1485155/check-if-a-file-is-real-or-a-symbolic-link
+
+
+
+
+
+
+
+
+
+
+-------------------------------------------------------------------------------
+
+https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Image_types
+
+
+
+.apng, .png
+image/apng
+
+
+.avif
+image/avif
+
+.gif
+image/gif
+
+
+
+.jpg, .jpeg, .jfif, .pjpeg, .pjp
+image/jpeg
+
+
+.png
+image/png
+
+
+.svg
+image/svg+xml
+
+
+.webp
+image/webp
+
+
+.bmp
+image/bmp
+
+
+.tif, .tiff
+image/tiff
+
+
+
+HTTP
+image/apng: Animated Portable Network Graphics (APNG)
+image/avif : AV1 Image File Format (AVIF)
+image/gif: Graphics Interchange Format (GIF)
+image/jpeg: Joint Photographic Expert Group image (JPEG)
+image/png: Portable Network Graphics (PNG)
+image/svg+xml: Scalable Vector Graphics (SVG)
+image/webp: Web Picture format (WEBP)
+
+
+
+
+'.gif','.jpeg','.jpg','.png','.webp','.bmp','.jfif'
+,'.psd'
+
+
+-------------------------------------------------------------------------------
+
+https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Formats/Containers
+https://www.iana.org/assignments/media-types/media-types.xhtml#video
+
+.3gp
+video/3gpp
+video/3gpp2
+video/3gp2
+
+
+.mpg
+.mpeg
+video/mpeg
+
+
+.mp4
+.m4v
+.m4p
+video/mp4
+
+.ogv
+.ogg
+video/ogg
+
+.mov
+video/quicktime
+
+
+.webm
+video/webm
+
+
+
+'.mkv','.mov','.mp4','.wmv','.webm','.m4v'
+
+
+'.pdf'
+'.htm','.html','.ini',
+
+
+
+
+<video controls width="250" height="200" muted>
+  <source src="/shared-assets/videos/flower.webm" type="video/webm" />
+  <source src="/shared-assets/videos/flower.mp4" type="video/mp4" />
+  Download the
+  <a href="/shared-assets/videos/flower.webm">WEBM</a>
+  or
+  <a href="/shared-assets/videos/flower.mp4">MP4</a>
+  video.
+</video>
+
 
 
 

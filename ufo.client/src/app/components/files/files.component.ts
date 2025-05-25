@@ -9,6 +9,7 @@ import { DialogComponent } from '../dialog/dialog.component';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { Subscription } from 'rxjs';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
 @Component({
     selector: 'app-files',
@@ -29,12 +30,18 @@ export class FilesComponent implements OnInit {
   selectedFolder: Folder;
   folderData: FsItem[];
   displayedColumns: string[] = ['Name', 'Extension', 'Size'];
+  isFilesView: boolean = true;
+  isVideosView: boolean = false;
+  isImagesView: boolean = false;
+  videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.flv', '.mkv', '.m4v'];
+  imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'];
   private subscriptionRoot: Subscription;
   private subscriptionFolder: Subscription;
   private subscriptionCreateSnapshot: Subscription;
 
   constructor(private renderer: Renderer2, private _liveAnnouncer: LiveAnnouncer,
-    public dialog: MatDialog, private fileService: FileService, private snapshotService: SnapshotService) {}
+    public dialog: MatDialog, private fileService: FileService, private snapshotService: SnapshotService,
+    private sanitizer: DomSanitizer) {}
 
   ngOnInit() {
     this.getRoot();
@@ -86,7 +93,7 @@ export class FilesComponent implements OnInit {
         isFile: false,
         fileExtension: '<DIR>',
         sha256Hash: '',
-        guid: '',
+        id: '',
         fullPath: folder.fullPath,
         isHidden: false,
         parentFolder: folder?.parentFolder
@@ -101,7 +108,7 @@ export class FilesComponent implements OnInit {
         isFile: false,
         fileExtension: '<DIR>',
         sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
+        id: element?.id,
         fullPath: element.fullPath,
         isHidden: element?.isHidden,
         parentFolder: element?.parentFolder
@@ -116,7 +123,7 @@ export class FilesComponent implements OnInit {
         isFile: true,
         fileExtension: element.fileExtension,
         sha256Hash: element?.sha256Hash,
-        guid: element?.guid,
+        id: element?.id,
         fullPath: element.fullPath,
         isHidden: element?.isHidden,
         parentFolder: element?.parentFolder
@@ -149,6 +156,92 @@ export class FilesComponent implements OnInit {
       },
       complete: () => {}
     });
+  }
+
+  enableFilesView() {
+    this.isFilesView = true;
+    this.isVideosView = false;
+    this.isImagesView = false;
+  }
+
+  enableVideosView() {
+    this.isFilesView = false;
+    this.isVideosView = true;
+    this.isImagesView = false;
+  }
+
+  enableImagesView() {
+    this.isFilesView = false;
+    this.isVideosView = false;
+    this.isImagesView = true;
+  }
+
+  isVideoFile(fsItem: FsItem): boolean {
+    if(this.isVideosView === false){
+      return false;
+    }
+
+    if (fsItem.fileExtension) {
+      return this.videoExtensions.includes(fsItem.fileExtension.toLowerCase());
+    }
+
+    return false;
+  }
+
+  isImageFile(fsItem: FsItem): boolean {
+    if(this.isImagesView === false){
+      return false;
+    }
+
+    if (fsItem.fileExtension) {
+      return this.imageExtensions.includes(fsItem.fileExtension.toLowerCase());
+    }
+
+    return false;
+  }
+
+  getVideoFileUri(fsItem: FsItem){
+    let baseUrl = window.location.origin;
+    const encodedFilename = encodeURIComponent(fsItem.fullPath);
+    let fullApiUrl = `https://localhost:44394/api/video?filePath=${encodedFilename}`;
+
+    return this.sanitizer.bypassSecurityTrustResourceUrl(fullApiUrl);
+  }
+
+  getVideoMimeType(fsItem: FsItem){
+    const lastDotIndex = fsItem.fullPath.lastIndexOf('.');
+    if (lastDotIndex === -1) {
+      return 'application/octet-stream'; // Default or unknown type
+    }
+
+    const extension = fsItem.fullPath.substring(lastDotIndex).toLowerCase(); // ".mp4", ".webm", etc.
+
+    switch (extension) {
+      case '.3gp':
+        return 'video/3gp2';
+      case '.avi': // AVI
+        return 'video/x-msvideo';
+      case '.mpg':
+      case '.mpeg':
+        return 'video/mpeg';
+      case '.mp4':
+      case '.m4v':
+      case '.m4p':
+        return 'video/mp4';
+      case '.ogg':
+      case '.ogv':
+        return 'video/ogg';
+      case '.mov': // QuickTime
+        return 'video/quicktime';
+      case '.mkv':
+      case '.webm':
+        return 'video/webm';
+      // Add more as needed
+      default:
+        // Log a warning if you encounter an unexpected extension
+        console.warn(`Unknown video extension: ${extension}. Defaulting to 'application/octet-stream'.`);
+        return 'application/octet-stream'; // A generic binary type
+    }
   }
 
   onRowDoubleClick(fsItem: FsItem) {

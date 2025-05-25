@@ -1,12 +1,12 @@
 export interface FsItem {
-  fileExtension: string;
+  id: string;
+  name: string;
   size?: number;
   sha256Hash: string;
-  guid: string;
-  name: string;
   isFile: boolean;
   fullPath: string;
   isHidden: boolean;
+  fileExtension: string;
   parentFolder?: Folder;
 }
 
@@ -19,7 +19,7 @@ export interface Folder extends FsItem  {
 }
 
 export interface Volume {
-  guid: string;
+  id: string;
   driveLetter: string;
   volumeName: string;
   description: string;
@@ -29,7 +29,7 @@ export interface Volume {
 }
 
 export interface StorageDrive {
-  guid: string;
+  id: string;
   name: string;
   deviceId: string;
   serialNumber: string;
@@ -41,22 +41,22 @@ export interface StorageDrive {
 }
 
 export interface Pc {
-  guid: string;
+  id: string;
   name: string;
 }
 
 export interface Snapshot {
-  guid: string;
+  id: string;
   timestamp: string;
   rootFolder: Folder;
   volumeInfo: VolumeInfo;
 }
 
 export interface VolumeInfo {
-  guid: string;
+  id: string;
   freeSpace: number;
   driveStatus: string;
-  volumeGuid: string;
+  volumeId: string;
   volume: Volume;
 };
 

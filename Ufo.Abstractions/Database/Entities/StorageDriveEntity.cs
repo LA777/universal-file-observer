@@ -1,106 +1,133 @@
-﻿using Newtonsoft.Json;
+﻿using Cysharp.Serialization.Json;
 using SQLite;
 using SQLiteNetExtensions.Attributes;
+using System.Text.Json.Serialization;
 
-namespace Ufo.Abstractions.Database.Entities
+namespace Ufo.Abstractions.Database.Entities;
+
+[Table("StorageDrives")]
+public class StorageDriveEntity: EntityBase
 {
-    [Table("StorageDrives")]
-    public class StorageDriveEntity: EntityBase
-    {
-        [MaxLength(128)]
-        public string DeviceId { get; set; } = string.Empty;
+    [JsonPropertyOrder(10)]
+    [MaxLength(128)]
+    public string DeviceId { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string SerialNumber { get; set; } = string.Empty;
+    [JsonPropertyOrder(15)]
+    [MaxLength(128)]
+    public string SerialNumber { get; set; } = string.Empty;
 
-        public long TotalSize { get; set; }
+    [JsonPropertyOrder(20)]
+    public long TotalSize { get; set; }
 
-        [MaxLength(128)]
-        public string Description { get; set; } = string.Empty;
+    [JsonPropertyOrder(25)]
+    [MaxLength(128)]
+    public string Description { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string MediaType { get; set; } = string.Empty;
+    [JsonPropertyOrder(30)]
+    [MaxLength(128)]
+    public string MediaType { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string InterfaceType { get; set; } = string.Empty;
+    [JsonPropertyOrder(35)]
+    [MaxLength(128)]
+    public string InterfaceType { get; set; } = string.Empty;
 
-        [ManyToMany(typeof(PcsToStorageDrivesEntity))]
-        public IList<PcEntity> Pcs { get; set; } = new List<PcEntity>();
+    [JsonPropertyOrder(40)]
+    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    public IList<PcEntity> Pcs { get; set; } = [];
 
-        [JsonIgnore]
-        [ManyToMany(typeof(PcsToStorageDrivesEntity))]
-        public IList<SnapshotEntity> Snapshots { get; set; } = new List<SnapshotEntity>();
+    [JsonIgnore]
+    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    public IList<SnapshotEntity> Snapshots { get; set; } = [];
 
-        [JsonIgnore]
-        [OneToMany]
-        public IList<VolumeEntity> Volumes { get; set; } = new List<VolumeEntity>();
-    }
+    [JsonIgnore]
+    [OneToMany]
+    public IList<VolumeEntity> Volumes { get; set; } = [];
+}
 
-    [Table("Volumes")]
-    public class VolumeEntity
-    {
-        [PrimaryKey]
-        public Guid Guid { get; set; } = Guid.NewGuid();
+[Table("Volumes")]
+public class VolumeEntity
+{
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(0)]
+    [PrimaryKey]
+    public Ulid Id { get; set; } = Ulid.NewUlid();
 
-        [MaxLength(10)]
-        public string DriveLetter { get; set; } = string.Empty;
+    [JsonPropertyOrder(5)]
+    [MaxLength(10)]
+    public string DriveLetter { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string VolumeName { get; set; } = string.Empty;
+    [JsonPropertyOrder(10)]
+    [MaxLength(128)]
+    public string VolumeName { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string Description { get; set; } = string.Empty;
+    [JsonPropertyOrder(15)]
+    [MaxLength(128)]
+    public string Description { get; set; } = string.Empty;
 
-        [MaxLength(128)]
-        public string VolumeSerialNumber { get; set; } = string.Empty;
+    [JsonPropertyOrder(20)]
+    [MaxLength(128)]
+    public string VolumeSerialNumber { get; set; } = string.Empty;
 
-        public long VolumeSize { get; set; }
+    [JsonPropertyOrder(25)]
+    public long VolumeSize { get; set; }
 
-        [JsonIgnore]
-        [ForeignKey(typeof(StorageDriveEntity))]
-        public Guid StorageDriveGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonIgnore]
+    [ForeignKey(typeof(StorageDriveEntity))]
+    public Ulid StorageDriveId { get; set; }
 
-        public StorageDriveEntity StorageDrive { get; set; }
+    [JsonPropertyOrder(100)]
+    public StorageDriveEntity? StorageDrive { get; set; }
 
-        [JsonIgnore]
-        [OneToMany]
-        public IList<VolumeInfoEntity> VolumeInfos { get; set; } = new List<VolumeInfoEntity>();
-    }
+    [JsonIgnore]
+    [OneToMany]
+    public IList<VolumeInfoEntity> VolumeInfos { get; set; } = [];
+}
 
-    [Table("VolumeInfos")]
-    public class VolumeInfoEntity
-    {
-        [PrimaryKey]
-        public Guid Guid { get; set; } = Guid.NewGuid();
+[Table("VolumeInfos")]
+public class VolumeInfoEntity
+{
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(0)]
+    [PrimaryKey]
+    public Ulid Id { get; set; } = Ulid.NewUlid();
 
-        public long FreeSpace { get; set; }
+    [JsonPropertyOrder(5)]
+    public long FreeSpace { get; set; }
 
-        [MaxLength(128)]
-        public string DriveStatus { get; set; } = string.Empty;
+    [JsonPropertyOrder(10)]
+    [MaxLength(128)]
+    public string DriveStatus { get; set; } = string.Empty;
 
-        [ForeignKey(typeof(VolumeEntity))]
-        public Guid VolumeGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(99)]
+    [ForeignKey(typeof(VolumeEntity))]
+    public Ulid VolumeId { get; set; }
 
-        public VolumeEntity Volume { get; set; }
+    [JsonPropertyOrder(100)]
+    public VolumeEntity? Volume { get; set; }
 
-        [JsonIgnore]
-        [ForeignKey(typeof(SnapshotEntity))]
-        public Guid SnapshotGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonIgnore]
+    [ForeignKey(typeof(SnapshotEntity))]
+    public Ulid SnapshotId { get; set; }
 
-        [JsonIgnore]
-        public SnapshotEntity Snapshot { get; set; }
-    }
+    [JsonIgnore]
+    public SnapshotEntity? Snapshot { get; set; }
+}
 
-    [Table("PcsToStorageDrives")]
-    public class PcsToStorageDrivesEntity
-    {
-        [ForeignKey(typeof(SnapshotEntity))]
-        public Guid SnapshotGuid { get; set; }
+[Table("PcsToStorageDrives")]
+public class PcsToStorageDrivesEntity
+{
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(SnapshotEntity))]
+    public Ulid SnapshotId { get; set; }
 
-        [ForeignKey(typeof(PcEntity))]
-        public Guid PcGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(PcEntity))]
+    public Ulid PcId { get; set; }
 
-        [ForeignKey(typeof(StorageDriveEntity))]
-        public Guid StorageDriveGuid { get; set; }
-    }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(StorageDriveEntity))]
+    public Ulid StorageDriveId { get; set; }
 }

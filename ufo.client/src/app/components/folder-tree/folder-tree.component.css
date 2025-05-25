@@ -1,58 +1,3 @@
-.explorer-container {
-  display: flex;
-  height: 100vh; /* Or adjust as needed */
-}
-
-.tree-container {
-  width: 35%;
-  border-right: 1px solid #ccc;
-  overflow-y: auto;
-}
-
-.file-list-container {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-}
-
-.file-tree {
-  padding: 16px;
-}
-
-.mat-tree-node {
-  cursor: pointer;
-}
-
-.tree-nested {
-  padding-left: 20px;
-}
-
-.file-table {
-  width: 100%;
-}
-
-table {
-    border-collapse: collapse;
-}
-
-th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-
-th {
-    background-color: #f2f2f2;
-}
-
-
-
-
-
-
-
-
-
 /* ... (your existing CSS) ... */
 
 .loading-indicator {
@@ -179,8 +124,3 @@ th {
   max-width: 24px;
   padding: 0px;
 }
-
-
-
-
-

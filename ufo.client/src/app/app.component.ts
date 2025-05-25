@@ -1,5 +1,8 @@
-import { Component, OnInit, Input, ViewChild, ViewEncapsulation  } from '@angular/core';
+import { Component, OnInit, Input, ViewChild, ViewEncapsulation, ViewChildren, QueryList } from '@angular/core';
 import { MatTabGroup } from '@angular/material/tabs';
+import { MatTabChangeEvent } from '@angular/material/tabs';
+import { TabChangeService } from './services/tab-change.service';
+import { SnapshotComponent } from './components/snapshot/snapshot.component';
 
 interface WeatherForecast {
   date: string;
@@ -20,13 +23,21 @@ export class AppComponent implements OnInit {
   title = 'ufo.client';
   @Input() selectedIndex: number | 0;// The index of the active tab.
   @ViewChild('tabGroup') tabGroup: MatTabGroup;
+  @ViewChildren(SnapshotComponent) tabComponents: QueryList<SnapshotComponent>;
 
-  constructor() {}
+  constructor(private tabChangeService: TabChangeService) {}
 
   ngOnInit() {
   }
 
-  onTabChange(index: number) {
+  tabChange(index: number) {
     this.tabGroup.selectedIndex = index;
+  }
+
+  onTabChange(index: number) {
+    const selectedTabComponent = this.tabComponents.toArray()[index];
+    if (selectedTabComponent && selectedTabComponent.getLatestSnapshot) {
+      selectedTabComponent.getLatestSnapshot();
+    }
   }
 }

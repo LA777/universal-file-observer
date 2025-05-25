@@ -1,7 +1,7 @@
 ﻿using SQLite;
 using Ufo.Abstractions.Database.Entities;
 
-namespace Ufo.Server.Models;
+namespace Ufo.Abstractions.Responses;
 
 public class FsFolder : FsItem
 {

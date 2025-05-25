@@ -1,18 +1,22 @@
-﻿using SQLite;
+﻿using Cysharp.Serialization.Json;
+using SQLite;
 using SQLiteNetExtensions.Attributes;
+using System.Text.Json.Serialization;
 
-namespace Ufo.Abstractions.Database.Entities
+namespace Ufo.Abstractions.Database.Entities;
+
+[Table("FilesToFolders")]
+public class FilesToFoldersEntity
 {
-    [Table("FilesToFolders")]
-    public class FilesToFoldersEntity
-    {
-        [ForeignKey(typeof(SnapshotEntity))]
-        public Guid SnapshotGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(SnapshotEntity))]
+    public Ulid SnapshotId { get; set; }
 
-        [ForeignKey(typeof(FsFolderEntity))]
-        public Guid FolderGuid { get; set; }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(FsFolderEntity))]
+    public Ulid FolderId { get; set; }
 
-        [ForeignKey(typeof(FsFileEntity))]
-        public Guid FileGuid { get; set; }
-    }
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [ForeignKey(typeof(FsFileEntity))]
+    public Ulid FileId { get; set; }
 }

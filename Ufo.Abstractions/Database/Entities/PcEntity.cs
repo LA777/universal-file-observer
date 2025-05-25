@@ -1,18 +1,19 @@
-﻿using Newtonsoft.Json;
-using SQLite;
+﻿using SQLite;
 using SQLiteNetExtensions.Attributes;
+using System.Text.Json.Serialization;
 
-namespace Ufo.Abstractions.Database.Entities
+namespace Ufo.Abstractions.Database.Entities;
+
+[Table("Pcs")]
+public class PcEntity : EntityBase
 {
-    [Table("Pcs")]
-    public class PcEntity : EntityBase
-    {
-        [JsonIgnore]
-        [ManyToMany(typeof(PcsToStorageDrivesEntity))]
-        public IList<StorageDriveEntity> StorageDrives { get; set; } = new List<StorageDriveEntity>();
+    [JsonPropertyOrder(80)]
+    [JsonIgnore]
+    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    public IList<StorageDriveEntity> StorageDrives { get; set; } = [];
 
-        [JsonIgnore]
-        [ManyToMany(typeof(PcsToStorageDrivesEntity))]
-        public IList<SnapshotEntity> Snapshots { get; set; } = new List<SnapshotEntity>();
-    }
+    [JsonPropertyOrder(90)]
+    [JsonIgnore]
+    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    public IList<SnapshotEntity> Snapshots { get; set; } = [];
 }

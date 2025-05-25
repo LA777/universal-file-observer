@@ -1,4 +1,15 @@
-<p>Snapshot works!</p>
+<div *ngIf="selectedSnapshot">
+  <div>Snapshot root folder: [{{selectedSnapshot.rootFolder.name}}] Snapshot ID: [{{selectedSnapshot.id}}]</div>
+</div>
+<div class="buttons-list">
+
+  <button [disabled]="!selectedSnapshot" title="" (click)="deleteSnapshot(selectedSnapshot.id)">Delete
+    Snapshot</button>
+
+</div>
+
+
+
 <p *ngIf="!snapshots"><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
 
 
@@ -40,11 +51,11 @@
         </td>
       </ng-container>
 
-      <ng-container matColumnDef="SnapshotGuid">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Guid">
-          Snapshot Guid
+      <ng-container matColumnDef="SnapshotId">
+        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Id">
+          Snapshot Id
         </th>
-        <td mat-cell *matCellDef="let element"> {{element.guid}} </td>
+        <td mat-cell *matCellDef="let element"> {{element.id}} </td>
       </ng-container>
 
       <ng-container matColumnDef="SnapshotTimestamp">
@@ -70,7 +81,8 @@
 
 
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"
+        (click)="selectSnapshot(row)" [style.background-color]="row === selectedSnapshot ? 'cyan' : ''"></tr>
 
     </table>
 

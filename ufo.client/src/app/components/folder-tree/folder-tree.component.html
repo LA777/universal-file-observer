@@ -1,0 +1,74 @@
+<div class="file-explorer-container">
+
+
+
+
+  <!-- [treeControl]="treeControl" -->
+  <mat-tree #tree [dataSource]="dataSource" [childrenAccessor]="childrenAccessor">
+
+    <!-- This is the tree node template for leaf nodes -->
+    <!-- matTreeNodePadding -->
+    <mat-nested-tree-node #treeNode="matNestedTreeNode" *matTreeNodeDef="let node" class="mat-nested-tree-node">
+      <!-- use a disabled button to provide padding for tree leaf -->
+      <!-- <button mat-icon-button disabled></button> -->
+      <div class="leaf-tree">
+        Leaf - {{node.name}}
+      </div>
+
+    </mat-nested-tree-node>
+
+    <!-- This is the tree node template for expandable nodes -->
+    <!-- matTreeNodePadding -->
+    <mat-nested-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodeToggle #treeNode="matNestedTreeNode"
+      [cdkTreeNodeTypeaheadLabel]="node.name" isExpandable class="example-tree-node">
+
+      <div class="mat-tree-node">
+
+        <!-- Button for Expandable Tree item -->
+        <!-- mat-icon-button -->
+        <button matTreeNodeToggle [attr.aria-label]="'Toggle ' + node.name"
+          class="expandable-tree-item-button example-toggle">
+
+          <!-- Icon -->
+          <mat-icon class="mat-icon-rtl-mirror">
+            {{tree.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
+          </mat-icon>
+
+        </button>
+
+        Expandable - {{node.name}}
+      </div>
+      <!-- @if (node.isLoading()) {
+      <mat-progress-bar mode="indeterminate" class="example-tree-progress-bar"></mat-progress-bar>
+      } -->
+
+      <!-- There is inline padding applied to this div using styles.
+          This padding value depends on the mat-icon-button width.  -->
+      <!-- role="group" -->
+      <div [class.example-tree-invisible]="!tree.isExpanded(node)">
+        <ng-container matTreeNodeOutlet></ng-container>
+      </div>
+
+    </mat-nested-tree-node>
+  </mat-tree>
+
+
+
+
+
+  <div class="folder-view">
+    <h3>{{ selectedFolder ? selectedFolder.name : 'No Folder Selected' }}</h3>
+    <p *ngIf="selectedFolder">Full Path: {{ getFullPath(selectedFolder) }}</p>
+
+    <div *ngIf="displayedFiles.length > 0">
+      <h4>Files:</h4>
+      <ul>
+        <li *ngFor="let file of displayedFiles">
+          {{ file.name }} ({{file.size}} bytes)
+        </li>
+      </ul>
+    </div>
+    <p *ngIf="displayedFiles.length === 0 && selectedFolder">No files in this folder.</p>
+  </div>
+
+</div>

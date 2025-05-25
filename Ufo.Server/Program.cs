@@ -1,15 +1,19 @@
+using Cysharp.Serialization.Json;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using Microsoft.OpenApi.Models;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.DataProviders;
 using Ufo.Abstractions.Options;
 using Ufo.Database.Extensions;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
-using System.Text.Json.Serialization;
-using System.Text.Json;
+using Ufo.Server.SchemaFilters;
 
-Console.WriteLine("App started. Version: 0.0.1");
+Console.WriteLine("App started. Version: 0.0.2");
 
 var builder = WebApplication.CreateBuilder(args);
 var environment = builder.Configuration.GetSection("ASPNETCORE_ENVIRONMENT").Value ?? "Production";
@@ -20,25 +24,43 @@ builder.Configuration.AddJsonFile($"appsettings.{environment}.json", optional: t
 var applicationSettings = builder.Configuration.Get<ApplicationSettings>();
 if (applicationSettings == null)
 {
-    throw new ArgumentNullException("ApplicationSettings is null.", nameof(ApplicationSettings));
+    throw new ArgumentNullException(nameof(ApplicationSettings), "ApplicationSettings is null.");
 }
 
+builder.Services.Configure<DatabaseOptions>(options =>
+{
+    options.ConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+});
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
 builder.Services.AddTransient<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
-DependencyExtension.AddDataLayer(builder.Services);
+await DependencyExtension.AddDataLayerAsync(builder.Services, connectionString);
 
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+{
+    options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
+})
     .AddJsonOptions((options) => {
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.Converters.Add(new UlidJsonConverter());
     });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "UFO API",
+        Version = "v1" // This is the crucial part
+    });
+    c.SchemaFilter<UlidSchemaFilter>();
+});
 
 var app = builder.Build();
 app.UseDefaultFiles();
@@ -47,8 +69,11 @@ app.UseStaticFiles();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwagger(options =>
+    {
+        //options.SerializeAsV2 = true;
+    });
+    app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "v1"); });
 }
 
 app.UseHttpsRedirection();
@@ -65,7 +90,7 @@ var appEndpointUrl = app.Configuration["Kestrel:Endpoints:App:Url"] ?? "https://
 
 OpenBrowser(appEndpointUrl);
 
-app.Run();
+await app.RunAsync();
 
 return;
 
