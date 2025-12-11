@@ -14,7 +14,7 @@ public class SnapshotEntity
     public Ulid Id { get; set; } = Ulid.NewUlid();
 
     [JsonPropertyOrder(5)]
-    public DateTime Timestamp { get; set; } = DateTime.Now;
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
 
     [JsonPropertyOrder(10)]
     //[OneToOne(nameof(FsFolderEntity))]

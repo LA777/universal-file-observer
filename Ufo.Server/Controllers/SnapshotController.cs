@@ -79,8 +79,7 @@ public class SnapshotController : ControllerBase
         }
 
         var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path);
-        var folderTree = CreateFolderTree(folderPath.Path, snapshot, null);
-        snapshot.RootFolder = folderTree;
+        snapshot.RootFolder = CreateFolderTree(folderPath.Path, snapshot, null);
         _logger.LogInformation("Snapshot created");
         await _repository.AddSnapshotAsync(snapshot, cancellationToken);
         _logger.LogInformation("Snapshot saved to DB");
