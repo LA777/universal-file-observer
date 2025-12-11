@@ -1,361 +1,590 @@
-# Universal File Observer (UFO) - Project Analysis
+﻿# 📊 Universal File Observer (UFO) - Project Analysis
 
-## Project Overview
-The Universal File Observer is a .NET 10 application that monitors and tracks file system changes across multiple PCs and storage drives. It creates snapshots of the file system hierarchy and stores metadata about files, folders, volumes, and storage devices.
+## 🎯 Project Overview
 
-**Technology Stack:**
-- .NET 10
-- C# 14.0
-- SQLite Database
-- Dapper ORM (for data access)
-- SQLiteNetExtensions (for ORM relationships)
+The **Universal File Observer** is a comprehensive .NET 10 application designed to monitor and track file system changes across multiple PCs and storage drives. It creates point-in-time snapshots of the file system hierarchy and stores detailed metadata about files, folders, volumes, and storage devices.
+
+**Key Capabilities:**
+- 🖥️ Multi-PC system monitoring
+- 💾 Multiple storage drive tracking
+- 📸 Snapshot-based state capture
+- 🔐 SHA256 integrity hashing
+- 📈 Historical change tracking
+- 📊 Storage analytics and reporting
+
+### 📚 Technology Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Framework | **.NET 10** |
+| Language | **C# 14.0** |
+| Database | **SQLite** |
+| Data Access | **Dapper ORM** |
+| Relationships | **SQLiteNetExtensions** |
+| Identifiers | **ULID** (Sortable GUIDs) |
+| Hashing | **SHA256** |
 
 ---
 
-## Database Entities
+## 🗄️ Database Entities
+
+### Core Entities
 
 | Entity | Table Name | Purpose | Key Properties |
-|--------|-----------|---------|-----------------|
-| **Pc** | `Pcs` | Represents a personal computer | Id (PK), Name, DeviceId |
-| **StorageDrive** | `StorageDrives` | Represents a physical storage device | Id (PK), Name, DeviceId, SerialNumber, TotalSize, MediaType, InterfaceType, Description |
-| **Volume** | `Volumes` | Represents a partition on a storage drive | Id (PK), DriveLetter, VolumeName, VolumeSize, VolumeSerialNumber, StorageDriveId (FK), Description |
-| **VolumeInfo** | `VolumeInfos` | Tracks volume state at a specific point in time | Id (PK), FreeSpace, DriveStatus, VolumeId (FK), SnapshotId (FK) |
-| **Snapshot** | `Snapshots` | Point-in-time record of file system state | Id (PK), Timestamp |
-| **FsFolder** | `Folders` | Represents a directory in the file system | Id (PK), Name, Size, Sha256Hash |
-| **FsFile** | `Files` | Represents a file in the file system | Id (PK), Name, Size, Sha256Hash, FileExtension |
-| **PcsToStorageDrives** | `PcsToStorageDrives` | Junction table linking Pcs, StorageDrives, and Snapshots (Many-to-Many) | PcId (FK), StorageDriveId (FK), SnapshotId (FK) |
-| **FoldersToFolders** | `FoldersToFolders` | Junction table for folder hierarchy (Parent-Child relationships) | SnapshotId (FK), ParentFolderId (FK), ChildFolderId (FK) |
-| **FilesToFolders** | `FilesToFolders` | Junction table linking files to their parent folders | SnapshotId (FK), FolderId (FK), FileId (FK) |
+|:-------|:-----------|:--------|:----------------|
+| **Pc** | `Pcs` | Personal computer records | `Id` (PK), `Name`, `DeviceId` |
+| **StorageDrive** | `StorageDrives` | Physical storage devices | `Id` (PK), `Name`, `DeviceId`, `SerialNumber`, `TotalSize`, `MediaType`, `InterfaceType`, `Description` |
+| **Volume** | `Volumes` | Storage partitions | `Id` (PK), `DriveLetter`, `VolumeName`, `VolumeSize`, `VolumeSerialNumber`, `StorageDriveId` (FK), `Description` |
+| **VolumeInfo** | `VolumeInfos` | Point-in-time volume state | `Id` (PK), `FreeSpace`, `DriveStatus`, `VolumeId` (FK), `SnapshotId` (FK) |
+| **Snapshot** | `Snapshots` | File system state captures | `Id` (PK), `Timestamp` |
+| **FsFolder** | `Folders` | Directory entries | `Id` (PK), `Name`, `Size`, `Sha256Hash` |
+| **FsFile** | `Files` | File entries | `Id` (PK), `Name`, `Size`, `Sha256Hash`, `FileExtension` |
+
+### Junction Tables (Relationships)
+
+| Entity | Table Name | Purpose | Composite Key |
+|:-------|:-----------|:--------|:--------------|
+| **PcsToStorageDrives** | `PcsToStorageDrives` | Links PCs to storage drives | `(PcId, StorageDriveId, SnapshotId)` |
+| **FoldersToFolders** | `FoldersToFolders` | Folder hierarchy (parent-child) | `(SnapshotId, ParentFolderId, ChildFolderId)` |
+| **FilesToFolders** | `FilesToFolders` | Links files to folders | `(SnapshotId, FolderId, FileId)` |
 
 ---
 
-## Entity Relationships Diagram
+## 📐 Entity Relationships Diagram
 
 ```
-???????????????????????????????????????????????????????????????????????????
-?                     UNIVERSAL FILE OBSERVER DATABASE                    ?
-???????????????????????????????????????????????????????????????????????????
+╔════════════════════════════════════════════════════════════════════════════╗
+║                  UNIVERSAL FILE OBSERVER DATABASE MODEL                    ║
+╚════════════════════════════════════════════════════════════════════════════╝
 
-                              ????????????????
-                              ?      PC      ?
-                              ?   (Pcs)      ?
-                              ????????????????
-                              ? Id (PK)      ?
-                              ? Name         ?
-                              ? DeviceId     ?
-                              ????????????????
-                                     ?
-                                     ? (Many-to-Many)
-                                     ?
-                        ????????????????????????????
-                        ?  PcsToStorageDrives     ?
-                        ?  (Junction Table)       ?
-                        ??????????????????????????
-                        ? PcId (FK)              ?
-                        ? StorageDriveId (FK)    ?
-                        ? SnapshotId (FK)        ?
-                        ????????????????????????????
-                                     ?
-                ??????????????????????????????????????????
-                ?                    ?                   ?
-    ????????????????????????  ??????????????????  ?????????????????????
-    ?  StorageDrive        ?  ?   Snapshot     ?  ?   (1-1 relation)  ?
-    ?  (StorageDrives)     ?  ?   (Snapshots)  ?  ?   shown in PC      ?
-    ????????????????????????  ??????????????????  ?????????????????????
-    ? Id (PK)              ?  ? Id (PK)        ?
-    ? Name                 ?  ? Timestamp      ?
-    ? DeviceId             ?  ? RootFolder (FK)?
-    ? SerialNumber         ?  ? VolumeInfo (FK)?
-    ? TotalSize            ?  ??????????????????
-    ? Description          ?           ?
-    ? MediaType            ?           ? (One-to-Many)
-    ? InterfaceType        ?           ?
-    ????????????????????????           ?
-               ?                       ?
-               ? (One-to-Many)    ???????????????????????
-               ?                  ?   VolumeInfo        ?
-    ???????????????????????????   ?   (VolumeInfos)     ?
-    ?  Volume                 ?   ???????????????????????
-    ?  (Volumes)              ?   ? Id (PK)             ?
-    ???????????????????????????   ? FreeSpace           ?
-    ? Id (PK)                 ?   ? DriveStatus         ?
-    ? DriveLetter             ?   ? VolumeId (FK)       ?
-    ? VolumeName              ?   ? SnapshotId (FK)     ?
-    ? Description             ?   ???????????????????????
-    ? VolumeSerialNumber      ?
-    ? VolumeSize              ?
-    ? StorageDriveId (FK)     ?
-    ???????????????????????????
+                                ┌─────────────────┐
+                                │      PC         │
+                                │   (Pcs)         │
+                                ├─────────────────┤
+                                │ ◆ Id            │
+                                │ • Name          │
+                                │ • DeviceId      │
+                                └────────┬────────┘
+                                         │
+                                         │ Many-to-Many
+                                         │
+                        ┌────────────────┼─────────────────┐
+                        │   PcsToStorageDrives (Junction)  │
+                        ├──────────────────────────────────┤
+                        │ ◆ PcId (FK)                      │
+                        │ ◆ StorageDriveId (FK)            │
+                        │ ◆ SnapshotId (FK)                │
+                        └────────────────┬─────────────────┘
+                                         │
+                ┌────────────────────────┼────────────────────┐
+                │                        │                    │
+    ┌───────────▼──────────────┐  ┌──────▼─────────┐  ┌───────▼──────────┐
+    │   StorageDrive           │  │   Snapshot     │  │  (1:1)           │
+    │   (StorageDrives)        │  │   (Snapshots)  │  │  relation        │
+    ├──────────────────────────┤  ├────────────────┤  └──────────────────┘
+    │ ◆ Id                     │  │ ◆ Id           │
+    │ • Name                   │  │ • Timestamp    │
+    │ • DeviceId               │  │ • RootFolder*  │
+    │ • SerialNumber           │  │ • VolumeInfo*  │
+    │ • TotalSize              │  └────────┬───────┘
+    │ • Description            │           │
+    │ • MediaType              │           │ One-to-Many
+    │ • InterfaceType          │           │
+    └──────────┬───────────────┘           │
+               │                           │
+               │ One-to-Many         ┌─────▼────────────────┐
+               │                     │   VolumeInfo         │
+    ┌──────────▼──────────────┐      │   (VolumeInfos)      │
+    │  Volume                 │      ├──────────────────────┤
+    │  (Volumes)              │      │ ◆ Id                 │
+    ├─────────────────────────┤      │ • FreeSpace          │
+    │ ◆ Id                    │      │ • DriveStatus        │
+    │ • DriveLetter           │      │ ► VolumeId (FK)      │
+    │ • VolumeName            │      │ ► SnapshotId (FK)    │
+    │ • Description           │      └──────────────────────┘
+    │ • VolumeSerialNumber    │
+    │ • VolumeSize            │
+    │ ► StorageDriveId (FK)   │
+    └─────────────────────────┘
 
 
-                      FILE SYSTEM HIERARCHY
-                      ?????????????????????
-                        
-                        ????????????????????
-                        ?   FsFolder       ?
-                        ?   (Folders)      ?
-                        ????????????????????
-                        ? Id (PK)          ?
-                        ? Name             ?
-                        ? Size             ?
-                        ? Sha256Hash       ?
-                        ????????????????????
-                                 ?
-                ???????????????????????????????????
-                ?                ?                ?
-        (Many-to-Many)    (Many-to-Many)  (Many-to-Many)
-                ?                ?                ?
-    ???????????????????????   ?        ????????????????????????
-    ? FoldersToFolders    ?   ?        ?  FilesToFolders     ?
-    ? (Junction)          ?   ?        ?  (Junction)         ?
-    ???????????????????????   ?        ???????????????????????
-    ? SnapshotId (FK)     ?   ?        ? SnapshotId (FK)     ?
-    ? ParentFolderId (FK) ?   ?        ? FolderId (FK)       ?
-    ? ChildFolderId (FK)  ?   ?        ? FileId (FK)         ?
-    ???????????????????????   ?        ???????????????????????
-                              ?
-                    ????????????????????
-                    ?   FsFile         ?
-                    ?   (Files)        ?
-                    ????????????????????
-                    ? Id (PK)          ?
-                    ? Name             ?
-                    ? Size             ?
-                    ? Sha256Hash       ?
-                    ? FileExtension    ?
-                    ????????????????????
-```
+                         ╔═══════════════════════════════════════╗
+                         ║    FILE SYSTEM HIERARCHY              ║
+                         ╚═══════════════════════════════════════╝
 
----
+                        ┌──────────────────────┐
+                        │   FsFolder           │
+                        │   (Folders)          │
+                        ├──────────────────────┤
+                        │ ◆ Id                 │
+                        │ • Name               │
+                        │ • Size               │
+                        │ • Sha256Hash         │
+                        └────────────┬─────────┘
+                                     │
+                   ┌─────────────────┼──────────────────┐
+                   │                 │                  │
+             Many-to-Many       Many-to-Many        Many-to-Many
+                   │                 │                  │
+    ┌──────────────▼──────────┐      │      ┌───────────▼──────────┐
+    │  FoldersToFolders       │      │      │  FilesToFolders      │
+    │  (Hierarchy Junction)   │      │      │  (File Mapping)      │
+    ├─────────────────────────┤      │      ├──────────────────────┤
+    │ ◆ SnapshotId (FK)       │      │      │ ◆ SnapshotId (FK)    │
+    │ • ParentFolderId (FK)   │      │      │ ◆ FolderId (FK)      │
+    │ ◆ ChildFolderId (FK)    │      │      │ ◆ FileId (FK)        │
+    └─────────────────────────┘      │      └──────────────────────┘
+                                     │
+                           ┌─────────▼──────────┐
+                           │   FsFile           │
+                           │   (Files)          │
+                           ├────────────────────┤
+                           │ ◆ Id               │
+                           │ • Name             │
+                           │ • Size             │
+                           │ • Sha256Hash       │
+                           │ • FileExtension    │
+                           └────────────────────┘
 
-## SQLite Database Schema Summary
-
-### Core Storage Structure
-- **Pcs**: Stores computer information for multi-PC support
-- **StorageDrives**: Physical storage devices connected to PCs (includes device metadata like serial number, media type, interface)
-- **Volumes**: Partitions on storage drives (drive letter, volume name, size)
-- **VolumeInfos**: Point-in-time snapshots of volume state (tracks free space and drive status at specific timestamps)
-
-### File System Hierarchy Structure
-- **Folders**: Directory entries with associated metadata (size, SHA256 hash for integrity verification)
-- **Files**: File entries with metadata (size, extension, SHA256 hash)
-- **FoldersToFolders**: Hierarchical relationships between folders enabling parent-child directory trees
-- **FilesToFolders**: Relationships between files and their parent directories
-
-### Temporal & Relationship Tables
-- **Snapshots**: Point-in-time captures of the entire file system state with timestamps
-- **PcsToStorageDrives**: Links PCs to their storage drives within a snapshot context
-  - Composite PK: (PcId, StorageDriveId, SnapshotId)
-  - Enables tracking which drives were connected to which PC at which time
-- **VolumeInfos**: Captures volume state (free space, status) at each snapshot
-  - Allows historical analysis of storage usage patterns
-- **FoldersToFolders & FilesToFolders**: Both include SnapshotId to track file system state across time
-  - Enables comparison of file system state between different snapshots
-
----
-
-## Key Design Patterns
-
-### 1. Temporal Snapshots
-- All file system and volume data is snapshot-aware
-- Allows historical tracking and comparison of file system states
-- Each snapshot represents a complete state capture at a specific point in time
-
-### 2. Hierarchical File System Storage
-- Folders can have parent and child relationships for representing directory trees
-- FoldersToFolders junction table supports unlimited directory depth
-- ParentFolderId is nullable to support root folders
-
-### 3. Many-to-Many Relationships
-- Uses junction tables for complex relationships:
-  - PcsToStorageDrives: Multiple PCs can have multiple storage drives across multiple snapshots
-  - FoldersToFolders: Supports complex folder hierarchies
-  - FilesToFolders: Files linked to folders within snapshots
-
-### 4. Entity Base Class Pattern
-- Common inheritance pattern with `EntityBase` providing:
-  - Unique identifier (Id)
-  - Common name property
-- Inherited by PcEntity, StorageDriveEntity, FsFolderEntity, FsFileEntity
-
-### 5. Content Hashing for Integrity
-- SHA256 hashes for both files and folders
-- Enables duplicate detection and integrity verification
-- Useful for identifying unchanged content across snapshots
-
-### 6. ULID Identifiers
-- Uses ULID (Universally Unique Lexicographically Sortable Identifier) instead of GUID
-- Provides sortable unique identifiers with timestamp information
-- Improves database index efficiency compared to random GUIDs
-
----
-
-## Foreign Key Relationships & Cascading Delete Strategy
-
-| Foreign Key | Table | References | Delete Rule | Rationale |
-|-------------|-------|-----------|------------|-----------|
-| FK_Volumes_StorageDrives | Volumes | StorageDrives | ON DELETE CASCADE | Volumes depend on storage drives |
-| FK_VolumeInfos_Volumes | VolumeInfos | Volumes | ON DELETE CASCADE | Volume info tied to volumes |
-| FK_VolumeInfos_Snapshots | VolumeInfos | Snapshots | ON DELETE NO ACTION | Preserves snapshot history |
-| FK_PcsToStorageDrives_Pcs | PcsToStorageDrives | Pcs | ON DELETE NO ACTION | Maintains historical relationships |
-| FK_PcsToStorageDrives_StorageDrives | PcsToStorageDrives | StorageDrives | ON DELETE NO ACTION | Maintains historical relationships |
-| FK_PcsToStorageDrives_Snapshots | PcsToStorageDrives | Snapshots | ON DELETE NO ACTION | Preserves snapshot associations |
-| FK_FoldersToFolders_Snapshots | FoldersToFolders | Snapshots | ON DELETE NO ACTION | Preserves snapshot history |
-| FK_FoldersToFolders_Folders | FoldersToFolders | Folders | ON DELETE NO ACTION | Maintains folder relationships |
-| FK_FilesToFolders_Folders | FilesToFolders | Folders | ON DELETE NO ACTION | Maintains file-folder associations |
-| FK_FilesToFolders_Files | FilesToFolders | Files | ON DELETE NO ACTION | Maintains file references |
-| FK_FilesToFolders_Snapshots | FilesToFolders | Snapshots | ON DELETE NO ACTION | Preserves snapshot history |
-
-**Strategy Notes:**
-- Cascade deletes used only for dependent data (Volumes ? StorageDrives, VolumeInfos ? Volumes)
-- NO ACTION used for snapshots to preserve complete historical records
-- Prevents accidental data loss when snapshots need to be queried later
-
----
-
-## Data Flow & Usage Scenarios
-
-```
-???????????????????????????????????????????????????????????????
-?              CAPTURE WORKFLOW                               ?
-???????????????????????????????????????????????????????????????
-?                                                             ?
-?  1. System Scan                                             ?
-?     ??? Enumerate PCs ? StorageDrives ? Volumes           ?
-?                                                             ?
-?  2. Create Snapshot                                         ?
-?     ??? Record Timestamp & VolumeInfo                       ?
-?         (FreeSpace, DriveStatus)                            ?
-?                                                             ?
-?  3. Build File System Hierarchy                             ?
-?     ??? Recursively scan folders & files                    ?
-?         ? Calculate SHA256 hashes                           ?
-?         ? Store in Folders & Files tables                   ?
-?         ? Create FoldersToFolders & FilesToFolders links    ?
-?                                                             ?
-?  4. Associate with Snapshot                                 ?
-?     ??? Link PCs to StorageDrives via                       ?
-?         PcsToStorageDrives junction table                   ?
-?                                                             ?
-???????????????????????????????????????????????????????????????
-
-???????????????????????????????????????????????????????????????
-?              QUERY SCENARIOS                                ?
-???????????????????????????????????????????????????????????????
-?                                                             ?
-?  � Get all files in a folder for a specific snapshot       ?
-?    ? Query FilesToFolders WHERE SnapshotId & FolderId      ?
-?                                                             ?
-?  � Track storage usage over time                           ?
-?    ? Query VolumeInfos with FreeSpace trends               ?
-?                                                             ?
-?  � Find all PCs with a specific storage drive              ?
-?    ? Query PcsToStorageDrives WHERE StorageDriveId         ?
-?                                                             ?
-?  � Compare folder contents between snapshots               ?
-?    ? Query FoldersToFolders for both snapshots             ?
-?                                                             ?
-?  � Identify duplicate files by hash                        ?
-?    ? Query Files WHERE Sha256Hash matches                  ?
-?                                                             ?
-???????????????????????????????????????????????????????????????
+Legend: ◆ = Primary Key | • = Standard Property | ► = Foreign Key
 ```
 
 ---
 
-## Strengths of the Design
+## 📑 SQLite Database Schema
 
-? **Complete Historical Tracking**
-- Maintains complete file system history through snapshots
-- Enables time-series analysis of storage and file system changes
-- Supports audit trails and compliance reporting
+### 🖥️ Storage Infrastructure
 
-? **Multi-PC & Multi-Drive Support**
-- Designed to track multiple PCs with multiple storage drives
-- Flexible enough for enterprise environments
-- Scales to multiple snapshots over time
+| Table | Purpose | Key Strategy |
+|:------|:--------|:-------------|
+| **Pcs** | Computer system records with device identification | ULID primary key for sortable uniqueness |
+| **StorageDrives** | Physical hardware devices attached to PCs | Stores metadata: serial number, media type, interface type |
+| **Volumes** | Logical partitions on storage drives | Links to StorageDrive via foreign key (CASCADE delete) |
+| **VolumeInfos** | Temporal snapshots of volume state | Tracks free space and drive status over time |
 
-? **Efficient Data Organization**
-- Proper indexing with primary/foreign keys for query optimization
-- Composite primary keys prevent duplicate entries
-- Normalized schema reduces data redundancy
+**Usage Example:**
+```
+PC (Desktop) → StorageDrive (Samsung SSD) → Volume (C:) → VolumeInfo (free space tracking)
+```
 
-? **Rich Metadata Tracking**
-- Tracks both structural data (hierarchy) and metadata (size, hash, status)
-- SHA256 hashes enable integrity verification and duplicate detection
-- Status tracking for volumes (healthy, warning, error states)
+### 📂 File System Hierarchy
 
-? **Snapshot-Based Approach**
-- Point-in-time captures enable consistent state representation
-- Allows comparison and analytics across multiple time periods
-- Supports branching analysis (what changed between snapshot X and Y)
+| Table | Purpose | Structure |
+|:------|:--------|:----------|
+| **Folders** | Directory entries with metadata | Parent-child relationships via FoldersToFolders |
+| **Files** | File entries with extension and hash | Linked to parent folders via FilesToFolders |
+| **FoldersToFolders** | Represents directory tree structure | Nullable ParentFolderId for root folders |
+| **FilesToFolders** | Maps files to their parent directories | Enables file location queries |
 
-? **Flexible Folder Hierarchy**
-- Supports unlimited directory depth
-- Nullable ParentFolderId allows root folder representation
-- Enables querying folder trees at any level
+**Hierarchy Example:**
+```
+Snapshot #1
+└── Root (ParentFolderId = NULL)
+    ├── Documents (ParentFolderId = Root)
+    │   ├── Project.txt
+    │   └── Budget.xlsx
+    └── Downloads
+        ├── Image.jpg
+        └── Archive.zip
+```
 
----
+### ⏱️ Temporal & Relationship Management
 
-## Design Considerations & Potential Optimizations
-
-?? **Data Volume at Scale**
-- **Issue**: Large file systems can result in significant data volume
-  - One entry per file/folder per snapshot
-  - Example: 1M files � 52 snapshots/year = 52M file records
-- **Mitigation**: Consider archiving old snapshots or implementing incremental snapshots
-
-?? **Query Performance on Deep Hierarchies**
-- **Issue**: Deep folder hierarchies require multiple joins
-- **Optimization**: Consider materialized path or nested set model for ancestor queries
-- **Current Approach**: Works well with indexed ForeignKeys but may need optimization for large hierarchies
-
-?? **Snapshot Deletion Constraints**
-- **Issue**: Foreign key constraints with ON DELETE NO ACTION prevent cascading deletes
-- **Benefit**: Preserves data integrity and historical records
-- **Note**: Requires explicit data cleanup procedures if snapshots must be deleted
-
-?? **Storage Drive Updates**
-- **Issue**: StorageDrive table doesn't include timestamps
-- **Consideration**: Cannot track when drive properties changed (e.g., serial number updates)
-- **Potential Fix**: Add CreatedAt, UpdatedAt timestamps to Pcs, StorageDrives
+| Table | Purpose | Time Awareness |
+|:------|:--------|:---------------|
+| **Snapshots** | Point-in-time captures | Timestamp-based state capture |
+| **PcsToStorageDrives** | PC-Drive associations per snapshot | Tracks drive connectivity changes |
+| **FoldersToFolders** | Folder hierarchy per snapshot | Enables multi-version comparisons |
+| **FilesToFolders** | File locations per snapshot | Historical file tracking |
 
 ---
 
-## Projects in Solution
+## 🏗️ Key Design Patterns
 
-| Project | Purpose |
-|---------|---------|
-| **Ufo.Abstractions** | Contains entity definitions, interfaces, and DTOs |
-| **Ufo.Database** | Database context (Dapper), repositories, and migrations |
-| **Ufo.Server** | ASP.NET Core API server with controllers and data providers |
-| **Ufo.UnitTests** | Unit tests for repositories and services |
+### 1️⃣ **Temporal Snapshots** ⏸️
+- **What:** Point-in-time captures of complete system state
+- **Why:** Enables historical tracking and state comparison
+- **Example:** Compare file system between Monday's and Friday's snapshots
+
+### 2️⃣ **Hierarchical File System** 🌳
+- **What:** Parent-child folder relationships with nullable root
+- **Why:** Supports arbitrary directory depth and complex hierarchies
+- **Example:** `C:\Users\John\Documents\Projects\Current\Source\`
+
+### 3️⃣ **Many-to-Many Relationships** 🔗
+- **What:** Junction tables for complex associations
+- **Why:** Flexible modeling of complex real-world relationships
+- **Examples:**
+  - PCs with multiple drives across multiple snapshots
+  - Folders with multiple files and files in multiple snapshots
+
+### 4️⃣ **Entity Base Class** 👨‍👩‍👧
+- **What:** Common parent class providing Id and Name
+- **Why:** Reduces code duplication and ensures consistency
+- **Inherited by:** PcEntity, StorageDriveEntity, FsFolderEntity, FsFileEntity
+
+### 5️⃣ **Content Hashing** 🔐
+- **What:** SHA256 hashes for files and folders
+- **Why:** Enables duplicate detection and integrity verification
+- **Use Cases:**
+  - Identify unchanged files across snapshots
+  - Detect duplicate content
+  - Verify file integrity
+
+### 6️⃣ **ULID Identifiers** 🆔
+- **What:** Sortable unique identifiers replacing standard GUIDs
+- **Why:** Improves database performance and enables natural sorting
+- **Benefits:**
+  - ✅ Sortable and time-ordered
+  - ✅ Better index performance
+  - ✅ Human-readable timestamp information
 
 ---
 
-## Related Files & Components
+## 🔑 Foreign Key Relationships & Delete Strategy
 
-### Database Layer
-- `Ufo.Database/Contexts/DapperDataContext.cs` - Schema initialization
-- `Ufo.Database/Repositories/FileSystemSqLiteRepository.cs` - Data access logic
-- Entity definitions in `Ufo.Abstractions/Database/Entities/`
+### Delete Strategy Rationale
 
-### API Layer
-- `Ufo.Server/Controllers/SnapshotController.cs` - Snapshot endpoints
-- `Ufo.Server/DataProviders/SystemInfoProvider.cs` - System data collection
+```
+CASCADE DELETE                          NO ACTION DELETE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  ━━━━━━━━━━━━━━━━━━
+• Volumes → StorageDrives             • Snapshots ← Historical references
+• VolumeInfos → Volumes               • PC data ← Maintain relationships
+                                      • File system ← Preserve integrity
+```
+
+### Detailed Relationship Table
+
+| Relationship | Delete Rule | Rationale |
+|:-------------|:------------|:----------|
+| **Volumes → StorageDrives** | **CASCADE** | Volumes are dependent physical artifacts |
+| **VolumeInfos → Volumes** | **CASCADE** | Volume info belongs to specific volume |
+| **VolumeInfos → Snapshots** | **NO ACTION** | ✅ Preserves snapshot data for historical analysis |
+| **PcsToStorageDrives → Pcs** | **NO ACTION** | ✅ Maintains PC-drive associations over time |
+| **PcsToStorageDrives → StorageDrives** | **NO ACTION** | ✅ Tracks drive history and migrations |
+| **PcsToStorageDrives → Snapshots** | **NO ACTION** | ✅ Snapshots are immutable records |
+| **FoldersToFolders → Snapshots** | **NO ACTION** | ✅ Preserves folder structure snapshots |
+| **FoldersToFolders → Folders** | **NO ACTION** | ✅ Maintains folder relationships |
+| **FilesToFolders → Folders** | **NO ACTION** | ✅ Maintains file location records |
+| **FilesToFolders → Files** | **NO ACTION** | ✅ Preserves file references |
+| **FilesToFolders → Snapshots** | **NO ACTION** | ✅ Enables time-based file queries |
 
 ---
 
-## Technology Integration
+## 🔄 Data Flow & Usage Scenarios
 
-- **SQLite** via `Microsoft.Data.Sqlite` for embedded database
-- **Dapper** for lightweight ORM and query execution
-- **SQLiteNetExtensions** for navigation properties and relationship management
-- **ULID** for sortable unique identifiers
-- **SHA256** for content hashing and integrity verification
+### 📸 **Snapshot Capture Workflow**
+
+```
+Step 1: System Discovery
+┌──────────────────────────────────┐
+│ Enumerate all PCs and devices    │
+│ • Scan hardware inventory        │
+│ • Identify storage drives        │
+│ • Detect volume partitions       │
+└────────────────┬─────────────────┘
+                 ↓
+Step 2: Create Snapshot Record
+┌──────────────────────────────────┐
+│ Create Snapshot with Timestamp   │
+│ • Record current date/time       │
+│ • Capture volume free space      │
+│ • Store drive health status      │
+└────────────────┬─────────────────┘
+                 ↓
+Step 3: File System Scan
+┌──────────────────────────────────┐
+│ Recursively scan all folders     │
+│ • Traverse directory tree        │
+│ • Calculate SHA256 hashes        │
+│ • Record file metadata           │
+│ • Store in Folders & Files       │
+└────────────────┬─────────────────┘
+                 ↓
+Step 4: Link to Snapshot
+┌──────────────────────────────────┐
+│ Associate all data with Snapshot │
+│ • Create folder relationships    │
+│ • Link files to parents          │
+│ • Record PC-Drive associations   │
+└──────────────────────────────────┘
+```
+
+### 🔍 **Common Query Scenarios**
+
+#### Scenario A: Get all files in a folder
+```sql
+SELECT f.* FROM Files f
+JOIN FilesToFolders ftf ON f.Id = ftf.FileId
+WHERE ftf.FolderId = @folderId 
+  AND ftf.SnapshotId = @snapshotId
+```
+**Use Case:** Browse folder contents at specific point in time
+
+#### Scenario B: Track storage usage trend
+```sql
+SELECT v.VolumeName, vi.FreeSpace, s.Timestamp
+FROM VolumeInfos vi
+JOIN Volumes v ON vi.VolumeId = v.Id
+JOIN Snapshots s ON vi.SnapshotId = s.Id
+WHERE v.StorageDriveId = @driveId
+ORDER BY s.Timestamp DESC
+```
+**Use Case:** Generate storage usage charts over time
+
+#### Scenario C: Find all PCs with specific drive
+```sql
+SELECT DISTINCT p.* FROM Pcs p
+JOIN PcsToStorageDrives ptsd ON p.Id = ptsd.PcId
+WHERE ptsd.StorageDriveId = @driveId
+  AND ptsd.SnapshotId = @snapshotId
+```
+**Use Case:** Asset tracking and inventory management
+
+#### Scenario D: Compare folder contents across snapshots
+```sql
+SELECT * FROM FoldersToFolders
+WHERE ParentFolderId = @folderId
+  AND SnapshotId IN (@snapshot1, @snapshot2)
+```
+**Use Case:** Detect folder changes between time periods
+
+#### Scenario E: Find duplicate files by hash
+```sql
+SELECT Sha256Hash, COUNT(*) as Count, GROUP_CONCAT(Name)
+FROM Files
+GROUP BY Sha256Hash
+HAVING COUNT(*) > 1
+```
+**Use Case:** Identify redundant content and save storage space
 
 ---
 
-*Analysis Date: 2024*  
-*Project: Universal File Observer (UFO)*  
-*Framework: .NET 10 with C# 14.0*
+## ✅ Design Strengths
+
+### 🎯 **Complete Historical Tracking**
+- ✓ Maintains complete file system history through snapshots
+- ✓ Enables time-series analysis of storage and changes
+- ✓ Supports audit trails and compliance reporting
+- ✓ Answers: "What was the state on date X?"
+
+### 🏢 **Enterprise-Scale Multi-PC Support**
+- ✓ Track multiple PCs with multiple storage drives
+- ✓ Flexible for small offices to large enterprises
+- ✓ Scales to hundreds of snapshots over months/years
+- ✓ Supports: "Which PCs have drive SN-12345?"
+
+### ⚡ **Performance Optimization**
+- ✓ Proper indexing with primary/foreign keys
+- ✓ Composite keys prevent duplicate entries
+- ✓ Normalized schema reduces redundancy
+- ✓ ULID provides better index performance
+
+### 📊 **Rich Metadata & Analytics**
+- ✓ Tracks structural data (hierarchy) + metadata (size, hash, status)
+- ✓ SHA256 enables integrity verification
+- ✓ Duplicate detection across snapshots
+- ✓ Drive health status tracking
+
+### 📈 **Flexible Temporal Analysis**
+- ✓ Point-in-time consistency
+- ✓ Multi-snapshot comparisons
+- ✓ Trend analysis capabilities
+- ✓ Supports: "What changed between snapshots?"
+
+### 🌳 **Unlimited Hierarchy Support**
+- ✓ Supports arbitrary directory depth
+- ✓ Nullable root folder support
+- ✓ Tree queries at any level
+- ✓ Handles: `C:\...\...\...\very\deep\folder\path\`
+
+---
+
+## ⚠️ Design Considerations & Optimizations
+
+### 📦 **Data Volume at Scale**
+
+**Challenge:**
+```
+Large File Systems = Significant Storage Requirements
+Example: 1,000,000 files × 52 snapshots/year = 52,000,000+ records
+```
+
+**Mitigations:**
+- 🔄 Archive old snapshots to separate database
+- 📊 Implement incremental/differential snapshots
+- 🗜️ Compress historical snapshot data
+- 🧹 Implement data retention policies
+
+---
+
+### 🔗 **Query Performance on Deep Hierarchies**
+
+**Challenge:**
+```
+Deep Folder Hierarchies = Multiple Joins Required
+Recursive Queries: C:\A\B\C\D\E\F\G\H\I\J\K\...
+```
+
+**Current Approach:**
+- ✓ Works well with indexed foreign keys
+- ⚠️ May need optimization for 20+ level deep paths
+
+**Potential Optimizations:**
+- 🆕 Materialized path pattern (store full path as string)
+- 🆕 Nested set model for fast ancestor queries
+- 📍 Common table expressions (CTEs) for recursive queries
+
+---
+
+### 🔒 **Snapshot Deletion Constraints**
+
+**Challenge:**
+```
+ON DELETE NO ACTION prevents cascading deletes
+Cannot delete snapshots without explicit cleanup
+```
+
+**Strategy:**
+- ✅ Preserves data integrity (intentional)
+- ✅ Requires explicit deletion procedures
+- ✅ Prevents accidental data loss
+- 📋 Implement archive/purge stored procedures
+
+---
+
+### ⏰ **Temporal Metadata Gaps**
+
+**Challenge:**
+```
+StorageDrive table missing timestamps
+Cannot track when drive properties changed
+```
+
+**Current State:**
+- ❌ Serial number changes undetected
+- ❌ Drive renames not timestamped
+- ❌ Hardware upgrades not logged
+
+**Potential Enhancement:**
+```csharp
+// Add audit columns to Pcs and StorageDrives
+CreatedAt: DateTimeOffset
+UpdatedAt: DateTimeOffset
+```
+
+---
+
+## 🏗️ Solution Architecture
+
+### 📦 **Projects in Solution**
+
+| Project | Purpose | Key Responsibilities |
+|:--------|:--------|:-------------------|
+| **Ufo.Abstractions** | Core definitions | Entity models, interfaces, DTOs |
+| **Ufo.Database** | Data access layer | Dapper context, repositories, migrations |
+| **Ufo.Server** | API application | Controllers, services, data providers |
+| **Ufo.UnitTests** | Testing suite | Repository tests, integration tests |
+
+### 📂 **Key Components by Layer**
+
+**Database Layer:**
+- 📄 `DapperDataContext.cs` - Schema initialization and migrations
+- 📄 `FileSystemSqLiteRepository.cs` - CRUD operations
+- 📁 `Entities/` - All entity definitions
+
+**API Layer:**
+- 🌐 `SnapshotController.cs` - RESTful snapshot endpoints
+- 📊 `SystemInfoProvider.cs` - System data collection
+
+**Domain Layer:**
+- 🔧 Entity models with business logic
+- 📝 Service interfaces and implementations
+
+---
+
+## 🛠️ Technology Integration Stack
+
+```
+┌─────────────────────────────────────────┐
+│    Universal File Observer Stack        │
+├─────────────────────────────────────────┤
+│ Framework:        .NET 10               │
+│ Language:         C# 14.0               │
+│ API:              ASP.NET Core          │
+├─────────────────────────────────────────┤
+│ Database:         SQLite                │
+│ Connection:       Microsoft.Data.Sqlite │
+│ ORM:              Dapper                │
+│ Extensions:       SQLiteNetExtensions   │
+├─────────────────────────────────────────┤
+│ Identifiers:      ULID                  │
+│ Hashing:          SHA256                │
+│ JSON:             System.Text.Json      │
+├─────────────────────────────────────────┤
+│ Testing:          xUnit / NUnit         │
+│ Build:            .NET CLI              │
+│ VCS:              Git                   │
+└─────────────────────────────────────────┘
+```
+
+### 🔌 **Integration Details**
+
+- **SQLite** via `Microsoft.Data.Sqlite` - Embedded database without external dependencies
+- **Dapper** - Lightweight, high-performance micro-ORM for SQL execution
+- **SQLiteNetExtensions** - Simplifies navigation properties and relationship management
+- **ULID** - Sortable unique identifiers with built-in timestamp information
+- **SHA256** - Industry-standard cryptographic hashing for content integrity
+
+---
+
+## 📊 Summary Matrix
+
+| Aspect | Strength | Consideration |
+|:-------|:---------|:--------------|
+| **Scalability** | ✅ Multi-PC, multi-drive | ⚠️ Large snapshots impact |
+| **Performance** | ✅ Indexed relationships | ⚠️ Deep hierarchies need optimization |
+| **Data Integrity** | ✅ SHA256 hashing | ⚠️ No cascade on snapshots (by design) |
+| **History Tracking** | ✅ Comprehensive snapshots | ⚠️ Requires archive strategy |
+| **Flexibility** | ✅ ULID, no rigid types | ⚠️ Temporal metadata limited |
+| **Hierarchy Support** | ✅ Unlimited depth | ⚠️ May need materialized paths |
+
+---
+
+## 📝 Quick Reference
+
+### Common Database Queries
+
+**Get folder contents:**
+```sql
+SELECT * FROM Files 
+WHERE Id IN (
+  SELECT FileId FROM FilesToFolders 
+  WHERE FolderId = ? AND SnapshotId = ?
+)
+```
+
+**Get drive usage history:**
+```sql
+SELECT Timestamp, FreeSpace 
+FROM VolumeInfos vi
+JOIN Snapshots s ON vi.SnapshotId = s.Id
+WHERE vi.VolumeId = ?
+ORDER BY s.Timestamp DESC
+```
+
+**Find duplicates:**
+```sql
+SELECT Sha256Hash, COUNT(*) FROM Files 
+GROUP BY Sha256Hash 
+HAVING COUNT(*) > 1
+```
+
+---
+
+**📌 Document Information**
+- **Created:** 2024
+- **Project:** Universal File Observer (UFO)
+- **Framework:** .NET 10 with C# 14.0
+- **Status:** Comprehensive Architecture Analysis
+- **Repository:** https://github.com/LA777/universal-file-observer

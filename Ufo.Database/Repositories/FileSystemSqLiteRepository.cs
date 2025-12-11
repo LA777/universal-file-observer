@@ -499,7 +499,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             await sqLiteConnection.ExecuteAsync(SqlScripts.InsertVolumeInfoSql, snapshotEntity.VolumeInfo, transaction);
 
             // add Folder Tree to DB
-            await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, snapshotEntity.RootFolder, null, snapshotEntity, transaction);
+            await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, snapshotEntity.RootFolder!, null, snapshotEntity, transaction);
 
             await transaction.CommitAsync(cancellationToken);
         }
