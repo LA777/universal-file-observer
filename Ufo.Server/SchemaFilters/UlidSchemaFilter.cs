@@ -11,8 +11,10 @@ public class UlidSchemaFilter : ISchemaFilter
         if (context.Type == typeof(Ulid))
         {
             schema.Type = "string";
-            schema.Format = "uuid"; // Or a custom format like "ulid"
-            schema.Example = new OpenApiString(Ulid.NewUlid().ToString()); // Add an example
+            schema.Format = "ulid";
+            schema.Pattern = @"^[0-7][0-9A-HJKMNP-TV-Z]{25}$";
+            schema.Description = "A ULID (Universally Unique Lexicographically Sortable Identifier)";
+            schema.Example = new OpenApiString(Ulid.NewUlid().ToString());
         }
     }
 }

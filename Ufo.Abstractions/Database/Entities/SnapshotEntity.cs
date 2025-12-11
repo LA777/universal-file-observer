@@ -1,26 +1,36 @@
 ﻿using Cysharp.Serialization.Json;
-using SQLite;
-using SQLiteNetExtensions.Attributes;
+//using SQLite;
+//using SQLiteNetExtensions.Attributes;
 using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Database.Entities;
 
-[Table("Snapshots")]
+//[Table("Snapshots")]
 public class SnapshotEntity
 {
     [JsonConverter(typeof(UlidJsonConverter))]
     [JsonPropertyOrder(0)]
-    [PrimaryKey]
+    //[PrimaryKey]
     public Ulid Id { get; set; } = Ulid.NewUlid();
 
     [JsonPropertyOrder(5)]
     public DateTime Timestamp { get; set; } = DateTime.Now;
 
     [JsonPropertyOrder(10)]
-    [OneToOne(nameof(FsFolderEntity))]
+    //[OneToOne(nameof(FsFolderEntity))]
     public FsFolderEntity? RootFolder { get; set; }
 
     [JsonPropertyOrder(20)]
-    [OneToOne(nameof(VolumeInfoEntity))]
+    //[OneToOne(nameof(VolumeInfoEntity))]
     public VolumeInfoEntity? VolumeInfo { get; set; }
+
+    // EF Core navigation properties for join entities
+    [JsonIgnore]
+    public IList<PcsToStorageDrivesEntity> PcsToStorageDrives { get; set; } = [];
+
+    [JsonIgnore]
+    public IList<FoldersToFoldersEntity> FoldersToFolders { get; set; } = [];
+
+    [JsonIgnore]
+    public IList<FilesToFoldersEntity> FilesToFolders { get; set; } = [];
 }

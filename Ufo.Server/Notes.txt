@@ -56,8 +56,8 @@ DirectoryNotFoundException
 Windows LINK/DIR https://stackoverflow.com/questions/1485155/check-if-a-file-is-real-or-a-symbolic-link
 
 
-
-
+Schema diagram in Google DOCS
+https://docs.google.com/drawings/d/1_rMELftQb5M0f3_HTPP1OQWAKHW6_Y9H6XB4jBDWBt0/edit?usp=sharing
 
 
 

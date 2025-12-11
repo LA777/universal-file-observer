@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.9.34728.123
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11304.174 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ufo.Server", "Ufo.Server\Ufo.Server.csproj", "{B29C4DCD-0F63-4A89-94B6-AF9FC4FB3CE7}"
 EndProject
@@ -12,6 +12,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Ufo.Database", "Ufo.Database\Ufo.Database.csproj", "{F1426AD6-68F0-49AF-B1CC-6075AEBE60FB}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ufo.UnitTests", "Ufo.UnitTests\Ufo.UnitTests.csproj", "{7FDC8FC0-BBA4-4167-B525-C7F68C5CB144}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ufo.IntegrationTests", "Ufo.IntegrationTests\Ufo.IntegrationTests.csproj", "{AB59D0FB-DF50-4F5C-AAF8-B57997579073}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,10 @@ Global
 		{7FDC8FC0-BBA4-4167-B525-C7F68C5CB144}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{7FDC8FC0-BBA4-4167-B525-C7F68C5CB144}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{7FDC8FC0-BBA4-4167-B525-C7F68C5CB144}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AB59D0FB-DF50-4F5C-AAF8-B57997579073}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AB59D0FB-DF50-4F5C-AAF8-B57997579073}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AB59D0FB-DF50-4F5C-AAF8-B57997579073}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AB59D0FB-DF50-4F5C-AAF8-B57997579073}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

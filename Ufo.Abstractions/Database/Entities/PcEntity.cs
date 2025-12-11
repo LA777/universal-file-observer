@@ -1,19 +1,25 @@
-﻿using SQLite;
-using SQLiteNetExtensions.Attributes;
+﻿//using SQLite;
+//using SQLiteNetExtensions.Attributes;
 using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Database.Entities;
 
-[Table("Pcs")]
+//[Table("Pcs")]
 public class PcEntity : EntityBase
 {
+    public string? DeviceId { get; set; }
+
     [JsonPropertyOrder(80)]
     [JsonIgnore]
-    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    //[ManyToMany(typeof(PcsToStorageDrivesEntity))]
     public IList<StorageDriveEntity> StorageDrives { get; set; } = [];
 
     [JsonPropertyOrder(90)]
     [JsonIgnore]
-    [ManyToMany(typeof(PcsToStorageDrivesEntity))]
+    //[ManyToMany(typeof(PcsToStorageDrivesEntity))]
     public IList<SnapshotEntity> Snapshots { get; set; } = [];
+
+    // EF Core navigation property for join entity
+    [JsonIgnore]
+    public IList<PcsToStorageDrivesEntity> StorageDrivesLinks { get; set; } = [];
 }

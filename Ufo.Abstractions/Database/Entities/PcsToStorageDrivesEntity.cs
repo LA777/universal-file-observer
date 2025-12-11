@@ -5,28 +5,28 @@ using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Database.Entities;
 
-//[Table("FilesToFolders")]
-public class FilesToFoldersEntity
+//[Table("PcsToStorageDrives")]
+public class PcsToStorageDrivesEntity
 {
     [JsonConverter(typeof(UlidJsonConverter))]
     //[ForeignKey(typeof(SnapshotEntity))]
     public Ulid SnapshotId { get; set; }
 
     [JsonConverter(typeof(UlidJsonConverter))]
-    //[ForeignKey(typeof(FsFolderEntity))]
-    public Ulid FolderId { get; set; }
+    //[ForeignKey(typeof(PcEntity))]
+    public Ulid PcId { get; set; }
 
     [JsonConverter(typeof(UlidJsonConverter))]
-    //[ForeignKey(typeof(FsFileEntity))]
-    public Ulid FileId { get; set; }
+    //[ForeignKey(typeof(StorageDriveEntity))]
+    public Ulid StorageDriveId { get; set; }
 
     // EF Core navigation properties
     [JsonIgnore]
     public SnapshotEntity? Snapshot { get; set; }
 
     [JsonIgnore]
-    public FsFolderEntity? Folder { get; set; }
+    public PcEntity? Pc { get; set; }
 
     [JsonIgnore]
-    public FsFileEntity? File { get; set; }
+    public StorageDriveEntity? StorageDrive { get; set; }
 }

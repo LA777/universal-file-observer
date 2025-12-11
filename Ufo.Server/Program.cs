@@ -5,11 +5,9 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.DataProviders;
 using Ufo.Abstractions.Options;
 using Ufo.Database.Extensions;
-using Ufo.Database.Repositories;
 using Ufo.DataProviders;
 using Ufo.Server.SchemaFilters;
 
@@ -36,7 +34,6 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
-builder.Services.AddTransient<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
 await DependencyExtension.AddDataLayerAsync(builder.Services, connectionString);
 
 builder.Services.AddControllers(options =>

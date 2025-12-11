@@ -1,4 +1,4 @@
-﻿using SQLite;
+﻿using System.ComponentModel.DataAnnotations;
 using Ufo.Abstractions.Database.Entities;
 
 namespace Ufo.Server.Models;

@@ -1,4 +1,4 @@
-﻿using SQLite;
+﻿//using SQLite;
 using Ufo.Abstractions.Database.Entities;
 
 namespace Ufo.Abstractions.Responses;
@@ -27,7 +27,7 @@ public abstract class FsItem
 
 public class FsFile : FsItem
 {
-    [MaxLength(128)]
+    //[MaxLength(128)]
     public string? FileExtension { get; set; }
 
     public IList<SnapshotEntity> Snapshots { get; } = new List<SnapshotEntity>();
