@@ -1,6 +1,6 @@
 using Cysharp.Serialization.Json;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
