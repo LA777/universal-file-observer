@@ -1,8 +1,12 @@
-﻿using Ufo.Abstractions.Database.Entities;
-using Ufo.Abstractions.DataProviders;
-using System.Management;
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Text;
+using Ufo.Abstractions.Database.Entities;
+using Ufo.Abstractions.DataProviders;
+
+#if WINDOWS
+using System.Management;
+#endif
 
 namespace Ufo.DataProviders;
 
@@ -12,7 +16,7 @@ public class SystemInfoProvider : ISystemInfoProvider
     {
         var driveLetter = char.ToUpper(path[0]);
         var snapshotEntity = new SnapshotEntity();
-        var pc = new PcEntity { Name = Environment.MachineName };
+        var pc = new PcEntity { Name = Environment.MachineName, DeviceId = GetStableDeviceId() };
         var storageDriveEntity = new StorageDriveEntity();
         var volume = new VolumeEntity();
         var volumeInfo = new VolumeInfoEntity();
@@ -81,6 +85,7 @@ public class SystemInfoProvider : ISystemInfoProvider
     [SupportedOSPlatform("windows")]
     private void GetDriveInformationForWindows(char driveLetter, VolumeInfoEntity volumeInfo)
     {
+#if WINDOWS
         var volume = volumeInfo.Volume ??= new VolumeEntity();
         var storageDrive = volume.StorageDrive ??= new StorageDriveEntity();
 
@@ -129,5 +134,99 @@ public class SystemInfoProvider : ISystemInfoProvider
                 }
             }
         }
+#endif
     }
+
+    /// <summary>
+    /// Retrieves a stable, hardware-linked ID based on the OS.
+    /// </summary>
+    static string? GetStableDeviceId()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return GetWindowsDeviceId();
+        }
+        else if (OperatingSystem.IsLinux())
+        {
+            return GetLinuxDeviceId();
+        }
+        // Add other platforms like macOS if needed (requires P/Invoke calls)
+        // else if (OperatingSystem.IsMacOS())
+        // {
+        //     return GetMacOsDeviceId();
+        // }
+
+        return null;
+    }
+
+    #region Windows Implementation (WMI)
+
+    static string? GetWindowsDeviceId()
+    {
+#if WINDOWS
+            try
+            {
+                // Query WMI for the Motherboard Serial Number (considered stable)
+                // Use Win32_BaseBoard or Win32_ComputerSystemProduct
+                string query = "SELECT SerialNumber FROM Win32_BaseBoard";
+                
+                using (var searcher = new ManagementObjectSearcher(query))
+                {
+                    foreach (ManagementObject obj in searcher.Get())
+                    {
+                        // Return the first serial number found
+                        return obj["SerialNumber"]?.ToString().Trim();
+                    }
+                }
+                Console.WriteLine("Warning: Failed to query Win32_BaseBoard.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error querying WMI on Windows: {ex.Message}");
+                return null;
+            }
+#else
+        // This case should be unreachable if using OperatingSystem.IsWindows()
+        return null;
+#endif
+    }
+
+    #endregion
+
+    #region Linux Implementation (Reading /etc/machine-id)
+
+    // On Linux, the standard stable ID is the /etc/machine-id
+    static string? GetLinuxDeviceId()
+    {
+        const string machineIdPath = "/etc/machine-id";
+
+        if (File.Exists(machineIdPath))
+        {
+            try
+            {
+                // Read the entire file, which contains the 32-character hex string
+                string id = File.ReadAllText(machineIdPath, Encoding.ASCII).Trim();
+
+                if (id.Length == 32)
+                {
+                    return id;
+                }
+                Console.WriteLine($"Warning: Found file, but ID format is incorrect: {id.Length} chars.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading {machineIdPath}: {ex.Message}");
+                return null;
+            }
+        }
+        else
+        {
+            Console.WriteLine($"Warning: {machineIdPath} not found. This is normal in some environments (e.g., containers).");
+            return null;
+        }
+    }
+
+    #endregion
 }

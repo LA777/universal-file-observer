@@ -446,12 +446,12 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             // add snapshot to DB
             await sqLiteConnection.ExecuteAsync(SqlScripts.InsertSnapshotSql, snapshotEntity, transaction);
 
-            var volumeEntity = snapshotEntity.VolumeInfo.Volume;
-            var storageDriveEntity = volumeEntity.StorageDrive;
+            var volumeEntity = snapshotEntity.VolumeInfo!.Volume;
+            var storageDriveEntity = volumeEntity!.StorageDrive;
 
             // Find same PC in DB
-            var pcEntity = storageDriveEntity.Pcs[0];
-            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, new { PcName = pcEntity.Name });
+            var pcEntity = storageDriveEntity!.Pcs[0];
+            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, new { PcName = pcEntity.Name, DeviceId = pcEntity.DeviceId });
             if (pcInDb == null)
             {
                 _logger.LogInformation($"Insert PC: {pcEntity.Id}");
@@ -632,11 +632,11 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
 public static class SqlScripts
 {
-    public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName;";
+    public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName AND DeviceId = @DeviceId;";
     public const string InsertPcSql = "INSERT INTO Pcs " +
-                                        "(Id, Name) " +
+                                        "(Id, Name, DeviceId) " +
                                         "VALUES " +
-                                        "(@Id, @Name)";
+                                        "(@Id, @Name, @DeviceId)";
     public const string SelectStorageDriveSql = "SELECT * FROM StorageDrives WHERE SerialNumber = @SerialNumber AND DeviceId = @DeviceId AND Name = @Name;";
     public const string InsertStorageDriveSql = "INSERT INTO StorageDrives " +
                                                 "(Id, Name, DeviceId, SerialNumber, TotalSize, Description, MediaType, InterfaceType) " +

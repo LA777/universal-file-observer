@@ -7,6 +7,8 @@ namespace Ufo.Abstractions.Database.Entities;
 [Table("Pcs")]
 public class PcEntity : EntityBase
 {
+    public string? DeviceId { get; set; }
+
     [JsonPropertyOrder(80)]
     [JsonIgnore]
     [ManyToMany(typeof(PcsToStorageDrivesEntity))]
