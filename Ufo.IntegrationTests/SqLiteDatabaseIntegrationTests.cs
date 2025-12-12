@@ -682,7 +682,25 @@ namespace Ufo.IntegrationTests
                 folderCount++;
             }
 
+            // Sort folders and files by name recursively
+            SortFoldersAndFilesRecursively(rootFolder);
+
             return snapshot;
+        }
+
+        private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
+        {
+            // Sort child folders by name
+            folderEntity.ChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
+
+            // Sort files by name
+            folderEntity.Files = folderEntity.Files.OrderBy(f => f.Name).ToList();
+
+            // Recursively sort child folders
+            foreach (var childFolder in folderEntity.ChildFolders)
+            {
+                SortFoldersAndFilesRecursively(childFolder);
+            }
         }
 
         private List<FsFolderEntity> GetAllFolders(FsFolderEntity rootFolder)

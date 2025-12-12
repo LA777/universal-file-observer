@@ -209,6 +209,9 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                     param: new { SnapshotId = snapshotId },
                     splitOn: "SnapshotId, SnapshotId, Id");
 
+            // Sort folders and files by name for consistent ordering
+            SortFoldersAndFilesRecursively(snapshotResult.RootFolder!);
+
             return snapshotResult;
         }
         catch (Exception exception)
@@ -357,6 +360,9 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                     },
                     param: new { SnapshotId = snapshotResult.Id },
                     splitOn: "SnapshotId, SnapshotId, Id");
+
+            // Sort folders and files by name for consistent ordering
+            SortFoldersAndFilesRecursively(snapshotResult.RootFolder!);
 
             return snapshotResult;
 
@@ -579,13 +585,15 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
             await BindFolderWithFolderAndSnapshotAsync(sqLiteConnection, parentFolderEntity, folderEntity, snapshotEntity, transaction);
 
-            // add child Folders
+            // add child Folders (sorted by name)
+            //var sortedChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
             foreach (var childFolder in folderEntity.ChildFolders)
             {
                 await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, childFolder, folderEntity, snapshotEntity, transaction);
             }
 
-            // add Files
+            // add Files (sorted by name)
+            //var sortedFiles = folderEntity.Files.OrderBy(f => f.Name).ToList();
             foreach (var fileEntity in folderEntity.Files)
             { // check if File in DB
                 var fileInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FsFileEntity>(SqlScripts.SelectFileByNameAndParentFolderPathAndStorageDriveIdSql,
@@ -672,6 +680,21 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
         {
             _logger.LogError(exception, "ERROR - BindFileWithFolderAndSnapshotAsync");
             throw;
+        }
+    }
+
+    private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
+    {
+        // Sort child folders by name
+        folderEntity.ChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
+
+        // Sort files by name
+        folderEntity.Files = folderEntity.Files.OrderBy(f => f.Name).ToList();
+
+        // Recursively sort child folders
+        foreach (var childFolder in folderEntity.ChildFolders)
+        {
+            SortFoldersAndFilesRecursively(childFolder);
         }
     }
 }
