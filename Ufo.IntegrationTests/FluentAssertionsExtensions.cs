@@ -22,9 +22,8 @@ namespace Ufo.IntegrationTests
                 .Excluding(x => x.VolumeInfo!.Volume!.StorageDrive!.Volumes)
                 .Excluding(x => x.VolumeInfo!.Volume!.VolumeInfos)
                 .Excluding(x => x.RootFolder!.Snapshots)
-                .Excluding(x => x.RootFolder!.ParentFolders)
+                .Excluding(ctx => ctx.Path.Contains("ParentFolders"))
                 .Excluding(ctx => ctx.Path.Contains("Snapshots") && ctx.Path.Contains("Files"))
-                .Excluding(ctx => ctx.Path.Contains("ParentFolders") && ctx.Path.Contains("Files"))
                 .WithoutStrictOrdering();
         }
 
