@@ -15,7 +15,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 {
     private readonly ILogger<FileSystemSqLiteRepository> _logger;
     private readonly string _connectionString;
-
+   
     public FileSystemSqLiteRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<FileSystemSqLiteRepository>? logger)
     {
         _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
@@ -93,9 +93,12 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         volumeEntity.StorageDriveId = storageDriveEntity.Id;
                         storageDriveEntity.Snapshots.Add(snapshotResult);
                         storageDriveEntity.Volumes.Add(volumeEntity);
-                        storageDriveEntity.Pcs.Add(pcEntity);
-                        pcEntity.Snapshots.Add(snapshotResult);
-                        pcEntity.StorageDrives.Add(storageDriveEntity);
+                        if (pcEntity != null)
+                        {
+                            storageDriveEntity.Pcs.Add(pcEntity);
+                            pcEntity.Snapshots.Add(snapshotResult);
+                            pcEntity.StorageDrives.Add(storageDriveEntity);
+                        }
                     }
 
                     return snapshotResult;
@@ -108,9 +111,11 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                 throw new ArgumentNullException(nameof(snapshotResult));
             }
 
-            FsFolderEntity currentFolder = null;
+            FsFolderEntity? currentFolder = null;
             var folders = new Dictionary<Ulid, FsFolderEntity>();
             var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
+            var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
+            
             await sqLiteConnection
                 .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
@@ -125,6 +130,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                             {
                                 snapshotResult.RootFolder = fsFolderEntity;
                                 currentFolder = fsFolderEntity;
+                                processedFolderIds.Add(fsFolderEntity.Id);
                             }
                             else
                             {
@@ -135,21 +141,32 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         var currentFolderParentFolder = currentFolder?.ParentFolders.FirstOrDefault();
                         var currentFolderParentFolderId = currentFolderParentFolder?.Id;
 
-                        if (currentFolder.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId)
+                        // Only process folder relationships once per unique folder
+                        if (!processedFolderIds.Contains(fsFolderEntity.Id) && 
+                            (currentFolder!.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId))
                         {
+                            processedFolderIds.Add(fsFolderEntity.Id);
+                            
                             // find ParentFolder
-                            var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var parentFolder);
+                            var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId!.Value, out var parentFolder);
                             if (parentFolderWasFound)
                             {
-                                parentFolder.ChildFolders.Add(fsFolderEntity);
-                                fsFolderEntity.ParentFolders.Add(parentFolder);
+                                // Only add if not already added
+                                if (!parentFolder!.ChildFolders.Contains(fsFolderEntity))
+                                {
+                                    parentFolder.ChildFolders.Add(fsFolderEntity);
+                                    fsFolderEntity.ParentFolders.Add(parentFolder);
+                                }
                             }
                             else
                             {
                                 var childFolderWasFound1 = childFolders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var childFolderList);
                                 if (childFolderWasFound1)
                                 {
-                                    childFolderList.Add(fsFolderEntity);
+                                    if (!childFolderList!.Contains(fsFolderEntity))
+                                    {
+                                        childFolderList.Add(fsFolderEntity);
+                                    }
                                 }
                                 else
                                 {
@@ -161,10 +178,13 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                             var childFoldersWasFound = childFolders.TryGetValue(fsFolderEntity.Id, out var childFoldersList);
                             if (childFoldersWasFound)
                             {
-                                foreach (var childFolder in childFoldersList)
+                                foreach (var childFolder in childFoldersList!)
                                 {
-                                    childFolder.ParentFolders.Add(fsFolderEntity);
-                                    fsFolderEntity.ChildFolders.Add(childFolder);
+                                    if (!childFolder.ParentFolders.Contains(fsFolderEntity))
+                                    {
+                                        childFolder.ParentFolders.Add(fsFolderEntity);
+                                        fsFolderEntity.ChildFolders.Add(childFolder);
+                                    }
                                 }
 
                                 childFolders.Remove(fsFolderEntity.Id);
@@ -175,9 +195,13 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
                         if (fsFileEntity != null)
                         {
-                            fsFileEntity.Snapshots.Add(snapshotResult);
-                            fsFileEntity.ParentFolders.Add(currentFolder);
-                            currentFolder.Files.Add(fsFileEntity);
+                            // Only add file if not already added
+                            if (!currentFolder!.Files.Contains(fsFileEntity))
+                            {
+                                fsFileEntity.Snapshots.Add(snapshotResult);
+                                fsFileEntity.ParentFolders.Add(currentFolder);
+                                currentFolder.Files.Add(fsFileEntity);
+                            }
                         }
 
                         return currentFolder;
@@ -199,7 +223,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
-            SnapshotEntity snapshotResult = null;
+            SnapshotEntity? snapshotResult = null;
 
             await sqLiteConnection
             .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcsToStorageDrivesEntity, PcEntity, SnapshotEntity>(
@@ -219,9 +243,12 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         volumeEntity.StorageDriveId = storageDriveEntity.Id;
                         storageDriveEntity.Snapshots.Add(snapshotResult);
                         storageDriveEntity.Volumes.Add(volumeEntity);
-                        storageDriveEntity.Pcs.Add(pcEntity);
-                        pcEntity.Snapshots.Add(snapshotResult);
-                        pcEntity.StorageDrives.Add(storageDriveEntity);
+                        if (pcEntity != null)
+                        {
+                            storageDriveEntity.Pcs.Add(pcEntity);
+                            pcEntity.Snapshots.Add(snapshotResult);
+                            pcEntity.StorageDrives.Add(storageDriveEntity);
+                        }
                     }
 
                     return snapshotResult;
@@ -233,9 +260,11 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                 return null;
             }
 
-            FsFolderEntity currentFolder = null;
+            FsFolderEntity? currentFolder = null;
             var folders = new Dictionary<Ulid, FsFolderEntity>();
             var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
+            var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
+            
             await sqLiteConnection
                 .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
@@ -250,6 +279,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                             {
                                 snapshotResult.RootFolder = fsFolderEntity;
                                 currentFolder = fsFolderEntity;
+                                processedFolderIds.Add(fsFolderEntity.Id);
                             }
                             else
                             {
@@ -260,21 +290,32 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         var currentFolderParentFolder = currentFolder?.ParentFolders.FirstOrDefault();
                         var currentFolderParentFolderId = currentFolderParentFolder?.Id;
 
-                        if (currentFolder.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId)
+                        // Only process folder relationships once per unique folder
+                        if (!processedFolderIds.Contains(fsFolderEntity.Id) && 
+                            (currentFolder!.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId))
                         {
+                            processedFolderIds.Add(fsFolderEntity.Id);
+                            
                             // find ParentFolder
                             var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var parentFolder);
                             if (parentFolderWasFound)
                             {
-                                parentFolder.ChildFolders.Add(fsFolderEntity);
-                                fsFolderEntity.ParentFolders.Add(parentFolder);
+                                // Only add if not already added
+                                if (!parentFolder!.ChildFolders.Contains(fsFolderEntity))
+                                {
+                                    parentFolder.ChildFolders.Add(fsFolderEntity);
+                                    fsFolderEntity.ParentFolders.Add(parentFolder);
+                                }
                             }
                             else
                             {
                                 var childFolderWasFound1 = childFolders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var childFolderList);
                                 if (childFolderWasFound1)
                                 {
-                                    childFolderList.Add(fsFolderEntity);
+                                    if (!childFolderList!.Contains(fsFolderEntity))
+                                    {
+                                        childFolderList.Add(fsFolderEntity);
+                                    }
                                 }
                                 else
                                 {
@@ -286,10 +327,13 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                             var childFoldersWasFound = childFolders.TryGetValue(fsFolderEntity.Id, out var childFoldersList);
                             if (childFoldersWasFound)
                             {
-                                foreach (var childFolder in childFoldersList)
+                                foreach (var childFolder in childFoldersList!)
                                 {
-                                    childFolder.ParentFolders.Add(fsFolderEntity);
-                                    fsFolderEntity.ChildFolders.Add(childFolder);
+                                    if (!childFolder.ParentFolders.Contains(fsFolderEntity))
+                                    {
+                                        childFolder.ParentFolders.Add(fsFolderEntity);
+                                        fsFolderEntity.ChildFolders.Add(childFolder);
+                                    }
                                 }
 
                                 childFolders.Remove(fsFolderEntity.Id);
@@ -300,9 +344,13 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
                         if (fsFileEntity != null)
                         {
-                            fsFileEntity.Snapshots.Add(snapshotResult);
-                            fsFileEntity.ParentFolders.Add(currentFolder);
-                            currentFolder.Files.Add(fsFileEntity);
+                            // Only add file if not already added
+                            if (!currentFolder!.Files.Contains(fsFileEntity))
+                            {
+                                fsFileEntity.Snapshots.Add(snapshotResult);
+                                fsFileEntity.ParentFolders.Add(currentFolder);
+                                currentFolder.Files.Add(fsFileEntity);
+                            }
                         }
 
                         return currentFolder;
@@ -398,9 +446,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
 
 
-
-
-            // 1. Delete related records in PcsToStorageDrives
+            // 1. Delete related records in PcsToStorage
             //var deletedPcsToStorageDrives = await sqLiteConnection.ExecuteAsync(
             //    "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId",
             //    new { SnapshotId = snapshotId },

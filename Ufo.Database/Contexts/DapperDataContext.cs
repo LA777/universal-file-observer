@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
+using Ufo.Database.Handlers;
 
 namespace Ufo.Database.Contexts;
 
@@ -8,6 +9,7 @@ public static class DapperDataContext
     private const string Sql = @"
         CREATE TABLE IF NOT EXISTS Pcs (
             Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Pcs PRIMARY KEY,
+            DeviceId                  TEXT NOT NULL,
             Name                      TEXT NOT NULL
         );
 
@@ -48,7 +50,7 @@ public static class DapperDataContext
         CREATE TABLE IF NOT EXISTS PcsToStorageDrives (
             SnapshotId                TEXT NOT NULL,
             PcId                      TEXT NOT NULL,
-            StorageDriveId          TEXT NOT NULL,
+            StorageDriveId            TEXT NOT NULL,
 
             CONSTRAINT PK_PcsToStorageDrives                              PRIMARY KEY (PcId, StorageDriveId, SnapshotId),
             CONSTRAINT FK_PcsToStorageDrives_Pcs_PcId                     FOREIGN KEY (PcId)            REFERENCES Pcs (Id)           ON DELETE NO ACTION,
@@ -105,6 +107,12 @@ public static class DapperDataContext
         {
             throw new ArgumentNullException(nameof(connectionString));
         }
+
+        SqlMapper.AddTypeHandler(new SqlUlidTypeHandler());
+        SqlMapper.AddTypeHandler(new SqlNullableUlidTypeHandler());
+        SqlMapper.RemoveTypeMap(typeof(Ulid));
+        SqlMapper.RemoveTypeMap(typeof(Ulid?));
+        SqlMapper.AddTypeHandler(new DateTimeOffsetHandler());
 
         await using var sqLiteConnection = new SqliteConnection(connectionString);
         await sqLiteConnection.ExecuteAsync(Sql);
