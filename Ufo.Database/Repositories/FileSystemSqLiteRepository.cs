@@ -420,74 +420,111 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
     public async Task<DeleteResult> DeleteSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Implement deletion
-
-
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
-        await sqLiteConnection.OpenAsync();
-        using var transaction = await sqLiteConnection.BeginTransactionAsync();
+        await sqLiteConnection.OpenAsync(cancellationToken);
+        using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
         try
         {
+            _logger.LogInformation($"Deleting snapshot: {snapshotId}");
 
+            // Check if snapshot exists
+            var snapshot = await sqLiteConnection.QuerySingleOrDefaultAsync<SnapshotEntity>(
+                "SELECT * FROM Snapshots WHERE Id = @SnapshotId;",
+                new { SnapshotId = snapshotId },
+                transaction);
 
-            // Select PcsToStorageDrives by SnapshotId
-            // Select PCs that have only one Snapshot that is deleting
-            // Select StorageDrives that have only one Snapshot that is deleting
-            // Select Volumes by StorageDriveId
-            // Select VolumeInfoes by VolumeId and SnapshotId
+            if (snapshot == null)
+            {
+                return DeleteResult.NotFound;
+            }
 
+            // 1. Delete FilesToFolders entries for this snapshot
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteFilesToFoldersBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted FilesToFolders entries for snapshot: {snapshotId}");
 
-            // Select FolderToFiles by SnapshotId
-            // Delete Files that have only one Snapshot that is deleting
+            // 2. Delete Files that have no other snapshots
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteFilesWithoutSnapshotsSql,
+                null,
+                transaction);
+            _logger.LogInformation($"Deleted Files with no snapshots");
 
-            // Select FolderToFolders by SnapshotId
-            // Delete Folders that have only one Snapshot that is deleting
+            // 3. Delete FoldersToFolders entries for this snapshot
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteFoldersToFoldersBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted FoldersToFolders entries for snapshot: {snapshotId}");
 
+            // 4. Delete Folders that have no other snapshots
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteFoldersWithoutSnapshotsSql,
+                null,
+                transaction);
+            _logger.LogInformation($"Deleted Folders with no snapshots");
 
-            // Dev snapshot         cc9785d5-7bb1-47e6-beb1-6c011c026fd9
-            // PC Id              1bd5a3d1-4fa1-47d0-b723-2a483413aa54 - has other Snapshots
-            // StorageDriveId     0c59da92-3826-49a2-8b74-772e5c3f1047 - has other Snapshots
+            // 5. Delete PcsToStorageDrives entries for this snapshot
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeletePcsToStorageDrivesBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted PcsToStorageDrives entries for snapshot: {snapshotId}");
 
+            // 6. Delete Pcs that have no other storage drives
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeletePcsWithoutStorageDrivesSql,
+                null,
+                transaction);
+            _logger.LogInformation($"Deleted Pcs with no StorageDrives");
 
+            // 7. Delete StorageDrives that have no other volumes and no other snapshots
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteStorageDrivesWithoutVolumesAndSnapshotsSql,
+                null,
+                transaction);
+            _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");
 
+            // 8. Delete Volumes that have no other volume infos
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteVolumesWithoutVolumeInfosSql,
+                null,
+                transaction);
+            _logger.LogInformation($"Deleted Volumes with no VolumeInfos");
 
-            // 1. Delete related records in PcsToStorage
-            //var deletedPcsToStorageDrives = await sqLiteConnection.ExecuteAsync(
-            //    "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId",
-            //    new { SnapshotId = snapshotId },
-            //    transaction
-            //);
+            // 9. Delete VolumeInfo entries for this snapshot
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteVolumeInfoBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted VolumeInfo for snapshot: {snapshotId}");
 
-            // 2. Delete the snapshot from Fodlers
-            //var deletedPcsToStorageDrives = await sqLiteConnection.ExecuteAsync(
-            //    "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId",
-            //    new { SnapshotId = snapshotId },
-            //    transaction
-            //);
+            // 10. Finally, delete the snapshot itself
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteSnapshotByIdSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted snapshot: {snapshotId}");
 
-
-            // 3. Delete the snapshot from Snapshots
-            //var deletedSnapshots = await sqLiteConnection.ExecuteAsync(
-            //    "DELETE FROM Snapshots WHERE Id = @Id",
-            //    new { Id = snapshotId },
-            //    transaction
-            //);
-
-            await transaction.CommitAsync();
+            await transaction.CommitAsync(cancellationToken);
 
             return DeleteResult.Success;
         }
         catch (Exception exception)
         {
-            await transaction.RollbackAsync();
+            await transaction.RollbackAsync(cancellationToken);
             _logger.LogError(exception, "ERROR - DeleteSnapshotByIdAsync");
             throw;
         }
     }
 
     public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default)
-    {
+    { 
+        // NOTE: Covered by Integration Tests
+
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
@@ -816,4 +853,16 @@ public static class SqlScripts
                                                 "DROP TABLE IF EXISTS VolumeInfos;" +
                                                 "DROP TABLE IF EXISTS Files;" +
                                                 "PRAGMA foreign_keys = ON;";
+
+    // Delete SQL Scripts
+    public const string DeleteFilesToFoldersBySnapshotSql = "DELETE FROM FilesToFolders WHERE SnapshotId = @SnapshotId;";
+    public const string DeleteFilesWithoutSnapshotsSql = "DELETE FROM Files WHERE Id NOT IN (SELECT DISTINCT FileId FROM FilesToFolders);";
+    public const string DeleteFoldersToFoldersBySnapshotSql = "DELETE FROM FoldersToFolders WHERE SnapshotId = @SnapshotId;";
+    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id NOT IN (SELECT DISTINCT ChildFolderId FROM FoldersToFolders) AND Id NOT IN (SELECT DISTINCT ParentFolderId FROM FoldersToFolders);";
+    public const string DeletePcsToStorageDrivesBySnapshotSql = "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId;";
+    public const string DeletePcsWithoutStorageDrivesSql = "DELETE FROM Pcs WHERE Id NOT IN (SELECT DISTINCT PcId FROM PcsToStorageDrives);";
+    public const string DeleteStorageDrivesWithoutVolumesAndSnapshotsSql = "DELETE FROM StorageDrives WHERE Id NOT IN (SELECT DISTINCT StorageDriveId FROM Volumes) AND Id NOT IN (SELECT DISTINCT StorageDriveId FROM PcsToStorageDrives);";
+    public const string DeleteVolumesWithoutVolumeInfosSql = "DELETE FROM Volumes WHERE Id NOT IN (SELECT DISTINCT VolumeId FROM VolumeInfos);";
+    public const string DeleteVolumeInfoBySnapshotSql = "DELETE FROM VolumeInfos WHERE SnapshotId = @SnapshotId;";
+    public const string DeleteSnapshotByIdSql = "DELETE FROM Snapshots WHERE Id = @SnapshotId;";
 }

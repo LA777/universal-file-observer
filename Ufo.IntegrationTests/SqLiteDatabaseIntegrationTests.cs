@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using System.Diagnostics;
+using Ufo.Abstractions;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Options;
 using Ufo.Database.Contexts;
@@ -405,6 +406,53 @@ namespace Ufo.IntegrationTests
 
                 retrievedSnapshot.Should().BeEquivalentTo(snapshot, options =>
                   options.ExcludingCircularReferences());
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_WhenSnapshotExists_DeletesSnapshotAndRelatedEntities()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var snapshot = CreateSnapshotWithFiles();
+
+                await _repository!.AddSnapshotAsync(snapshot);
+
+                // Act
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot.Id);
+
+                // Assert
+                result.Should().Be(DeleteResult.Success);
+
+                var allSnapshots = await _repository.GetAllSnapshotsAsync();
+                allSnapshots.Should().NotContain(s => s.Id == snapshot.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_WhenSnapshotNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var missingId = Ulid.NewUlid();
+
+                // Act
+                var result = await _repository!.DeleteSnapshotByIdAsync(missingId);
+
+                // Assert
+                result.Should().Be(DeleteResult.NotFound);
             }
             finally
             {
