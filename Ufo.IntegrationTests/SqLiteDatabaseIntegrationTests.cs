@@ -31,6 +31,8 @@ namespace Ufo.IntegrationTests
                 .Returns(new DatabaseOptions { ConnectionString = _connectionString });
         }
 
+        #region Database Initialization and Cleanup
+
         async ValueTask IAsyncDisposable.DisposeAsync()
         {
             await Task.Run(CleanupDatabase);
@@ -101,6 +103,10 @@ namespace Ufo.IntegrationTests
                 }
             }
         }
+
+        #endregion
+
+        #region AddSnapshotAsync Tests
 
         [Fact]
         public async Task AddSnapshotAsync_WithSimpleFolder_CreatesSnapshotSuccessfully()
@@ -413,6 +419,10 @@ namespace Ufo.IntegrationTests
             }
         }
 
+        #endregion
+
+        #region DeleteSnapshotByIdAsync Tests
+
         [Fact]
         public async Task DeleteSnapshotByIdAsync_WhenSnapshotExists_DeletesSnapshotAndRelatedEntities()
         {
@@ -459,6 +469,373 @@ namespace Ufo.IntegrationTests
                 CleanupDatabase();
             }
         }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_DeletesFoldersIfTheyNotShared()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create snapshot 1 with unique folder structure
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var sharedFolder = new FsFolderEntity
+                {
+                    Name = "SharedFolder",
+                    Size = 100,
+                    Sha256Hash = "sharedhash"
+                };
+                var uniqueFolder1 = new FsFolderEntity
+                {
+                    Name = "UniqueFolder1",
+                    Size = 200,
+                    Sha256Hash = "uniquehash1"
+                };
+                snapshot1.RootFolder!.ChildFolders.Add(sharedFolder);
+                sharedFolder.ParentFolders.Add(snapshot1.RootFolder);
+                snapshot1.RootFolder.ChildFolders.Add(uniqueFolder1);
+                uniqueFolder1.ParentFolders.Add(snapshot1.RootFolder);
+
+                // Create snapshot 2 with shared folder but different PC and StorageDrive
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "TestPc2",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive2",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "D:",
+                    VolumeName = "DataDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "D:\\", Size = 0, Sha256Hash = "d_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                // Add shared folder to snapshot2
+                rootFolder2.ChildFolders.Add(sharedFolder);
+                sharedFolder.ParentFolders.Add(rootFolder2);
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository.AddSnapshotAsync(snapshot2);
+                var sharedFolderId = sharedFolder.Id;
+                var uniqueFolderId = uniqueFolder1.Id;
+
+                // Act - Delete snapshot 1
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+
+                // Assert
+                result.Should().Be(DeleteResult.Success);
+
+                // Shared folder should still exist (used by snapshot 2)
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var allFolders = GetAllFolders(snapshot2After.RootFolder!);
+                allFolders.Should().Contain(f => f.Id == sharedFolderId);
+
+                // Unique folder should be deleted
+                await using var connection = new SqliteConnection(_connectionString);
+                var uniqueFolderExists = await connection.QueryFirstOrDefaultAsync<FsFolderEntity>(
+                    "SELECT * FROM Folders WHERE Id = @Id",
+                    new { Id = uniqueFolderId });
+                uniqueFolderExists.Should().BeNull();
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_DeletesFilesIfTheyNotShared()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create snapshot 1 with shared and unique files
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var sharedFile = new FsFileEntity
+                {
+                    Name = "shared",
+                    FileExtension = ".txt",
+                    Size = 100,
+                    Sha256Hash = "sharedhashfile"
+                };
+                var uniqueFile = new FsFileEntity
+                {
+                    Name = "unique",
+                    FileExtension = ".txt",
+                    Size = 200,
+                    Sha256Hash = "uniquehashfile"
+                };
+                snapshot1.RootFolder!.Files.Add(sharedFile);
+                sharedFile.ParentFolders.Add(snapshot1.RootFolder);
+                snapshot1.RootFolder.Files.Add(uniqueFile);
+                uniqueFile.ParentFolders.Add(snapshot1.RootFolder);
+
+                // Create snapshot 2 with shared file but different PC and StorageDrive
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "TestPc3",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive3",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "E:",
+                    VolumeName = "ExtraDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "E:\\", Size = 0, Sha256Hash = "e_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                // Add shared file to snapshot 2
+                rootFolder2.Files.Add(sharedFile);
+                sharedFile.ParentFolders.Add(rootFolder2);
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository.AddSnapshotAsync(snapshot2);
+                var sharedFileId = sharedFile.Id;
+                var uniqueFileId = uniqueFile.Id;
+
+                // Act - Delete snapshot 1
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+
+                // Assert
+                result.Should().Be(DeleteResult.Success);
+
+                // Shared file should still exist (used by snapshot 2)
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                snapshot2After.RootFolder!.Files.Should().Contain(f => f.Id == sharedFileId);
+
+                // Unique file should be deleted
+                await using var connection = new SqliteConnection(_connectionString);
+                var uniqueFileExists = await connection.QueryFirstOrDefaultAsync<FsFileEntity>(
+                    "SELECT * FROM Files WHERE Id = @Id",
+                    new { Id = uniqueFileId });
+                uniqueFileExists.Should().BeNull();
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_DeletesPcIfItNotShared()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create snapshot 1 with unique PC
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var pcId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Id;
+
+                // Create snapshot 2 with different PC
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "UniqueTestPc",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive4",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "F:",
+                    VolumeName = "FileDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "F:\\", Size = 0, Sha256Hash = "f_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository.AddSnapshotAsync(snapshot2);
+                var pc2Id = pc2.Id;
+
+                // Act - Delete snapshot 1
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+
+                // Assert
+                result.Should().Be(DeleteResult.Success);
+
+                // PC from snapshot 2 should still exist
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                snapshot2After.VolumeInfo!.Volume!.StorageDrive!.Pcs.Should().Contain(p => p.Id == pc2Id);
+
+                // PC from snapshot 1 should be deleted
+                await using var connection = new SqliteConnection(_connectionString);
+                var pc1Exists = await connection.QueryFirstOrDefaultAsync<PcEntity>(
+                    "SELECT * FROM Pcs WHERE Id = @Id",
+                    new { Id = pcId1 });
+                pc1Exists.Should().BeNull();
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_DeletesStorageDriveIfItNotShared()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create snapshot 1 with unique StorageDrive
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var storageDriveId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Id;
+
+                // Create snapshot 2 with different StorageDrive
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "TestPc4",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "UniqueDrive",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "G:",
+                    VolumeName = "GameDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "G:\\", Size = 0, Sha256Hash = "g_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository.AddSnapshotAsync(snapshot2);
+                var storageDrive2Id = storageDrive2.Id;
+
+                // Act - Delete snapshot 1
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+
+                // Assert
+                result.Should().Be(DeleteResult.Success);
+
+                // StorageDrive from snapshot 2 should still exist
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                snapshot2After.VolumeInfo!.Volume!.StorageDrive!.Id.Should().Be(storageDrive2Id);
+
+                // StorageDrive from snapshot 1 should be deleted
+                await using var connection = new SqliteConnection(_connectionString);
+                var storageDrive1Exists = await connection.QueryFirstOrDefaultAsync<StorageDriveEntity>(
+                    "SELECT * FROM StorageDrives WHERE Id = @Id",
+                    new { Id = storageDriveId1 });
+                storageDrive1Exists.Should().BeNull();
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        #endregion
+
+        #region Helper Methods
 
         // Helper methods
         private SnapshotEntity CreateSnapshotWithSimpleFolder()
@@ -779,5 +1156,7 @@ namespace Ufo.IntegrationTests
             }
             return count;
         }
+
+        #endregion
     }
 }
