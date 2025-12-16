@@ -20,37 +20,38 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
-- Add Indexes to DB
-- Add CreatedAt and UpdatedAt for Entities
-+ Use ULID instead of Guid
-+ Fix - Create Snapshot
-+ Delete Snapshot
-+ Add Description to Snapshot
 - Add Labels to Snapshot
-- Delete All Snapshots. Labels shall preserve
 - Add Search by File name or Folder name
-- Delete Snapshot Folder
-- Delete Snapshot File
-+ optimize JSON view - folder name at bottom
-- [UI] Finish FolderTree Angular component
-- [UI] Change UI for Snapshot Tree MatTree
 - Search inside Snapshot/Snapshots
 - [UI] Add Spinner while data is loading
+- [UI] Finish FolderTree Angular component
+- [UI] Change UI for Snapshot Tree MatTree
+- [UI] Ability to View Photo, Video and TXT files
+- [UI] View file Hash
+- Delete Snapshot Folder
+- Delete Snapshot File
+- Add Indexes to DB
+- Add CreatedAt and UpdatedAt for Entities
+- Delete All Snapshots. Labels shall preserve
 - Split Entites (Entity for DB and Entity for UI)
 - Split Entites (UI)
-+ [UI] Make Snapshot tree browsable
 - add PIN to enter the APP
 - add Encryption for all fields in DB
 - [UI] Remove Forecast Controller and UI tab
 - [UI] Create navigation for Forward and Backward
 - [UI] Ability to edit text files
-- [UI] Ability to View Photo, Video and TXT files
 - [UI] Ability to Download files
 - [UI] Copy, Move, Delete files
-- [UI] View file Hash
 - [UI] Make Two panel file view
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 
+DONE:
++ Use ULID instead of Guid
++ Fix - Create Snapshot
++ Delete Snapshot
++ Add Description to Snapshot
++ [UI] Make Snapshot tree browsable
++ optimize JSON view - folder name at bottom
 
 
 UnauthorizedAccessException
