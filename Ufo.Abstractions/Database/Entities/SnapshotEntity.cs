@@ -16,6 +16,10 @@ public class SnapshotEntity
     [JsonPropertyOrder(5)]
     public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
 
+    [JsonPropertyOrder(6)]
+    [MaxLength(1024)]
+    public string? Description { get; set; }
+
     [JsonPropertyOrder(10)]
     [OneToOne(nameof(FsFolderEntity))]
     public FsFolderEntity? RootFolder { get; set; }

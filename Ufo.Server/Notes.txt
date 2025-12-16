@@ -21,9 +21,14 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 TODO:
 - Add Indexes to DB
+- Add CreatedAt and UpdatedAt for Entities
 + Use ULID instead of Guid
-- Fix - Create Snapshot
-- Delete Snapshot
++ Fix - Create Snapshot
++ Delete Snapshot
++ Add Description to Snapshot
+- Add Labels to Snapshot
+- Delete All Snapshots. Labels shall preserve
+- Add Search by File name or Folder name
 - Delete Snapshot Folder
 - Delete Snapshot File
 + optimize JSON view - folder name at bottom

@@ -396,14 +396,14 @@ namespace Ufo.IntegrationTests
                 Assert.NotNull(retrievedSnapshot);
                 var allFolders = GetAllFolders(retrievedSnapshot!.RootFolder!);
                 Assert.True(allFolders.Count > 10, "Expected large folder structure");
-                
+
                 // Calculate total amount of folders and files in both snapshots and compare counts
                 var originalFolderCount = GetAllFolders(snapshot.RootFolder!).Count;
                 var originalFileCount = GetTotalFileCount(snapshot.RootFolder!);
-                
+
                 var retrievedFolderCount = GetAllFolders(retrievedSnapshot.RootFolder!).Count;
                 var retrievedFileCount = GetTotalFileCount(retrievedSnapshot.RootFolder!);
-                
+
                 Assert.Equal(originalFolderCount, retrievedFolderCount);
                 Assert.Equal(originalFileCount, retrievedFileCount);
 
@@ -412,6 +412,185 @@ namespace Ufo.IntegrationTests
 
                 retrievedSnapshot.Should().BeEquivalentTo(snapshot, options =>
                   options.ExcludingCircularReferences());
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddSnapshotAsync_WithDuplicateFiles_ReusesFiles()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Snapshot 1 and Snapshot 2 will share the same files.
+                // Count of files in DB should be 1 for each file after adding both snapshots.
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var sharedFile = new FsFileEntity
+                {
+                    Name = "sharedfile",
+                    FileExtension = ".txt",
+                    Size = 1024,
+                    Sha256Hash = "sharedhashvalue123"
+                };
+                snapshot1.RootFolder!.Files.Add(sharedFile);
+                sharedFile.ParentFolders.Add(snapshot1.RootFolder);
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                var originalFileId = sharedFile.Id;
+
+                // Create snapshot 2 with the same file (same hash and properties)
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "TestPc5",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive5",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "H:",
+                    VolumeName = "HelperDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "H:\\", Size = 0, Sha256Hash = "h_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                // Add the same file to snapshot 2 (same hash)
+                rootFolder2.Files.Add(sharedFile);
+                sharedFile.ParentFolders.Add(rootFolder2);
+
+                // Act
+                await _repository.AddSnapshotAsync(snapshot2);
+
+                // Assert
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var fileFromSnapshot2 = retrievedSnapshot2.RootFolder!.Files.First();
+                Assert.Equal(originalFileId, fileFromSnapshot2.Id);
+
+                // Verify there's only one file with this hash in the database
+                await using var connection = new SqliteConnection(_connectionString);
+                var fileCount = await connection.QueryFirstOrDefaultAsync<int>(
+                    "SELECT COUNT(*) FROM Files WHERE Sha256Hash = @Hash",
+                    new { Hash = "sharedhashvalue123" });
+                Assert.Equal(1, fileCount);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddSnapshotAsync_WithDuplicateFolder_ReusesFolder()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Snapshot 1 and Snapshot 2 will share the same folder.
+                // Count of folders in DB should be 1 after adding both snapshots.
+                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var sharedFolder = new FsFolderEntity
+                {
+                    Name = "SharedFolder",
+                    Size = 5000,
+                    Sha256Hash = "sharedfolderhash456"
+                };
+                snapshot1.RootFolder!.ChildFolders.Add(sharedFolder);
+                sharedFolder.ParentFolders.Add(snapshot1.RootFolder);
+
+                await _repository!.AddSnapshotAsync(snapshot1);
+                var originalFolderId = sharedFolder.Id;
+
+                // Create snapshot 2 with the same folder (same hash and properties)
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var pc2 = new PcEntity
+                {
+                    Name = "TestPc6",
+                    DeviceId = Guid.NewGuid().ToString()
+                };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive6",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1099511627776,
+                    Description = "Disk drive",
+                    MediaType = "Fixed hard disk media",
+                    InterfaceType = "SATA"
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "I:",
+                    VolumeName = "ImageDrive",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 549755813888,
+                    Description = "Local Fixed Disk"
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
+                var rootFolder2 = new FsFolderEntity { Name = "I:\\", Size = 0, Sha256Hash = "i_drive_hash" };
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                // Add the same folder to snapshot 2 (same hash)
+                rootFolder2.ChildFolders.Add(sharedFolder);
+                sharedFolder.ParentFolders.Add(rootFolder2);
+
+                // Act
+                await _repository.AddSnapshotAsync(snapshot2);
+
+                // Assert
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var folderFromSnapshot2 = retrievedSnapshot2.RootFolder!.ChildFolders.First();
+                Assert.Equal(originalFolderId, folderFromSnapshot2.Id);
+
+                // Verify there's only one folder with this hash in the database
+                await using var connection = new SqliteConnection(_connectionString);
+                var folderCount = await connection.QueryFirstOrDefaultAsync<int>(
+                    "SELECT COUNT(*) FROM Folders WHERE Sha256Hash = @Hash",
+                    new { Hash = "sharedfolderhash456" });
+                Assert.Equal(1, folderCount);
             }
             finally
             {
@@ -546,6 +725,14 @@ namespace Ufo.IntegrationTests
                 await _repository.AddSnapshotAsync(snapshot2);
                 var sharedFolderId = sharedFolder.Id;
                 var uniqueFolderId = uniqueFolder1.Id;
+
+                var jsonSnapshot1BeforeDb = System.Text.Json.JsonSerializer.Serialize(snapshot1);
+                var jsonSnapshot2BeforeDb = System.Text.Json.JsonSerializer.Serialize(snapshot2);
+                var snapshot1FromDb = await _repository.GetSnapshotByIdAsync(snapshot1.Id);
+                var snapshot2FromDb = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var jsonSnapshot1FromDb = System.Text.Json.JsonSerializer.Serialize(snapshot1FromDb);
+                var jsonSnapshot2FromDb = System.Text.Json.JsonSerializer.Serialize(snapshot2FromDb);
+
 
                 // Act - Delete snapshot 1
                 var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
@@ -754,7 +941,7 @@ namespace Ufo.IntegrationTests
         }
 
         [Fact]
-        public async Task DeleteSnapshotByIdAsync_DeletesStorageDriveIfItNotShared()
+        public async Task DeleteSnapshotByIdAsync_DeletesStorageDriveAndVolumeIfItNotShared()
         {
             // Arrange
             await InitializeDatabaseAsync();
@@ -763,9 +950,10 @@ namespace Ufo.IntegrationTests
                 // Create snapshot 1 with unique StorageDrive
                 var snapshot1 = CreateSnapshotWithSystemInfo();
                 var storageDriveId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Id;
+                var volumerId1 = snapshot1.VolumeInfo!.Volume!.Id;
 
                 // Create snapshot 2 with different StorageDrive
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { Description = "Test Snapshot 28171" };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc4",
@@ -808,7 +996,7 @@ namespace Ufo.IntegrationTests
 
                 await _repository!.AddSnapshotAsync(snapshot1);
                 await _repository.AddSnapshotAsync(snapshot2);
-                var storageDrive2Id = storageDrive2.Id;
+                var storageDrive2Id = storageDrive2.Id;  
 
                 // Act - Delete snapshot 1
                 var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
@@ -826,12 +1014,18 @@ namespace Ufo.IntegrationTests
                     "SELECT * FROM StorageDrives WHERE Id = @Id",
                     new { Id = storageDriveId1 });
                 storageDrive1Exists.Should().BeNull();
+
+                // Volume from snapshot 1 should be deleted
+                var volume1Exists = await connection.QueryFirstOrDefaultAsync<VolumeEntity>(
+                    "SELECT * FROM Volumes WHERE Id = @Id",
+                    new { Id = volumerId1 });
+                volume1Exists.Should().BeNull();
             }
             finally
             {
                 CleanupDatabase();
             }
-        }
+        }        
 
         #endregion
 
@@ -840,7 +1034,7 @@ namespace Ufo.IntegrationTests
         // Helper methods
         private SnapshotEntity CreateSnapshotWithSimpleFolder()
         {
-            var snapshot = new SnapshotEntity();
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853" };
             var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
             var storageDrive = new StorageDriveEntity
             {
@@ -908,7 +1102,7 @@ namespace Ufo.IntegrationTests
                 Sha256Hash = "grandchildhash"
             };
 
-            rootFolder.ChildFolders.Add(childFolder1);
+            rootFolder!.ChildFolders.Add(childFolder1);
             childFolder1.ParentFolders.Add(rootFolder);
 
             childFolder1.ChildFolders.Add(grandchildFolder);
@@ -946,7 +1140,7 @@ namespace Ufo.IntegrationTests
                 Sha256Hash = "filehash3"
             };
 
-            rootFolder.Files.Add(file1);
+            rootFolder!.Files.Add(file1);
             rootFolder.Files.Add(file2);
             rootFolder.Files.Add(file3);
 
@@ -976,7 +1170,7 @@ namespace Ufo.IntegrationTests
                 Sha256Hash = "subdochash"
             };
 
-            rootFolder.ChildFolders.Add(folder1);
+            rootFolder!.ChildFolders.Add(folder1);
             folder1.ParentFolders.Add(rootFolder);
 
             folder1.ChildFolders.Add(folder2);
@@ -1009,7 +1203,7 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithSystemInfo()
         {
-            var snapshot = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot 35464" };
             var pc = new PcEntity
             {
                 Name = "TestPc30290",
@@ -1108,7 +1302,7 @@ namespace Ufo.IntegrationTests
             }
 
             // Sort folders and files by name recursively
-            SortFoldersAndFilesRecursively(rootFolder);
+            SortFoldersAndFilesRecursively(rootFolder!);
 
             return snapshot;
         }

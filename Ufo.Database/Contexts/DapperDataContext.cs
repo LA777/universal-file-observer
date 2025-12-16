@@ -60,7 +60,8 @@ public static class DapperDataContext
 
         CREATE TABLE IF NOT EXISTS Snapshots (
             Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Snapshots PRIMARY KEY,
-            Timestamp                 TEXT NOT NULL
+            Timestamp                 TEXT NOT NULL,
+            Description               TEXT
         );
 
         CREATE TABLE IF NOT EXISTS Folders (

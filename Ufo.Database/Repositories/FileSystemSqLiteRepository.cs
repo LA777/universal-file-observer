@@ -481,12 +481,12 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                 transaction);
             _logger.LogInformation($"Deleted Pcs with no StorageDrives");
 
-            // 7. Delete StorageDrives that have no other volumes and no other snapshots
+            // 7. Delete VolumeInfo entries for this snapshot
             await sqLiteConnection.ExecuteAsync(
-                SqlScripts.DeleteStorageDrivesWithoutVolumesAndSnapshotsSql,
-                null,
+                SqlScripts.DeleteVolumeInfoBySnapshotSql,
+                new { SnapshotId = snapshotId },
                 transaction);
-            _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");
+            _logger.LogInformation($"Deleted VolumeInfo for snapshot: {snapshotId}");
 
             // 8. Delete Volumes that have no other volume infos
             await sqLiteConnection.ExecuteAsync(
@@ -495,12 +495,12 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                 transaction);
             _logger.LogInformation($"Deleted Volumes with no VolumeInfos");
 
-            // 9. Delete VolumeInfo entries for this snapshot
+            // 9. Delete StorageDrives that have no other volumes and no other snapshots
             await sqLiteConnection.ExecuteAsync(
-                SqlScripts.DeleteVolumeInfoBySnapshotSql,
-                new { SnapshotId = snapshotId },
+                SqlScripts.DeleteStorageDrivesWithoutVolumesAndSnapshotsSql,
+                null,
                 transaction);
-            _logger.LogInformation($"Deleted VolumeInfo for snapshot: {snapshotId}");
+            _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");   
 
             // 10. Finally, delete the snapshot itself
             await sqLiteConnection.ExecuteAsync(
@@ -779,9 +779,9 @@ public static class SqlScripts
                                                                 "LEFT JOIN Files AS file ON fi2fl.FileId = file.Id " +
                                                                 "WHERE fl2fl.SnapshotId = @SnapshotId;";
     public const string InsertSnapshotSql = "INSERT INTO Snapshots " +
-                                            "(Id, Timestamp) " +
+                                            "(Id, Timestamp, Description) " +
                                             "VALUES " +
-                                            "(@Id, @Timestamp)";
+                                            "(@Id, @Timestamp, @Description)";
     public const string SelectVolumeSql = "SELECT * FROM Volumes WHERE VolumeSerialNumber = @VolumeSerialNumber;";
     public const string InsertVolumeSql = "INSERT INTO Volumes " +
                                             "(Id, DriveLetter, VolumeName, Description, VolumeSerialNumber, VolumeSize, StorageDriveId) " +
@@ -858,7 +858,7 @@ public static class SqlScripts
     public const string DeleteFilesToFoldersBySnapshotSql = "DELETE FROM FilesToFolders WHERE SnapshotId = @SnapshotId;";
     public const string DeleteFilesWithoutSnapshotsSql = "DELETE FROM Files WHERE Id NOT IN (SELECT DISTINCT FileId FROM FilesToFolders);";
     public const string DeleteFoldersToFoldersBySnapshotSql = "DELETE FROM FoldersToFolders WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id NOT IN (SELECT DISTINCT ChildFolderId FROM FoldersToFolders) AND Id NOT IN (SELECT DISTINCT ParentFolderId FROM FoldersToFolders);";
+    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id NOT IN (SELECT DISTINCT ChildFolderId FROM FoldersToFolders);";
     public const string DeletePcsToStorageDrivesBySnapshotSql = "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId;";
     public const string DeletePcsWithoutStorageDrivesSql = "DELETE FROM Pcs WHERE Id NOT IN (SELECT DISTINCT PcId FROM PcsToStorageDrives);";
     public const string DeleteStorageDrivesWithoutVolumesAndSnapshotsSql = "DELETE FROM StorageDrives WHERE Id NOT IN (SELECT DISTINCT StorageDriveId FROM Volumes) AND Id NOT IN (SELECT DISTINCT StorageDriveId FROM PcsToStorageDrives);";
