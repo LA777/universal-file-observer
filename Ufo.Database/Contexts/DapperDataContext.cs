@@ -100,6 +100,21 @@ public static class DapperDataContext
             CONSTRAINT FK_FilesToFolders_Files_FileId          FOREIGN KEY (FileId)      REFERENCES Files (Id)     ON DELETE NO ACTION,
             CONSTRAINT FK_FilesToFolders_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
         );
+
+        CREATE TABLE IF NOT EXISTS Lables (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Labels PRIMARY KEY,
+            Name                      TEXT NOT NULL,
+            ColorHex                  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS LabelsToSnapshots (
+            LabelId                   TEXT NOT NULL,
+            SnapshotId                TEXT NOT NULL,
+
+            CONSTRAINT PK_LabelsToSnapshots                       PRIMARY KEY (LabelId, SnapshotId),
+            CONSTRAINT FK_LabelsToSnapshots_Labels_LabelId        FOREIGN KEY (LabelId)     REFERENCES Labels (Id)    ON DELETE NO ACTION,
+            CONSTRAINT FK_LabelsToSnapshots_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
+        );
     ";
 
     public static async Task InitiateDatabaseAsync(string? connectionString)

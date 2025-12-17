@@ -21,6 +21,11 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 TODO:
 - Add Labels to Snapshot
+- Add Repository for Labels
+- API - CRUD for Labels
+- API - Assign/Remove Labels to/from Snapshot
+- API - Get Snapshots by Label
+- API - create Snapshot with Labels
 - Add Search by File name or Folder name
 - Search inside Snapshot/Snapshots
 - [UI] Add Spinner while data is loading

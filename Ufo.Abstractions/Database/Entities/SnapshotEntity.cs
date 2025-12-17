@@ -27,4 +27,8 @@ public class SnapshotEntity
     [JsonPropertyOrder(20)]
     [OneToOne(nameof(VolumeInfoEntity))]
     public VolumeInfoEntity? VolumeInfo { get; set; }
+
+    [JsonPropertyOrder(99)]
+    [ManyToMany(typeof(FoldersToFoldersEntity))]
+    public IList<LabelEntity> Labels { get; set; } = [];
 }
