@@ -14,14 +14,14 @@ using FluentAssertions;
 
 namespace Ufo.IntegrationTests
 {
-    public class SqLiteDatabaseIntegrationTests : IAsyncDisposable
+    public class FileSystemSqLiteRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
         private readonly Mock<ILogger<FileSystemSqLiteRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
         private FileSystemSqLiteRepository? _repository;
 
-        public SqLiteDatabaseIntegrationTests()
+        public FileSystemSqLiteRepositoryIntegrationTests()
         {
             var databaseFileName = $"test-{Guid.NewGuid()}.db";
             _connectionString = $"Data Source={databaseFileName};Foreign Keys=True";

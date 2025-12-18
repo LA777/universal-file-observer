@@ -418,6 +418,8 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
         }
     }
 
+    #region DeleteSnapshotByIdAsync
+
     public async Task<DeleteResult> DeleteSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
     {
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -500,7 +502,14 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                 SqlScripts.DeleteStorageDrivesWithoutVolumesAndSnapshotsSql,
                 null,
                 transaction);
-            _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");   
+            _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");
+
+            // Delete association with labels. Labels should not be deleted.
+            // TODO LA - Add Integration tests for this case
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteLabelsToSnapshotsBySnapshotIdSql,
+                new { SnapshotId = snapshotId },
+                transaction);
 
             // 10. Finally, delete the snapshot itself
             await sqLiteConnection.ExecuteAsync(
@@ -520,6 +529,10 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             throw;
         }
     }
+
+    #endregion
+
+    #region AddSnapshotAsync
 
     public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default)
     { 
@@ -589,6 +602,9 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 
             // add Folder Tree to DB
             await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, snapshotEntity.RootFolder!, null, snapshotEntity, transaction);
+
+            // Add Labels and associations
+            await AddLabelsAndAssighnToSnapshotAsync(sqLiteConnection, snapshotEntity, transaction);
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -720,6 +736,38 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
         }
     }
 
+    private async Task AddLabelsAndAssighnToSnapshotAsync(IDbConnection sqLiteConnection, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    {
+        // TODO LA - Add Integration tests for this case
+        try
+        {
+            foreach (var labelEntity in snapshotEntity.Labels)
+            {
+                // Check if label exists
+                var labelInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<LabelEntity>(SqlScripts.SelectLabelByIdSql,
+                    new { labelEntity.Id }, transaction);
+                if (labelInDb == null) // Label does not exist in DB
+                {
+                    _logger.LogInformation($"Insert Label: {labelEntity.Id}");
+                    // add new Label to DB
+                    await sqLiteConnection.ExecuteAsync(SqlScripts.InsertLabelSql, labelEntity, transaction);
+                }
+                else
+                {
+                    labelEntity.Id = labelInDb.Id;
+                }
+                // Bind Label to Snapshot
+                await sqLiteConnection.ExecuteAsync(SqlScripts.InsertLabelsToSnapshotsSql,
+                    new { SnapshotId = snapshotEntity.Id, LabelId = labelEntity.Id }, transaction);
+            }
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "ERROR - AddLabelsAndAssighnToSnapshotAsync");
+            throw;
+        }
+    }
+
     private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
     {
         // Sort child folders by name
@@ -734,135 +782,6 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             SortFoldersAndFilesRecursively(childFolder);
         }
     }
-}
 
-public static class SqlScripts
-{
-    public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName AND DeviceId = @DeviceId;";
-    public const string InsertPcSql = "INSERT INTO Pcs " +
-                                        "(Id, Name, DeviceId) " +
-                                        "VALUES " +
-                                        "(@Id, @Name, @DeviceId)";
-    public const string SelectStorageDriveSql = "SELECT * FROM StorageDrives WHERE SerialNumber = @SerialNumber AND DeviceId = @DeviceId AND Name = @Name;";
-    public const string InsertStorageDriveSql = "INSERT INTO StorageDrives " +
-                                                "(Id, Name, DeviceId, SerialNumber, TotalSize, Description, MediaType, InterfaceType) " +
-                                                "VALUES " +
-                                                "(@Id, @Name, @DeviceId, @SerialNumber, @TotalSize, @Description, @MediaType, @InterfaceType)";
-    public const string SelectSnapshotsSql = "SELECT * FROM Snapshots WHERE StorageDriveId = @StorageDriveId;";
-    public const string SelectLatestSnapshotWithSystemInfoSql = "SELECT * FROM Snapshots AS snapshot " +
-                                                                    "LEFT JOIN VolumeInfos AS volinf ON volinf.SnapshotId == snapshot.Id " +
-                                                                    "LEFT JOIN Volumes AS volume ON volinf.VolumeId == volume.Id " +
-                                                                    "LEFT JOIN StorageDrives AS stdrv ON volume.StorageDriveId = stdrv.Id " +
-                                                                    "LEFT JOIN PcsToStorageDrives AS pc2stdrv ON pc2stdrv.SnapshotId = snapshot.Id AND pc2stdrv.StorageDriveId = stdrv.Id " +
-                                                                    "LEFT JOIN Pcs AS pc ON pc2stdrv.PcId = pc.Id " +
-                                                                    "ORDER BY snapshot.Timestamp DESC LIMIT 1;";
-    public const string SelectSnapshotByIdSql = "SELECT * FROM Snapshots AS snapshot " +
-                                                    "LEFT JOIN VolumeInfos AS volinf ON volinf.SnapshotId == snapshot.Id " +
-                                                    "LEFT JOIN Volumes AS volume ON volinf.VolumeId == volume.Id " +
-                                                    "LEFT JOIN StorageDrives AS stdrv ON volume.StorageDriveId = stdrv.Id " +
-                                                    "LEFT JOIN PcsToStorageDrives AS pc2stdrv ON pc2stdrv.SnapshotId = snapshot.Id AND pc2stdrv.StorageDriveId = stdrv.Id " +
-                                                    "LEFT JOIN Pcs AS pc ON pc2stdrv.PcId = pc.Id " +
-                                                    "WHERE snapshot.Id = @SnapshotId;";
-    public const string SelectSnapshotsWithSystemInfoSql = "SELECT * FROM Snapshots AS snapshot " +
-                                                            "LEFT JOIN VolumeInfos AS volinf ON volinf.SnapshotId == snapshot.Id " +
-                                                            "LEFT JOIN Volumes AS volume ON volinf.VolumeId == volume.Id " +
-                                                            "LEFT JOIN StorageDrives AS stdrv ON volume.StorageDriveId = stdrv.Id " +
-                                                            "LEFT JOIN PcsToStorageDrives AS pc2stdrv ON pc2stdrv.SnapshotId = snapshot.Id AND pc2stdrv.StorageDriveId = stdrv.Id " +
-                                                            "LEFT JOIN Pcs AS pc ON pc2stdrv.PcId = pc.Id " +
-                                                            "LEFT JOIN FoldersToFolders AS fl2fl ON fl2fl.SnapshotId = snapshot.Id " +
-                                                            "LEFT JOIN Folders AS folder ON folder.Id = fl2fl.ChildFolderId " +
-                                                            "WHERE fl2fl.ParentFolderId is NULL " +
-                                                            "ORDER BY snapshot.Timestamp DESC;";
-    public const string SelectFoldersAndFilesBySnapshotSql = "SELECT * FROM Folders AS folder " +
-                                                                "LEFT JOIN FoldersToFolders AS fl2fl ON fl2fl.ChildFolderId = folder.Id " +
-                                                                "LEFT JOIN FilesToFolders AS fi2fl ON fi2fl.FolderId = folder.Id AND fi2fl.SnapshotId = @SnapshotId " +
-                                                                "LEFT JOIN Files AS file ON fi2fl.FileId = file.Id " +
-                                                                "WHERE fl2fl.SnapshotId = @SnapshotId;";
-    public const string InsertSnapshotSql = "INSERT INTO Snapshots " +
-                                            "(Id, Timestamp, Description) " +
-                                            "VALUES " +
-                                            "(@Id, @Timestamp, @Description)";
-    public const string SelectVolumeSql = "SELECT * FROM Volumes WHERE VolumeSerialNumber = @VolumeSerialNumber;";
-    public const string InsertVolumeSql = "INSERT INTO Volumes " +
-                                            "(Id, DriveLetter, VolumeName, Description, VolumeSerialNumber, VolumeSize, StorageDriveId) " +
-                                            "VALUES " +
-                                            "(@Id, @DriveLetter, @VolumeName, @Description, @VolumeSerialNumber, @VolumeSize, @StorageDriveId)";
-    public const string SelectVolumeInfoSql = "SELECT * FROM VolumeInfos WHERE VolumeSerialNumber = @VolumeSerialNumber;";
-    public const string InsertVolumeInfoSql = "INSERT INTO VolumeInfos " +
-                                                "(Id, FreeSpace, DriveStatus, VolumeId, SnapshotId) " +
-                                                "VALUES " +
-                                                "(@Id, @FreeSpace, @DriveStatus, @VolumeId, @SnapshotId)";
-    public const string SelectFolderByNameAndParentFolderPathAndStorageDriveIdSql = "SELECT * FROM Folders " +
-                                                                                        "WHERE Name = @Name " +
-                                                                                        "AND Size = @Size " +
-                                                                                        "AND Sha256Hash = @Sha256Hash;";
-    public const string SelectFoldersByNameSql = "SELECT * FROM Folders " +
-                                                    "WHERE Name = @Name;";
-    public const string InsertFolderSql = "INSERT INTO Folders " +
-                                            "(Id, Name, Size, Sha256Hash) " +
-                                            "VALUES " +
-                                            "(@Id, @Name, @Size, @Sha256Hash)";
-    public const string UpdateFolderHashSql = "UPDATE Folders " +
-                                                "SET Sha256Hash = @Sha256Hash " +
-                                                "WHERE Id = @Id;";
-    public const string InsertFileSql = "INSERT INTO Files " +
-                                            "(Id, Name, Size, FileExtension,Sha256Hash) " +
-                                            "VALUES " +
-                                            "(@Id, @Name, @Size, @FileExtension, @Sha256Hash)";
-    public const string SelectFilesByNameAndExtensionSql = "SELECT * FROM Files " +
-                                                                "WHERE Name = @Name " +
-                                                                "AND FileExtension = @FileExtension;";
-    public const string SelectFileByNameAndParentFolderPathAndStorageDriveIdSql = "SELECT * FROM Files " +
-                                                                                    "WHERE Name = @Name " +
-                                                                                    "AND Size = @Size " +
-                                                                                    "AND FileExtension = @FileExtension " +
-                                                                                    "AND Sha256Hash = @Sha256Hash;";
-    public const string InsertFoldersToFoldersSql = "INSERT INTO FoldersToFolders " +
-                                                    "(ParentFolderId, ChildFolderId, SnapshotId) " +
-                                                    "VALUES " +
-                                                    "(@ParentFolderId, @ChildFolderId, @SnapshotId)";
-    public const string SelectFoldersToFoldersSql = "SELECT * FROM FoldersToFolders " +
-                                                    "WHERE SnapshotId = @SnapshotId  " +
-                                                    "AND ParentFolderId = @ParentFolderId " +
-                                                    "AND ChildFolderId = @ChildFolderId;";
-    public const string InsertFilesToFoldersSql = "INSERT INTO FilesToFolders " +
-                                                    "(FolderId, FileId, SnapshotId) " +
-                                                    "VALUES " +
-                                                    "(@FolderId, @FileId, @SnapshotId)";
-    public const string SelectFilesToFoldersSql = "SELECT * FROM FilesToFolders " +
-                                                    "WHERE SnapshotId = @SnapshotId  " +
-                                                    "AND FolderId = @FolderId " +
-                                                    "AND FileId = @FileId;";
-    public const string InsertPcsToStorageDrivesSql = "INSERT INTO PcsToStorageDrives " +
-                                                        "(PcId, StorageDriveId, SnapshotId) " +
-                                                        "VALUES " +
-                                                        "(@PcId, @StorageDriveId, @SnapshotId)";
-    public const string SelectPcsToStorageDrivesSql = "SELECT * FROM PcsToStorageDrives " +
-                                                    "WHERE SnapshotId = @SnapshotId  " +
-                                                    "AND PcId = @PcId " +
-                                                    "AND StorageDriveId = @StorageDriveId;";
-    public const string ClearDataInTablesSql = "PRAGMA foreign_keys = OFF;" +
-                                                "DROP TABLE IF EXISTS PcsToStorageDrives;" +
-                                                "DROP TABLE IF EXISTS FoldersToFolders;" +
-                                                "DROP TABLE IF EXISTS FilesToFolders;" +
-                                                "DROP TABLE IF EXISTS Pcs;" +
-                                                "DROP TABLE IF EXISTS StorageDrives;" +
-                                                "DROP TABLE IF EXISTS Volumes;" +
-                                                "DROP TABLE IF EXISTS Folders;" +
-                                                "DROP TABLE IF EXISTS Snapshots;" +
-                                                "DROP TABLE IF EXISTS VolumeInfos;" +
-                                                "DROP TABLE IF EXISTS Files;" +
-                                                "PRAGMA foreign_keys = ON;";
-
-    // Delete SQL Scripts
-    public const string DeleteFilesToFoldersBySnapshotSql = "DELETE FROM FilesToFolders WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteFilesWithoutSnapshotsSql = "DELETE FROM Files WHERE Id NOT IN (SELECT DISTINCT FileId FROM FilesToFolders);";
-    public const string DeleteFoldersToFoldersBySnapshotSql = "DELETE FROM FoldersToFolders WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id NOT IN (SELECT DISTINCT ChildFolderId FROM FoldersToFolders);";
-    public const string DeletePcsToStorageDrivesBySnapshotSql = "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId;";
-    public const string DeletePcsWithoutStorageDrivesSql = "DELETE FROM Pcs WHERE Id NOT IN (SELECT DISTINCT PcId FROM PcsToStorageDrives);";
-    public const string DeleteStorageDrivesWithoutVolumesAndSnapshotsSql = "DELETE FROM StorageDrives WHERE Id NOT IN (SELECT DISTINCT StorageDriveId FROM Volumes) AND Id NOT IN (SELECT DISTINCT StorageDriveId FROM PcsToStorageDrives);";
-    public const string DeleteVolumesWithoutVolumeInfosSql = "DELETE FROM Volumes WHERE Id NOT IN (SELECT DISTINCT VolumeId FROM VolumeInfos);";
-    public const string DeleteVolumeInfoBySnapshotSql = "DELETE FROM VolumeInfos WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteSnapshotByIdSql = "DELETE FROM Snapshots WHERE Id = @SnapshotId;";
+    #endregion
 }
