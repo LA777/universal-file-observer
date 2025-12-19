@@ -97,7 +97,7 @@
             CONSTRAINT FK_FilesToFolders_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
         );
 
-        CREATE TABLE IF NOT EXISTS Lables (
+        CREATE TABLE IF NOT EXISTS Labels (
             Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Labels PRIMARY KEY,
             Name                      TEXT NOT NULL,
             ColorHex                  TEXT NOT NULL
@@ -124,6 +124,7 @@
                                                     "VALUES " +
                                                     "(@Id, @Name, @DeviceId, @SerialNumber, @TotalSize, @Description, @MediaType, @InterfaceType)";
         public const string SelectSnapshotsSql = "SELECT * FROM Snapshots WHERE StorageDriveId = @StorageDriveId;";
+        public const string SelectSnapshotOnlyByIdSql = "SELECT * FROM Snapshots WHERE Id = @SnapshotId;";
         public const string SelectLatestSnapshotWithSystemInfoSql = "SELECT * FROM Snapshots AS snapshot " +
                                                                         "LEFT JOIN VolumeInfos AS volinf ON volinf.SnapshotId == snapshot.Id " +
                                                                         "LEFT JOIN Volumes AS volume ON volinf.VolumeId == volume.Id " +
@@ -249,24 +250,25 @@
         public const string DeleteSnapshotByIdSql = "DELETE FROM Snapshots WHERE Id = @SnapshotId;";
 
         // Labels SQL Scripts
-        public const string InsertLabelSql = "INSERT INTO Lables " +
-                                            "(Id, Name, ColorHex) " +
-                                            "VALUES " +
-                                            "(@Id, @Name, @ColorHex)";
-        public const string SelectLabelByIdSql = "SELECT * FROM Lables WHERE Id = @LabelId;";
+        public const string InsertLabelSql = "INSERT INTO Labels " +
+                                               "(Id, Name, ColorHex) " +
+                                               "VALUES " +
+                                               "(@Id, @Name, @ColorHex)";
+        public const string SelectLabelByIdSql = "SELECT * FROM Labels WHERE Id = @LabelId;";
         public const string InsertLabelsToSnapshotsSql = "INSERT INTO LabelsToSnapshots " +
                                                             "(LabelId, SnapshotId) " +
                                                             "VALUES " +
                                                             "(@LabelId, @SnapshotId);";
-        public const string SelectAllLabelsSql = "SELECT * FROM Lables;";
-        public const string SelectLabelsBySnapshotIdSql = "SELECT DISTINCT l.* FROM Lables AS l " +
+        public const string SelectAllLabelsSql = "SELECT * FROM Labels;";
+        public const string SelectLabelsBySnapshotIdSql = "SELECT DISTINCT l.* FROM Labels AS l " +
                                                              "INNER JOIN LabelsToSnapshots AS l2s ON l2s.LabelId = l.Id " +
                                                              "WHERE l2s.SnapshotId = @SnapshotId;";
-        public const string UpdateLabelSql = "UPDATE Lables " +
+        public const string UpdateLabelSql = "UPDATE Labels " +
                                             "SET Name = @Name, ColorHex = @ColorHex " +
                                             "WHERE Id = @Id;";
-        public const string DeleteLabelByIdSql = "DELETE FROM Lables WHERE Id = @LabelId;"; // TODO LA - Also delete from LabelsToSnapshots
+        public const string DeleteLabelByIdSql = "DELETE FROM Labels WHERE Id = @LabelId;";
         public const string DeleteLabelsToSnapshotsBySnapshotIdSql = "DELETE FROM LabelsToSnapshots WHERE SnapshotId = @SnapshotId;";
         public const string DeleteLabelFromSnapshotSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId AND SnapshotId = @SnapshotId;";
+        public const string DeleteLabelsToSnapshotsByLabelIdSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId;";
     }
 }

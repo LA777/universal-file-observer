@@ -18,6 +18,7 @@ namespace Ufo.IntegrationTests
         private readonly string _connectionString;
         private readonly Mock<ILogger<LabelsSqLiteRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
+        private FileSystemSqLiteRepository? _fileSystemRepository;
         private LabelsSqLiteRepository? _repository;
 
         public LabelsSqLiteRepositoryIntegrationTests()
@@ -28,6 +29,9 @@ namespace Ufo.IntegrationTests
             _optionsMonitorMock = new Mock<IOptionsMonitor<DatabaseOptions>>();
             _optionsMonitorMock.Setup(o => o.CurrentValue)
                 .Returns(new DatabaseOptions { ConnectionString = _connectionString });
+
+            var fileSystemSqLiteRepositoryLoggerMock = new Mock<ILogger<FileSystemSqLiteRepository>>();
+            _fileSystemRepository = new FileSystemSqLiteRepository(_optionsMonitorMock.Object, fileSystemSqLiteRepositoryLoggerMock.Object);
         }
 
         #region Database Initialization and Cleanup
@@ -191,7 +195,7 @@ namespace Ufo.IntegrationTests
             {
                 var label1 = new LabelEntity { Name = "Priority1", ColorHex = "#FF0000" };
                 var label2 = new LabelEntity { Name = "Priority2", ColorHex = "#FFFF00" };
-                
+
                 await _repository!.AddLabelAsync(label1);
                 await _repository.AddLabelAsync(label2);
 
@@ -243,21 +247,18 @@ namespace Ufo.IntegrationTests
             {
                 var label1 = new LabelEntity { Name = "Tagged", ColorHex = "#0000FF" };
                 var label2 = new LabelEntity { Name = "Unrelated", ColorHex = "#00FF00" };
-                var snapshotId = Ulid.NewUlid();
-                // TODO LA - Create snapshot with label
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
 
                 // Add labels
                 await _repository!.AddLabelAsync(label1);
                 await _repository.AddLabelAsync(label2);
 
                 // Associate label1 with snapshot
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.ExecuteAsync(
-                    "INSERT INTO LabelsToSnapshots (LabelId, SnapshotId) VALUES (@LabelId, @SnapshotId)",
-                    new { LabelId = label1.Id, SnapshotId = snapshotId }); // TODO LA - Refactor to use AddSnapshotAsync method
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
 
                 // Act
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshotId);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
 
                 // Assert
                 labels.Should().HaveCount(1);
@@ -279,8 +280,8 @@ namespace Ufo.IntegrationTests
                 var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
                 var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
                 var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF" };
-                var snapshotId = Ulid.NewUlid();
-                // TODO LA - Create snapshot with labels
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
 
                 // Add labels
                 await _repository!.AddLabelAsync(label1);
@@ -288,16 +289,11 @@ namespace Ufo.IntegrationTests
                 await _repository.AddLabelAsync(label3);
 
                 // Associate label1 and label2 with snapshot
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.ExecuteAsync(
-                    "INSERT INTO LabelsToSnapshots (LabelId, SnapshotId) VALUES (@LabelId, @SnapshotId)",
-                    new[] {
-                        new { LabelId = label1.Id, SnapshotId = snapshotId },
-                        new { LabelId = label2.Id, SnapshotId = snapshotId }
-                    }); // TODO LA - Refactor to use AddSnapshotAsync method
-
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
+                
                 // Act
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshotId);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
 
                 // Assert
                 labels.Should().HaveCount(2);
@@ -401,13 +397,387 @@ namespace Ufo.IntegrationTests
 
         #region DeleteLabelByIdAsync Tests
 
-        // TODO LA - Implement DeleteLabelByIdAsync tests
+        [Fact]
+        public async Task DeleteLabelByIdAsync_WhenLabelExists_DeletesLabelSuccessfully()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "ToDelete", ColorHex = "#FF0000" };
+                await _repository!.AddLabelAsync(label);
 
+                // Act
+                var result = await _repository.DeleteLabelByIdAsync(label.Id);
 
+                // Assert
+                Assert.Equal(1, result);
+                var allLabels = await _repository.GetAllLabelsAsync();
+                allLabels.Should().NotContain(l => l.Id == label.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
 
+        [Fact]
+        public async Task DeleteLabelByIdAsync_WhenLabelNotFound_ReturnsZero()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var nonExistentLabelId = Ulid.NewUlid();
 
+                // Act
+                var result = await _repository!.DeleteLabelByIdAsync(nonExistentLabelId);
 
+                // Assert
+                Assert.Equal(0, result);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteLabelByIdAsync_RemovesAssociationsFromLabelsToSnapshots()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "AssociatedLabel", ColorHex = "#00FF00" };
+                await _repository!.AddLabelAsync(label);
+
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+
+                // Act
+                await _repository.DeleteLabelByIdAsync(label.Id);
+
+                // Assert
+                // Verify label is deleted
+                var allLabels = await _repository.GetAllLabelsAsync();
+                allLabels.Should().NotContain(l => l.Id == label.Id);
+
+                // Verify association is deleted
+                await using var connection = new SqliteConnection(_connectionString);
+                var association = await connection.QueryFirstOrDefaultAsync(
+                    "SELECT * FROM LabelsToSnapshots WHERE LabelId = @LabelId",
+                    new { LabelId = label.Id });
+                Assert.Null(association);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteLabelByIdAsync_OnlyDeletesTargetLabel()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+
+                await _repository!.AddLabelAsync(label1);
+                await _repository.AddLabelAsync(label2);
+
+                // Act
+                await _repository.DeleteLabelByIdAsync(label1.Id);
+
+                // Assert
+                var allLabels = await _repository.GetAllLabelsAsync();
+                allLabels.Should().HaveCount(1);
+                allLabels.Should().Contain(l => l.Id == label2.Id);
+                allLabels.Should().NotContain(l => l.Id == label1.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
 
         #endregion
+
+        #region AddLabelToSnapshotAsync Tests
+
+        [Fact]
+        public async Task AddLabelToSnapshotAsync_WithValidLabelAndSnapshot_CreatesAssociation()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "TestLabel", ColorHex = "#0000FF" };
+                await _repository!.AddLabelAsync(label);
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+
+                // Act
+                var result = await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+
+                // Assert
+                Assert.Equal(1, result);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                labels.Should().HaveCount(1);
+                labels.Should().Contain(l => l.Id == label.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddLabelToSnapshotAsync_WithMultipleLabelsSameSnapshot_CreatesAllAssociations()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+                var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF" };
+
+                await _repository!.AddLabelAsync(label1);
+                await _repository.AddLabelAsync(label2);
+                await _repository.AddLabelAsync(label3);
+
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+
+                // Act
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label3.Id, snapshot.Id);
+
+                // Assert
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                labels.Should().HaveCount(3);
+                labels.Should().Contain(l => l.Id == label1.Id);
+                labels.Should().Contain(l => l.Id == label2.Id);
+                labels.Should().Contain(l => l.Id == label3.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddLabelToSnapshotAsync_WithSameLabelMultipleSnapshots_CreatesMultipleAssociations()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "SharedLabel", ColorHex = "#FFFF00" };
+                await _repository!.AddLabelAsync(label);
+
+                var snapshot1 = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
+                var snapshot2 = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot2);
+
+                // Act
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id);
+
+                // Assert
+                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id);
+                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id);
+
+                labels1.Should().HaveCount(1);
+                labels2.Should().HaveCount(1);
+                labels1.Should().Contain(l => l.Id == label.Id);
+                labels2.Should().Contain(l => l.Id == label.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        #endregion
+
+        #region RemoveLabelFromSnapshotAsync Tests
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_WithValidAssociation_RemovesAssociation()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "RemoveLabel", ColorHex = "#FF00FF" };
+                await _repository!.AddLabelAsync(label);
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+
+                // Act
+                var result = await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot.Id);
+
+                // Assert
+                Assert.Equal(1, result);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                labels.Should().BeEmpty();
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_WhenAssociationNotFound_ReturnsZero()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var labelId = Ulid.NewUlid();
+                var snapshotId = Ulid.NewUlid();
+
+                // Act
+                var result = await _repository!.RemoveLabelFromSnapshotAsync(labelId, snapshotId);
+
+                // Assert
+                Assert.Equal(0, result);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_OnlyRemovesTargetAssociation()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+
+                await _repository!.AddLabelAsync(label1);
+                await _repository.AddLabelAsync(label2);
+
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
+
+                // Act
+                await _repository.RemoveLabelFromSnapshotAsync(label1.Id, snapshot.Id);
+
+                // Assert
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                labels.Should().HaveCount(1);
+                labels.Should().Contain(l => l.Id == label2.Id);
+                labels.Should().NotContain(l => l.Id == label1.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_RemovesOnlyFromTargetSnapshot()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "Label", ColorHex = "#0000FF" };
+                await _repository!.AddLabelAsync(label);
+
+                var snapshot1 = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
+                var snapshot2 = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot2);
+
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id);
+
+                // Act
+                await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot1.Id);
+
+                // Assert
+                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id);
+                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id);
+
+                labels1.Should().BeEmpty();
+                labels2.Should().HaveCount(1);
+                labels2.Should().Contain(l => l.Id == label.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        #endregion
+
+        private SnapshotEntity CreateSnapshotWithSimpleFolder()
+        {
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853" };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var storageDrive = new StorageDriveEntity
+            {
+                Name = "Test Drive",
+                DeviceId = Guid.NewGuid().ToString(),
+                SerialNumber = Guid.NewGuid().ToString(),
+                TotalSize = 1000000,
+                Description = "Test Storage Drive",
+                MediaType = "SSD",
+                InterfaceType = "SATA"
+            };
+            var volume = new VolumeEntity
+            {
+                DriveLetter = "C:",
+                VolumeName = "TestVolume",
+                VolumeSerialNumber = Guid.NewGuid().ToString(),
+                VolumeSize = 500000,
+                Description = "Test Volume"
+            };
+            var volumeInfo = new VolumeInfoEntity
+            {
+                FreeSpace = 250000,
+                DriveStatus = "OK"
+            };
+            var rootFolder = new FsFolderEntity
+            {
+                Name = "Root",
+                Size = 0,
+                Sha256Hash = "abc123"
+            };
+
+            pc.Snapshots.Add(snapshot);
+            pc.StorageDrives.Add(storageDrive);
+            storageDrive.Pcs.Add(pc);
+            storageDrive.Volumes.Add(volume);
+            volume.StorageDrive = storageDrive;
+            volume.StorageDriveId = storageDrive.Id;
+            volume.VolumeInfos.Add(volumeInfo);
+            volumeInfo.Volume = volume;
+            volumeInfo.VolumeId = volume.Id;
+            volumeInfo.Snapshot = snapshot;
+            volumeInfo.SnapshotId = snapshot.Id;
+            snapshot.VolumeInfo = volumeInfo;
+            snapshot.RootFolder = rootFolder;
+
+            return snapshot;
+        }
     }
 }

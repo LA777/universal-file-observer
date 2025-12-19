@@ -15,7 +15,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
 {
     private readonly ILogger<FileSystemSqLiteRepository> _logger;
     private readonly string _connectionString;
-   
+
     public FileSystemSqLiteRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<FileSystemSqLiteRepository>? logger)
     {
         _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
@@ -115,7 +115,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             var folders = new Dictionary<Ulid, FsFolderEntity>();
             var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
             var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
-            
+
             await sqLiteConnection
                 .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
@@ -142,11 +142,11 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         var currentFolderParentFolderId = currentFolderParentFolder?.Id;
 
                         // Only process folder relationships once per unique folder
-                        if (!processedFolderIds.Contains(fsFolderEntity.Id) && 
+                        if (!processedFolderIds.Contains(fsFolderEntity.Id) &&
                             (currentFolder!.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId))
                         {
                             processedFolderIds.Add(fsFolderEntity.Id);
-                            
+
                             // find ParentFolder
                             var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId!.Value, out var parentFolder);
                             if (parentFolderWasFound)
@@ -267,7 +267,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
             var folders = new Dictionary<Ulid, FsFolderEntity>();
             var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
             var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
-            
+
             await sqLiteConnection
                 .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
@@ -294,11 +294,11 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
                         var currentFolderParentFolderId = currentFolderParentFolder?.Id;
 
                         // Only process folder relationships once per unique folder
-                        if (!processedFolderIds.Contains(fsFolderEntity.Id) && 
+                        if (!processedFolderIds.Contains(fsFolderEntity.Id) &&
                             (currentFolder!.Id != fsFolderEntity.Id || currentFolderParentFolderId != foldersToFoldersEntity.ParentFolderId))
                         {
                             processedFolderIds.Add(fsFolderEntity.Id);
-                            
+
                             // find ParentFolder
                             var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var parentFolder);
                             if (parentFolderWasFound)
@@ -535,9 +535,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     #region AddSnapshotAsync
 
     public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default)
-    { 
-        // NOTE: Covered by Integration Tests
-
+    {
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);

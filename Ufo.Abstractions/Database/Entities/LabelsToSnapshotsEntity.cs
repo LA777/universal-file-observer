@@ -9,11 +9,11 @@ namespace Ufo.Abstractions.Database.Entities
     public class LabelsToSnapshotsEntity
     {
         [JsonConverter(typeof(UlidJsonConverter))]
-        [ForeignKey(typeof(SnapshotEntity))]
-        public Ulid SnapshotId { get; set; }
+        [ForeignKey(typeof(LabelEntity))]
+        public Ulid LabelId { get; set; }
 
         [JsonConverter(typeof(UlidJsonConverter))]
         [ForeignKey(typeof(SnapshotEntity))]
-        public Ulid LabelId { get; set; }
+        public Ulid SnapshotId { get; set; }
     }
 }
