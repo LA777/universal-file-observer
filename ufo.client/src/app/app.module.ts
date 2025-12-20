@@ -1,5 +1,5 @@
 import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
-import { NgModule } from '@angular/core';
+import { NgModule, provideZoneChangeDetection } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
 import {DragDropModule} from '@angular/cdk/drag-drop';
@@ -118,6 +118,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
     ],
     providers: [
       provideAnimationsAsync(),
+      provideZoneChangeDetection(),
       provideHttpClient(withInterceptorsFromDi())
     ]
   })
