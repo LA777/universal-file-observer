@@ -3,7 +3,7 @@ import { Component, OnInit, inject, signal, Injectable, ChangeDetectionStrategy,
 import { take } from 'rxjs/operators'; // For unsubscribing
 import { SnapshotService } from '../../services/snapshot.service';
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common'; // Important!
+ // Important!
 import { MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { MatIconModule } from '@angular/material/icon';
 import { Folder, File, FsItem, Snapshot } from '../../models/models';

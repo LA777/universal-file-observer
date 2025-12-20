@@ -1,32 +1,36 @@
-<p *ngIf="!selectedFolder"><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
+@if (!selectedFolder) {
+  <p><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
+}
 
-<div *ngIf="selectedFolder">
-  <div>Current folder: {{selectedFolder.name}} Current folder full path: {{selectedFolder.fullPath}}</div>
-  <div class="drive-list">
-    <button *ngFor="let drive of fileSystemRoot.drives" (click)="navigateToPath(drive)" title="{{drive}}">
-      {{drive.substring(0,1)}}
-    </button>
-    <button (click)="navigateToPath(fileSystemRoot.folder.fullPath)" title="{{fileSystemRoot.folder.fullPath}}">
+@if (selectedFolder) {
+  <div>
+    <div>Current folder: {{selectedFolder.name}} Current folder full path: {{selectedFolder.fullPath}}</div>
+    <div class="drive-list">
+      @for (drive of fileSystemRoot.drives; track drive) {
+        <button (click)="navigateToPath(drive)" title="{{drive}}">
+          {{drive.substring(0,1)}}
+        </button>
+      }
+      <button (click)="navigateToPath(fileSystemRoot.folder.fullPath)" title="{{fileSystemRoot.folder.fullPath}}">
       Home folder</button>
-    <button (click)="createSnapshot()" title="Create Snapshot">Create Snapshot</button>
-
-    <button (click)="enableFilesView()" title="Files view">Files view</button>
-    <button (click)="enableVideosView()" title="Videos view">Videos view</button>
-    <button (click)="enableImagesView()" title="Images view">Images view</button>
-
-    <span>Navigation: </span>
-    <button (click)="navigateBackward()" title="Backward">
-      <mat-icon>arrow_back</mat-icon>
-    </button>
-    <button (click)="navigateForward()" title="Forward">
-      <mat-icon>arrow_forward</mat-icon>
-    </button>
-    <button (click)="navigateToPath(selectedFolder.parentFolder?.fullPath)" [disabled]="!selectedFolder.parentFolder"
-      title="Upward">
-      <mat-icon>arrow_upward</mat-icon>
-    </button>
+      <button (click)="createSnapshot()" title="Create Snapshot">Create Snapshot</button>
+      <button (click)="enableFilesView()" title="Files view">Files view</button>
+      <button (click)="enableVideosView()" title="Videos view">Videos view</button>
+      <button (click)="enableImagesView()" title="Images view">Images view</button>
+      <span>Navigation: </span>
+      <button (click)="navigateBackward()" title="Backward">
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <button (click)="navigateForward()" title="Forward">
+        <mat-icon>arrow_forward</mat-icon>
+      </button>
+      <button (click)="navigateToPath(selectedFolder.parentFolder?.fullPath)" [disabled]="!selectedFolder.parentFolder"
+        title="Upward">
+        <mat-icon>arrow_upward</mat-icon>
+      </button>
+    </div>
   </div>
-</div>
+}
 
 <div class="folder-panel-wrapper">
 
@@ -56,100 +60,97 @@
 
 
         <!-- <button mat-icon-button matTreeNodeToggle>
-                <mat-icon class="mat-icon-rtl-mirror">{{treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
-                </mat-icon>
-              </button>
-              <mat-icon class="mat-icon-rtl-mirror">{{treeControl.isExpanded(node) ? 'folder_open' : 'folder'}}
-              </mat-icon>
-              {{ node.Name }} - B hasChild {{hasChild(0, node)}} -->
+        <mat-icon class="mat-icon-rtl-mirror">{{treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
+        </mat-icon>
+      </button>
+      <mat-icon class="mat-icon-rtl-mirror">{{treeControl.isExpanded(node) ? 'folder_open' : 'folder'}}
+      </mat-icon>
+      {{ node.Name }} - B hasChild {{hasChild(0, node)}} -->
 
 
-        <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group">
-          <ng-container matTreeNodeOutlet *ngFor="let childFolder of node.ChildFolders">
+      <div [class.example-tree-invisible]="!treeControl.isExpanded(node)" role="group">
+        @for (childFolder of node.ChildFolders; track childFolder) {
+          <ng-container matTreeNodeOutlet>
           </ng-container>
-        </div>
+        }
+      </div>
 
-      </mat-nested-tree-node>
+    </mat-nested-tree-node>
 
-      <!-- <ng-container *ngFor="let file of node.Files">
-              <mat-tree-node *matTreeNodeDef="let file">
-                <button mat-icon-button>
-                  <mat-icon>insert_drive_file</mat-icon>
-                </button>
-                {{ file.Name }}
-              </mat-tree-node>
-            </ng-container> -->
+    <!-- <ng-container *ngFor="let file of node.Files">
+    <mat-tree-node *matTreeNodeDef="let file">
+      <button mat-icon-button>
+        <mat-icon>insert_drive_file</mat-icon>
+      </button>
+      {{ file.Name }}
+    </mat-tree-node>
+  </ng-container> -->
 
-    </mat-tree>
+</mat-tree>
 
-  </div>
+</div>
 
-  <!-- <div class="inter-panel-area" (mousedown)="onMouseDown($event)"></div> -->
-
-
-
-
-  <div class="folder-details-panel">
-    <div *ngIf="selectedFolder">
+<!-- <div class="inter-panel-area" (mousedown)="onMouseDown($event)"></div> -->
 
 
+
+
+<div class="folder-details-panel">
+  @if (selectedFolder) {
+    <div>
       <table mat-table [dataSource]="folderData" matSort (matSortChange)="announceSortChange($event)"
         class="mat-elevation-z8">
-
         <ng-container matColumnDef="IsFile">
           <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by IsFile">
             IsFile
           </th>
           <td mat-cell *matCellDef="let element"> {{element.isFile}} </td>
         </ng-container>
-
         <!-- Name Column -->
         <ng-container matColumnDef="Name">
           <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Name">
             Name
           </th>
           <td mat-cell *matCellDef="let element">
-
-            <img *ngIf="isImageFile(element)" [src]="element.fullPath" [alt]="element.name" class="thumbnail-image">
-
+            @if (isImageFile(element)) {
+              <img [src]="element.fullPath" [alt]="element.name" class="thumbnail-image">
+            }
             <!-- <img src="data:image/jpeg;base64,iiiiiiiiii"> -->
-
-            <video *ngIf="isVideoFile(element)" width="320" height="240" controls>
-              <source [src]="getVideoFileUri(element)" [type]="getVideoMimeType(element)">
-              Your browser does not support the video tag.
-            </video>
-
-            <mat-icon *ngIf="!element.isFile" class="mat-icon-rtl-mirror"
+            @if (isVideoFile(element)) {
+              <video width="320" height="240" controls>
+                <source [src]="getVideoFileUri(element)" [type]="getVideoMimeType(element)">
+                Your browser does not support the video tag.
+              </video>
+            }
+            @if (!element.isFile) {
+              <mat-icon class="mat-icon-rtl-mirror"
               [ngStyle]="element.isHidden ? { color: 'grey' } : { color: 'black' }">folder</mat-icon>
-            <mat-icon *ngIf="element.isFile && isFilesView" class="mat-icon-rtl-mirror"
+            }
+            @if (element.isFile && isFilesView) {
+              <mat-icon class="mat-icon-rtl-mirror"
               [ngStyle]="element.isHidden ? { color: 'grey' } : { color: 'black' }">description</mat-icon>
-
+            }
             {{element.name}}
           </td>
         </ng-container>
-
         <ng-container matColumnDef="Extension">
           <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Extension">
             Extension
           </th>
           <td mat-cell *matCellDef="let element"> {{element.fileExtension}} </td>
         </ng-container>
-
         <ng-container matColumnDef="Size">
           <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Size">
             Size
           </th>
           <td mat-cell *matCellDef="let element"> {{element?.size}} </td>
         </ng-container>
-
         <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
         <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"></tr>
-
       </table>
-
-
     </div>
-  </div>
+  }
+</div>
 </div>
 
 

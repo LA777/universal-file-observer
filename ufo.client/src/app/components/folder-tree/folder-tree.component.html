@@ -43,7 +43,7 @@
       } -->
 
       <!-- There is inline padding applied to this div using styles.
-          This padding value depends on the mat-icon-button width.  -->
+      This padding value depends on the mat-icon-button width.  -->
       <!-- role="group" -->
       <div [class.example-tree-invisible]="!tree.isExpanded(node)">
         <ng-container matTreeNodeOutlet></ng-container>
@@ -58,17 +58,25 @@
 
   <div class="folder-view">
     <h3>{{ selectedFolder ? selectedFolder.name : 'No Folder Selected' }}</h3>
-    <p *ngIf="selectedFolder">Full Path: {{ getFullPath(selectedFolder) }}</p>
+    @if (selectedFolder) {
+      <p>Full Path: {{ getFullPath(selectedFolder) }}</p>
+    }
 
-    <div *ngIf="displayedFiles.length > 0">
-      <h4>Files:</h4>
-      <ul>
-        <li *ngFor="let file of displayedFiles">
-          {{ file.name }} ({{file.size}} bytes)
-        </li>
-      </ul>
-    </div>
-    <p *ngIf="displayedFiles.length === 0 && selectedFolder">No files in this folder.</p>
+    @if (displayedFiles.length > 0) {
+      <div>
+        <h4>Files:</h4>
+        <ul>
+          @for (file of displayedFiles; track file) {
+            <li>
+              {{ file.name }} ({{file.size}} bytes)
+            </li>
+          }
+        </ul>
+      </div>
+    }
+    @if (displayedFiles.length === 0 && selectedFolder) {
+      <p>No files in this folder.</p>
+    }
   </div>
 
 </div>
