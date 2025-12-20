@@ -1,4 +1,4 @@
-﻿:host {
+:host {
     /* max-width: 1280px; */
     /* padding: 2rem; */
     text-align: center;
@@ -43,7 +43,7 @@ table {
   min-width: 20px; /* Adjust this value as needed */
   padding: 0 0px;
   font-size: 10px;
-  --mdc-secondary-navigation-tab-container-height: 12px;
+  --mat-tab-container-height: 12px;
 }
 
 .mat-mdc-tab-labels {
@@ -60,6 +60,6 @@ table {
 
 .mat-tab-header {
   &.mat-mdc-tab-header {
-    --mdc-secondary-navigation-tab-container-height: 12px;
+    --mat-tab-container-height: 12px;
   }
 }
