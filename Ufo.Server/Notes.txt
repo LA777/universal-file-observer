@@ -71,7 +71,8 @@ Windows LINK/DIR https://stackoverflow.com/questions/1485155/check-if-a-file-is-
 
 
 
-
+Cross-Platform Path Handling: Remember that Windows uses C:\Path and Linux uses /home/path. 
+Use System.IO.Path.Combine and Path.DirectorySeparatorChar in your C# code to ensure it runs on both OS types without modification.
 
 
 
