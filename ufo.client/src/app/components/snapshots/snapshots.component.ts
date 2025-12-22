@@ -1,7 +1,12 @@
 import { Component, OnInit, Injectable, ElementRef, ViewChild, ViewContainerRef, Output, EventEmitter, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { Overlay, OverlayRef } from '@angular/cdk/overlay';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
+import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { Snapshot, StorageDrive, VolumeInfo, DialogData } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
 import { MatDialog } from '@angular/material/dialog';
@@ -13,7 +18,8 @@ import { DialogComponent } from '../dialog/dialog.component';
     selector: 'app-snapshots',
     templateUrl: './snapshots.component.html',
     styleUrl: './snapshots.component.css',
-    standalone: false
+    standalone: true,
+    imports: [CommonModule, MatSortModule, MatTableModule, MatButtonModule, MatIconModule, MatTooltipModule]
 })
 @Injectable()
 export class SnapshotsComponent implements OnInit {

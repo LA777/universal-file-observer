@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, Injectable, ChangeDetectionStrategy, ViewChild } from '@angular/core';
+import { CommonModule } from '@angular/common';
 //import { NestedTreeControl } from '@angular/cdk/tree';
 import { take } from 'rxjs/operators'; // For unsubscribing
 import { SnapshotService } from '../../services/snapshot.service';
@@ -88,8 +89,8 @@ export class DynamicDatabase {
   selector: 'app-folder-tree',
   templateUrl: './folder-tree.component.html',
   styleUrls: ['./folder-tree.component.css'],
-  standalone: false,
-  // imports: [ MatTreeModule, MatButtonModule, MatIconModule, MatProgressBarModule  ],
+  standalone: true,
+  imports: [ MatTreeModule, MatButtonModule, MatIconModule, MatProgressBarModule, CdkTreeModule, CommonModule  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class FolderTreeComponent implements OnInit {

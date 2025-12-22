@@ -1,7 +1,12 @@
 import { Component, OnInit, AfterViewInit, Injectable, signal, ElementRef, ChangeDetectionStrategy, Renderer2, ViewChild, Input, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { MatTreeNestedDataSource } from '@angular/material/tree';
+import { MatTreeNestedDataSource, MatTreeModule } from '@angular/material/tree';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
+import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { Folder, File, FsItem, Snapshot } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
@@ -13,8 +18,9 @@ import { MatTree } from '@angular/material/tree';
     selector: 'app-snapshot',
     templateUrl: './snapshot.component.html',
     styleUrl: './snapshot.component.css',
-    standalone: false,
-    changeDetection: ChangeDetectionStrategy.OnPush
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [CommonModule, MatTreeModule, MatSortModule, MatTableModule, MatButtonModule, MatIconModule, MatProgressBarModule, CdkTreeModule]
 })
 @Injectable()
 export class SnapshotComponent implements OnInit, AfterViewInit {

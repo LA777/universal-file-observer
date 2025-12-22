@@ -1,8 +1,13 @@
 import { Component, OnInit, Injectable, ElementRef, HostListener, Renderer2, ViewChild, OnDestroy } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
-import { MatTreeNestedDataSource } from '@angular/material/tree';
+import { MatTreeNestedDataSource, MatTreeModule } from '@angular/material/tree';
 import { MatSort, Sort, MatSortModule } from '@angular/material/sort';
 import { MatDialog } from '@angular/material/dialog';
+import { MatTableModule } from '@angular/material/table';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { NestedTreeControl } from '@angular/cdk/tree';
 import { Folder, File, FsItem, SnapshotData, FileSystemRoot, DialogData } from '../../models/models';
 import { DialogComponent } from '../dialog/dialog.component';
@@ -15,7 +20,8 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
     selector: 'app-files',
     templateUrl: './files.component.html',
     styleUrl: './files.component.css',
-    standalone: false
+    standalone: true,
+    imports: [CommonModule, MatTreeModule, MatSortModule, MatTableModule, MatButtonModule, MatIconModule, MatProgressBarModule]
 })
 @Injectable()
 export class FilesComponent implements OnInit {
