@@ -111,8 +111,12 @@ public class SqlScripts
             CONSTRAINT FK_LabelsToSnapshots_Labels_LabelId        FOREIGN KEY (LabelId)     REFERENCES Labels (Id)    ON DELETE NO ACTION,
             CONSTRAINT FK_LabelsToSnapshots_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
         );
-
         
+        CREATE TABLE IF NOT EXISTS Users (
+            Id           TEXT NOT NULL PRIMARY KEY,
+            Username     TEXT NOT NULL UNIQUE,
+            PasswordHash TEXT NOT NULL
+        );        
     ";
 
     public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName AND DeviceId = @DeviceId;";

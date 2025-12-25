@@ -20,6 +20,8 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
+- Add Authorization and Authentication on Back-end
+- [UI] Add Login Page
 - Add Search by File name or Folder name
 - Search inside Snapshot/Snapshots
 - [UI] Add Spinner while data is loading
