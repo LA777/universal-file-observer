@@ -10,6 +10,7 @@ public class UserRepository : IUserRepository
 {
     private readonly string _connectionString;
     private readonly ILogger<UserRepository> _logger;
+
     public UserRepository(string connectionString, ILogger<UserRepository>? logger)
     {
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
@@ -19,41 +20,54 @@ public class UserRepository : IUserRepository
     public async Task<UserEntity?> GetUserByUsernameAsync(string username)
     {
         using var sqLiteConnection = new SqliteConnection(_connectionString);
-        const string sql = @"SELECT * FROM Users WHERE Username = @Username";
+        const string sql = @"SELECT * FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
 
-        var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { username });
-        _logger.LogInformation("Retrieved user: {Username}", userEntity?.Name);
-
-        return userEntity;
+        try
+        {
+            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { Username = username });
+            _logger.LogInformation("Retrieved user: {Username}", userEntity?.Name);
+            return userEntity;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
     }
 
     public async Task<bool> UserExistsAsync(string username)
     {
         using var sqLiteConnection = new SqliteConnection(_connectionString);
-        const string sql = "SELECT COUNT(1) FROM Users WHERE Name = @Username";
+        const string sql = "SELECT COUNT(1) FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
         _logger.LogInformation("Checking if user exists: {Username}", username);
 
-        return await sqLiteConnection.ExecuteScalarAsync<int>(sql, new { username }) > 0;
+        try
+        {
+            var usersWithSameName = await sqLiteConnection.ExecuteScalarAsync<int>(sql, new { Username = username });
+            return usersWithSameName > 0;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
     }
 
-    public async Task<bool> CreateUserAsync(UserEntity user, Ulid defaultRoleId)
+    public async Task<bool> CreateUserAsync(UserEntity user)
     {
         using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync();
         using var transaction = sqLiteConnection.BeginTransaction();
+        const string userSql = @"
+                INSERT INTO Users (Id, Name, PasswordHash) 
+                VALUES (@Id, @Name, @PasswordHash)"; // TODO LA - Move to SqlScript class
 
         try
         {
-            const string userSql = @"
-                INSERT INTO Users (Id, Name, PasswordHash) 
-                VALUES (@Id, @Name, @PasswordHash)";
-
             await sqLiteConnection.ExecuteAsync(userSql, new
             {
                 Id = user.Id.ToString(),
                 user.Name,
                 user.PasswordHash
-            }, transaction);            
+            }, transaction);
 
             await transaction.CommitAsync();
             _logger.LogInformation("Created user: {Username}", user.Name);
@@ -65,5 +79,23 @@ public class UserRepository : IUserRepository
             await transaction.RollbackAsync();
             throw;
         }
+    }
+
+    public async Task<int> GetUserCountAsync()
+    {
+        using var sqLiteConnection = new SqliteConnection(_connectionString);
+        const string sql = "SELECT COUNT(1) FROM Users"; // TODO LA - Move to SqlScript class
+
+        try
+        {
+            var userCount = await sqLiteConnection.ExecuteScalarAsync<int>(sql);
+            _logger.LogInformation("Users in Databse: {userCount}", userCount);
+
+            return userCount;
+        }
+        catch (Exception)
+        {
+            throw;
+        }        
     }
 }

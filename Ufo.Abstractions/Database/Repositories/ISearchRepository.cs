@@ -3,7 +3,7 @@ using Ufo.Abstractions.Responses;
 
 namespace Ufo.Abstractions.Database.Repositories;
 
-public interface ISearchSqLiteRepository
+public interface ISearchRepository
 {
     public Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default);
 }

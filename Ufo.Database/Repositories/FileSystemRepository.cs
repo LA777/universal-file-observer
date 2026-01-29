@@ -11,12 +11,12 @@ using Ufo.Abstractions.Options;
 
 namespace Ufo.Database.Repositories;
 
-public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
+public class FileSystemRepository : IFileSystemRepository
 {
-    private readonly ILogger<FileSystemSqLiteRepository> _logger;
+    private readonly ILogger<FileSystemRepository> _logger;
     private readonly string _connectionString;
 
-    public FileSystemSqLiteRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<FileSystemSqLiteRepository>? logger)
+    public FileSystemRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<FileSystemRepository>? logger)
     {
         _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -69,7 +69,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     }
 
     public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
-    {
+    { // TODO LA - Filter by User
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -222,7 +222,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     }
 
     public async Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(CancellationToken cancellationToken = default)
-    {
+    { // TODO LA - Filter by User
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -375,7 +375,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     }
 
     public async Task<IList<SnapshotEntity>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
-    {
+    { // TODO LA - Filter by User
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -421,7 +421,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     #region DeleteSnapshotByIdAsync
 
     public async Task<DeleteResult> DeleteSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
-    {
+    { // TODO LA - Filter by User
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
@@ -535,7 +535,7 @@ public class FileSystemSqLiteRepository : IFileSystemSqLiteRepository
     #region AddSnapshotAsync
 
     public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default)
-    {
+    { // TODO LA - Bind to User
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);

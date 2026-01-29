@@ -9,7 +9,7 @@ public static class DependencyExtension
 {
     public static async Task AddDataLayerAsync(IServiceCollection services, string? connectionString)
     {
-        services.AddScoped<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
+        services.AddScoped<IFileSystemRepository, FileSystemRepository>();
 
         await DapperDataContext.InitiateDatabaseAsync(connectionString);
     }

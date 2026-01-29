@@ -11,12 +11,12 @@ using Ufo.Abstractions.Responses;
 
 namespace Ufo.Database.Repositories;
 
-public class SearchSqLiteRepository : ISearchSqLiteRepository
+public class SearchRepository : ISearchRepository
 {
-    private readonly ILogger<SearchSqLiteRepository> _logger;
+    private readonly ILogger<SearchRepository> _logger;
     private readonly string _connectionString;
 
-    public SearchSqLiteRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<SearchSqLiteRepository>? logger)
+    public SearchRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<SearchRepository>? logger)
     {
         _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

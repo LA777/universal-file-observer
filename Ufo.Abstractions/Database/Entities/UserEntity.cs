@@ -7,5 +7,6 @@ namespace Ufo.Abstractions.Database.Entities;
 public class UserEntity : EntityBase
 {
     [JsonIgnore] // Never expose the hash in API responses
+    [MaxLength(128)]
     public string PasswordHash { get; set; } = string.Empty;    
 }

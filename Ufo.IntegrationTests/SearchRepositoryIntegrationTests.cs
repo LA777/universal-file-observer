@@ -14,21 +14,21 @@ using FluentAssertions;
 
 namespace Ufo.IntegrationTests
 {
-    public class SearchSqLiteRepositoryIntegrationTests : IAsyncDisposable
+    public class SearchRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
-        private readonly Mock<ILogger<SearchSqLiteRepository>> _loggerMock;
-        private readonly Mock<ILogger<FileSystemSqLiteRepository>> _fsLoggerMock;
+        private readonly Mock<ILogger<SearchRepository>> _loggerMock;
+        private readonly Mock<ILogger<FileSystemRepository>> _fsLoggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
-        private SearchSqLiteRepository? _searchRepository;
-        private FileSystemSqLiteRepository? _fileSystemRepository;
+        private SearchRepository? _searchRepository;
+        private FileSystemRepository? _fileSystemRepository;
 
-        public SearchSqLiteRepositoryIntegrationTests()
+        public SearchRepositoryIntegrationTests()
         {
             var databaseFileName = $"test-{Guid.NewGuid()}.db";
             _connectionString = $"Data Source={databaseFileName};Foreign Keys=True";
-            _loggerMock = new Mock<ILogger<SearchSqLiteRepository>>();
-            _fsLoggerMock = new Mock<ILogger<FileSystemSqLiteRepository>>();
+            _loggerMock = new Mock<ILogger<SearchRepository>>();
+            _fsLoggerMock = new Mock<ILogger<FileSystemRepository>>();
             _optionsMonitorMock = new Mock<IOptionsMonitor<DatabaseOptions>>();
             _optionsMonitorMock.Setup(o => o.CurrentValue)
                 .Returns(new DatabaseOptions { ConnectionString = _connectionString });
@@ -51,8 +51,8 @@ namespace Ufo.IntegrationTests
             SqlMapper.RemoveTypeMap(typeof(Ulid?));
 
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
-            _searchRepository = new SearchSqLiteRepository(_optionsMonitorMock.Object, _loggerMock.Object);
-            _fileSystemRepository = new FileSystemSqLiteRepository(_optionsMonitorMock.Object, _fsLoggerMock.Object);
+            _searchRepository = new SearchRepository(_optionsMonitorMock.Object, _loggerMock.Object);
+            _fileSystemRepository = new FileSystemRepository(_optionsMonitorMock.Object, _fsLoggerMock.Object);
         }
 
         private void CleanupDatabase()

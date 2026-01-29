@@ -8,12 +8,12 @@ using Ufo.Abstractions.Options;
 
 namespace Ufo.Database.Repositories;
 
-public class LabelsSqLiteRepository : ILabelsSqLiteRepository
+public class LabelsRepository : ILabelsRepository
 {
-    private readonly ILogger<LabelsSqLiteRepository> _logger;
+    private readonly ILogger<LabelsRepository> _logger;
     private readonly string _connectionString;
 
-    public LabelsSqLiteRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<LabelsSqLiteRepository>? logger)
+    public LabelsRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<LabelsRepository>? logger)
     {
         _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

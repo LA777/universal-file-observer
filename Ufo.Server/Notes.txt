@@ -21,6 +21,7 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 TODO:
 - Add Authorization and Authentication on Back-end
+- [UI] Add Create User Page
 - [UI] Add Login Page
 - Add Search by File name or Folder name
 - Search inside Snapshot/Snapshots
@@ -29,6 +30,7 @@ TODO:
 - [UI] Change UI for Snapshot Tree MatTree
 - [UI] Ability to View Photo, Video and TXT files
 - [UI] View file Hash
+- Delete User Account
 - Delete Snapshot Folder
 - Delete Snapshot File
 - API - Get Snapshots by Label
@@ -46,6 +48,7 @@ TODO:
 - [UI] Copy, Move, Delete files
 - [UI] Make Two panel file view
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
+- Add SSL certificate
 
 DONE:
 + Use ULID instead of Guid
@@ -191,5 +194,15 @@ video/webm
 </video>
 
 
+-----------------------------------
+
+Workflow.
+This application should run locally or in a local server.
+When User runs this application first time - User must create an account by providing username and password.
+If User account already exists - User forwards to Login page and User provides username and password.
+This application consists of .Net Web API back-end and Angular front-end.
+
+Create the Registration page and Login page in Angular.
+When application loads first time it makes a request to api/user/is-created and gets { isCreated = [ false | true ] }.
 
 

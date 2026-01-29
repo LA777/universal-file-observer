@@ -14,10 +14,10 @@ namespace Ufo.Server.Controllers;
 public class SnapshotController : ControllerBase
 {
     private readonly ILogger<SnapshotController> _logger;
-    private readonly IFileSystemSqLiteRepository _repository;
+    private readonly IFileSystemRepository _repository;
     private readonly ISystemInfoProvider _systemInfoProvider;
 
-    public SnapshotController(ILogger<SnapshotController> logger, IFileSystemSqLiteRepository repository, ISystemInfoProvider systemInfoProvider)
+    public SnapshotController(ILogger<SnapshotController> logger, IFileSystemRepository repository, ISystemInfoProvider systemInfoProvider)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));

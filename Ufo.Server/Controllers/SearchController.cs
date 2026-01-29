@@ -10,9 +10,9 @@ namespace Ufo.Server.Controllers;
 public class SearchController : ControllerBase
 {
     private readonly ILogger<SearchController> _logger;
-    private readonly SearchSqLiteRepository _searchRepository;
+    private readonly SearchRepository _searchRepository;
 
-    public SearchController(SearchSqLiteRepository searchRepository, ILogger<SearchController> logger)
+    public SearchController(SearchRepository searchRepository, ILogger<SearchController> logger)
     {
         _searchRepository = searchRepository ?? throw new ArgumentNullException(nameof(searchRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

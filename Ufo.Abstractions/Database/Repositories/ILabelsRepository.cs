@@ -2,7 +2,7 @@
 
 namespace Ufo.Abstractions.Database.Repositories;
 
-public interface ILabelsSqLiteRepository
+public interface ILabelsRepository
 {
     public Task<int> AddLabelAsync(LabelEntity labelEntity, CancellationToken cancellationToken = default);
     public Task<IList<LabelEntity>> GetAllLabelsAsync(CancellationToken cancellationToken = default);

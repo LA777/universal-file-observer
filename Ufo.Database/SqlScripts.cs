@@ -114,9 +114,19 @@ public class SqlScripts
         
         CREATE TABLE IF NOT EXISTS Users (
             Id           TEXT NOT NULL PRIMARY KEY,
-            Username     TEXT NOT NULL UNIQUE,
+            Name         TEXT NOT NULL UNIQUE,
             PasswordHash TEXT NOT NULL
-        );        
+        );
+
+        CREATE TABLE IF NOT EXISTS UsersToSnapshots (
+            UserId                    TEXT NOT NULL,
+            SnapshotId                TEXT NOT NULL,
+
+            CONSTRAINT PK_UsersToSnapshots                       PRIMARY KEY (UserId, SnapshotId),
+            CONSTRAINT FK_UsersToSnapshots_Users_UserId          FOREIGN KEY (UserId)      REFERENCES Users (Id)    ON DELETE NO ACTION,
+            CONSTRAINT FK_UsersToSnapshots_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
+        );
+
     ";
 
     public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName AND DeviceId = @DeviceId;";

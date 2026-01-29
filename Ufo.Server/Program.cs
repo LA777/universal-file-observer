@@ -12,6 +12,7 @@ using Ufo.Database.Extensions;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
 using Ufo.Server.SchemaFilters;
+using Ufo.Server.Services;
 
 Console.WriteLine("App started. Version: 0.0.2");
 
@@ -27,6 +28,12 @@ if (applicationSettings == null)
     throw new ArgumentNullException(nameof(ApplicationSettings), "ApplicationSettings is null.");
 }
 
+var jwtOptions = builder.Configuration.GetSection("JWT").Get<JwtOptions>();
+if (jwtOptions == null)
+{
+    throw new ArgumentNullException(nameof(JwtOptions), "JwtOptions is null.");
+}
+
 builder.Services.Configure<DatabaseOptions>(options =>
 {
     options.ConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -34,10 +41,18 @@ builder.Services.Configure<DatabaseOptions>(options =>
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
-builder.Services.AddTransient<IFileSystemSqLiteRepository, FileSystemSqLiteRepository>();
+builder.Services.AddTransient<IFileSystemRepository, FileSystemRepository>();
+builder.Services.AddTransient<ILabelsRepository, LabelsRepository>();
+builder.Services.AddTransient<ISearchRepository, SearchRepository>();
+builder.Services.AddTransient<IUserRepository>(provider =>
+    new UserRepository(connectionString, provider.GetRequiredService<ILogger<UserRepository>>()));
+
 await DependencyExtension.AddDataLayerAsync(builder.Services, connectionString);
+
+builder.Services.AddTransient<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddControllers(options =>
 {

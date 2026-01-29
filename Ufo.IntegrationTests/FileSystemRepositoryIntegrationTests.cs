@@ -14,18 +14,18 @@ using FluentAssertions;
 
 namespace Ufo.IntegrationTests
 {
-    public class FileSystemSqLiteRepositoryIntegrationTests : IAsyncDisposable
+    public class FileSystemRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
-        private readonly Mock<ILogger<FileSystemSqLiteRepository>> _loggerMock;
+        private readonly Mock<ILogger<FileSystemRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
-        private FileSystemSqLiteRepository? _repository;
+        private FileSystemRepository? _repository;
 
-        public FileSystemSqLiteRepositoryIntegrationTests()
+        public FileSystemRepositoryIntegrationTests()
         {
             var databaseFileName = $"test-{Guid.NewGuid()}.db";
             _connectionString = $"Data Source={databaseFileName};Foreign Keys=True";
-            _loggerMock = new Mock<ILogger<FileSystemSqLiteRepository>>();
+            _loggerMock = new Mock<ILogger<FileSystemRepository>>();
             _optionsMonitorMock = new Mock<IOptionsMonitor<DatabaseOptions>>();
             _optionsMonitorMock.Setup(o => o.CurrentValue)
                 .Returns(new DatabaseOptions { ConnectionString = _connectionString });
@@ -48,7 +48,7 @@ namespace Ufo.IntegrationTests
             SqlMapper.RemoveTypeMap(typeof(Ulid?));
 
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
-            _repository = new FileSystemSqLiteRepository(_optionsMonitorMock.Object, _loggerMock.Object);
+            _repository = new FileSystemRepository(_optionsMonitorMock.Object, _loggerMock.Object);
         }
 
         private void CleanupDatabase()

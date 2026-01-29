@@ -13,25 +13,25 @@ using FluentAssertions;
 
 namespace Ufo.IntegrationTests
 {
-    public class LabelsSqLiteRepositoryIntegrationTests : IAsyncDisposable
+    public class LabelsRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
-        private readonly Mock<ILogger<LabelsSqLiteRepository>> _loggerMock;
+        private readonly Mock<ILogger<LabelsRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
-        private FileSystemSqLiteRepository? _fileSystemRepository;
-        private LabelsSqLiteRepository? _repository;
+        private FileSystemRepository? _fileSystemRepository;
+        private LabelsRepository? _repository;
 
-        public LabelsSqLiteRepositoryIntegrationTests()
+        public LabelsRepositoryIntegrationTests()
         {
             var databaseFileName = $"test-{Guid.NewGuid()}.db";
             _connectionString = $"Data Source={databaseFileName};Foreign Keys=True";
-            _loggerMock = new Mock<ILogger<LabelsSqLiteRepository>>();
+            _loggerMock = new Mock<ILogger<LabelsRepository>>();
             _optionsMonitorMock = new Mock<IOptionsMonitor<DatabaseOptions>>();
             _optionsMonitorMock.Setup(o => o.CurrentValue)
                 .Returns(new DatabaseOptions { ConnectionString = _connectionString });
 
-            var fileSystemSqLiteRepositoryLoggerMock = new Mock<ILogger<FileSystemSqLiteRepository>>();
-            _fileSystemRepository = new FileSystemSqLiteRepository(_optionsMonitorMock.Object, fileSystemSqLiteRepositoryLoggerMock.Object);
+            var fileSystemSqLiteRepositoryLoggerMock = new Mock<ILogger<FileSystemRepository>>();
+            _fileSystemRepository = new FileSystemRepository(_optionsMonitorMock.Object, fileSystemSqLiteRepositoryLoggerMock.Object);
         }
 
         #region Database Initialization and Cleanup
@@ -51,7 +51,7 @@ namespace Ufo.IntegrationTests
             SqlMapper.RemoveTypeMap(typeof(Ulid?));
 
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
-            _repository = new LabelsSqLiteRepository(_optionsMonitorMock.Object, _loggerMock.Object);
+            _repository = new LabelsRepository(_optionsMonitorMock.Object, _loggerMock.Object);
         }
 
         private void CleanupDatabase()

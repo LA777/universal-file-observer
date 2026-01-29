@@ -9,9 +9,9 @@ namespace Ufo.Server.Controllers;
 public class LabelController : ControllerBase
 {
     private readonly ILogger<LabelController> _logger;
-    private readonly LabelsSqLiteRepository _labelsRepository;
+    private readonly LabelsRepository _labelsRepository;
 
-    public LabelController(LabelsSqLiteRepository labelsRepository, ILogger<LabelController> logger)
+    public LabelController(LabelsRepository labelsRepository, ILogger<LabelController> logger)
     {
         _labelsRepository = labelsRepository ?? throw new ArgumentNullException(nameof(labelsRepository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));

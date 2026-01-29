@@ -2,7 +2,7 @@
 
 namespace Ufo.Abstractions.Database.Repositories;
 
-public interface IFileSystemSqLiteRepository
+public interface IFileSystemRepository
 {
     public Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default);
     //Task InitiateDatabase();
