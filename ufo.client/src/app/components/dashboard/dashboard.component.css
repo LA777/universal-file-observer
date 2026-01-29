@@ -1,0 +1,50 @@
+.dashboard-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+tr:nth-child(even) {
+  background: #dd7a7a;
+}
+
+tr:nth-child(odd) {
+  background-color: #5a2727;
+}
+
+th, td {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+table {
+  margin: 0 auto;
+}
+
+.mat-tab-group {
+  margin: 0px;
+  background-color: rgb(145, 100, 63);
+}
+
+.mat-tab-label {
+  min-width: 20px;
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-mdc-tab-label-container {
+  min-width: 20px;
+  padding: 0 0px;
+  font-size: 10px;
+}
+
+.mat-mdc-tab-header {
+  min-width: 20px;
+  padding: 0 0px;
+  font-size: 10px;
+  --mat-tab-container-height: 12px;
+}
+
+.mat-mdc-tab-labels {
+  min-width: 20px;
+}

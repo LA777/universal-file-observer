@@ -1,0 +1,26 @@
+<div class="dashboard-content">
+  <!-- <video width="320" height="240" controls>
+    <source src="https://localhost:44394/api/video?filePath=D%3A%5CVideo%5CFirebird%20(2021).mkv" type="video/webm">
+    Your browser does not support the video tag.
+  </video> -->
+
+  <mat-tab-group #tabGroup [selectedIndex]="0" class="mat-tab-group" (selectedIndexChange)="onTabChange($event)">
+    <mat-tab label="Files">
+      <app-files></app-files>
+    </mat-tab>
+    <mat-tab label="Snapshots">
+      <app-snapshots [tabIndex]="1" (tabChange)="tabChange($event)"></app-snapshots>
+    </mat-tab>
+    <mat-tab label="Snapshot Tree">
+      <app-snapshot></app-snapshot>
+    </mat-tab>
+    <mat-tab label="Forecast">
+      <app-forecast></app-forecast>
+    </mat-tab>
+    <mat-tab label="About">
+    </mat-tab>
+    <mat-tab label="Folder Tree">
+      <app-folder-tree></app-folder-tree>
+    </mat-tab>
+  </mat-tab-group>
+</div>

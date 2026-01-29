@@ -398,3 +398,21 @@ FodyWeavers.xsd
 *.sln.iml
 /ufo.client/package-lock.json
 *.db
+
+# Custom files
+/ufo.client/AUTH_IMPLEMENTATION.md
+/build-frontend-keep-open.bat
+/build-frontend-ps.bat
+/build-frontend.bat
+/build-frontend.ps1
+/build-frontend.sh
+/BUILD_QUICK_REFERENCE.md
+/check-wwwroot.bat
+/DASHBOARD_FIX_SUMMARY.md
+/FIX_STEPS.md
+/FIX_WWWROOT_ISSUE.md
+/FRONTEND_BUILD_GUIDE.md
+/LOGOUT_FIX.md
+/LOGOUT_NAVIGATION_DEBUG.md
+/STARTUP_GUIDE.md
+/TERMINAL_WINDOW_SOLUTIONS.md

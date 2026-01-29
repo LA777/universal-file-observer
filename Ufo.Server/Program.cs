@@ -54,6 +54,19 @@ await DependencyExtension.AddDataLayerAsync(builder.Services, connectionString);
 
 builder.Services.AddTransient<IJwtTokenService, JwtTokenService>();
 
+// Add CORS policy for Angular development server
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAngularDev", policyBuilder =>
+    {
+        policyBuilder
+            .WithOrigins("http://localhost:4200", "https://localhost:4200")
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers(options =>
 {
     options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider());
@@ -92,7 +105,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
+app.UseCors("AllowAngularDev");
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapFallbackToFile("/index.html");

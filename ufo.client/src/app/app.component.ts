@@ -1,107 +1,49 @@
-import { Component, OnInit, Input, ViewChild, ViewEncapsulation, ViewChildren, QueryList } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-import { MatTabGroup, MatTabsModule } from '@angular/material/tabs';
-import { MatTabChangeEvent } from '@angular/material/tabs';
-import { TabChangeService } from './services/tab-change.service';
-import { SnapshotComponent } from './components/snapshot/snapshot.component';
-import { ForecastComponent } from './components/forecast/forecast.component';
-import { SnapshotsComponent } from './components/snapshots/snapshots.component';
-import { FilesComponent } from './components/files/files.component';
-import { FolderTreeComponent } from './components/folder-tree/folder-tree.component';
-import { DialogComponent } from './components/dialog/dialog.component';
-
-// Material imports
-import { DragDropModule } from '@angular/cdk/drag-drop';
-import { PortalModule } from '@angular/cdk/portal';
-import { ScrollingModule } from '@angular/cdk/scrolling';
-import { CdkStepperModule } from '@angular/cdk/stepper';
-import { CdkTableModule } from '@angular/cdk/table';
-import { CdkTreeModule } from '@angular/cdk/tree';
-import { OverlayModule } from '@angular/cdk/overlay';
+import { Router, RouterModule } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MatDialogModule } from '@angular/material/dialog';
-import { MatGridListModule } from '@angular/material/grid-list';
 import { MatIconModule } from '@angular/material/icon';
-import { MatInputModule } from '@angular/material/input';
-import { MatListModule } from '@angular/material/list';
-import { MatNativeDateModule, MatRippleModule } from '@angular/material/core';
-import { MatSelectModule } from '@angular/material/select';
-import { MatSortModule } from '@angular/material/sort';
-import { MatTableModule } from '@angular/material/table';
-import { MatTabsModule as MatTabsModule2 } from '@angular/material/tabs';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { MatTreeModule } from '@angular/material/tree';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-
-interface WeatherForecast {
-  date: string;
-  temperatureC: number;
-  temperatureF: number;
-  summary: string;
-}
+import { AuthService } from './services/auth.service';
 
 @Component({
-    selector: 'app-root',
-    templateUrl: './app.component.html',
-    styleUrl: './app.component.css',
-    encapsulation: ViewEncapsulation.Emulated,
-    standalone: true,
-    imports: [
-      CommonModule,
-      RouterModule,
-      MatTabsModule,
-      DragDropModule,
-      PortalModule,
-      ScrollingModule,
-      CdkStepperModule,
-      CdkTableModule,
-      CdkTreeModule,
-      OverlayModule,
-      MatButtonModule,
-      MatButtonToggleModule,
-      MatDialogModule,
-      MatGridListModule,
-      MatIconModule,
-      MatInputModule,
-      MatListModule,
-      MatNativeDateModule,
-      MatRippleModule,
-      MatSelectModule,
-      MatSortModule,
-      MatTableModule,
-      MatTabsModule2,
-      MatTooltipModule,
-      MatTreeModule,
-      MatProgressBarModule,
-      ForecastComponent,
-      SnapshotComponent,
-      SnapshotsComponent,
-      FilesComponent,
-      FolderTreeComponent
-    ]
+  selector: 'app-root',
+  standalone: true,
+  imports: [
+    CommonModule,
+    RouterModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule
+  ],
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.css'
 })
-export class AppComponent implements OnInit {
-  public forecasts: WeatherForecast[] = [];
+export class AppComponent {
   title = 'ufo.client';
-  @Input() selectedIndex: number | 0;// The index of the active tab.
-  @ViewChild('tabGroup') tabGroup: MatTabGroup;
-  @ViewChildren(SnapshotComponent) tabComponents: QueryList<SnapshotComponent>;
+  currentUser$ = this.authService.currentUser$;
 
-  constructor(private tabChangeService: TabChangeService) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) { }
 
-  ngOnInit() {
-  }
-
-  tabChange(index: number) {
-    this.tabGroup.selectedIndex = index;
-  }
-
-  onTabChange(index: number) {
-    const selectedTabComponent = this.tabComponents.toArray()[index];
-    if (selectedTabComponent && selectedTabComponent.getLatestSnapshot) {
-      selectedTabComponent.getLatestSnapshot();
-    }
+  logout() {
+    console.log('Logout button clicked');
+    this.authService.logout();
+    console.log('Auth service logout called');
+    
+    // Navigate to login with explicit handling
+    this.router.navigate(['/login']).then(success => {
+      console.log('Navigation to login:', success ? 'successful' : 'failed');
+      if (!success) {
+        console.error('Navigation failed, attempting reload');
+        window.location.href = '/login';
+      }
+    }).catch(error => {
+      console.error('Navigation error:', error);
+      window.location.href = '/login';
+    });
   }
 }
+
