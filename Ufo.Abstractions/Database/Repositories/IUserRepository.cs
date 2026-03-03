@@ -8,4 +8,5 @@ public interface IUserRepository
     Task<bool> UserExistsAsync(string username);
     Task<bool> CreateUserAsync(UserEntity user);
     Task<int> GetUserCountAsync();
+    Task<UserEntity> GetUserByIdAsync(Ulid userId);
 }

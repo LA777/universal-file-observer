@@ -4,5 +4,5 @@ namespace Ufo.Abstractions.DataProviders;
 
 public interface ISystemInfoProvider
 {
-    SnapshotEntity GetSystemInformation(string path);
+    SnapshotEntity GetSystemInformation(string path, UserEntity user);
 }

@@ -12,14 +12,14 @@ namespace Ufo.DataProviders;
 
 public class SystemInfoProvider : ISystemInfoProvider
 {
-    public SnapshotEntity GetSystemInformation(string path)
+    public SnapshotEntity GetSystemInformation(string path, UserEntity user)
     {
         var driveLetter = char.ToUpper(path[0]);
-        var snapshotEntity = new SnapshotEntity();
-        var pc = new PcEntity { Name = Environment.MachineName, DeviceId = GetStableDeviceId() };
-        var storageDriveEntity = new StorageDriveEntity();
-        var volume = new VolumeEntity();
-        var volumeInfo = new VolumeInfoEntity();
+        var snapshotEntity = new SnapshotEntity() { User = user, UserId = user.Id };
+        var pc = new PcEntity { Name = Environment.MachineName, DeviceId = GetStableDeviceId(), User = user, UserId = user.Id };
+        var storageDriveEntity = new StorageDriveEntity() { User = user, UserId = user.Id };
+        var volume = new VolumeEntity() { User = user, UserId = user.Id };
+        var volumeInfo = new VolumeInfoEntity() { User = user, UserId = user.Id };
         pc.Snapshots.Add(snapshotEntity);
         pc.StorageDrives.Add(storageDriveEntity);
         storageDriveEntity.Pcs.Add(pc);
@@ -39,22 +39,22 @@ public class SystemInfoProvider : ISystemInfoProvider
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            GetDriveInformationSystem(driveLetter, volumeInfo);
+            GetDriveInformationSystem(driveLetter, volumeInfo, user);
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            GetDriveInformationSystem(driveLetter, volumeInfo);
+            GetDriveInformationSystem(driveLetter, volumeInfo, user);
         }
 
         return snapshotEntity;
     }
 
-    private void GetDriveInformationSystem(char driveLetter, VolumeInfoEntity volumeInfo)
+    private void GetDriveInformationSystem(char driveLetter, VolumeInfoEntity volumeInfo, UserEntity user)
     {
         var allDrives = DriveInfo.GetDrives().ToList();
         var pcDrive = allDrives.First(x => char.ToUpper(x.Name[0]) == driveLetter);
 
-        volumeInfo.Volume ??= new VolumeEntity();
+        volumeInfo.Volume ??= new VolumeEntity() { User = user, UserId = user.Id };
         volumeInfo.Volume.DriveLetter = pcDrive.Name;
         volumeInfo.Volume.VolumeName = pcDrive.VolumeLabel;
         volumeInfo.Volume.VolumeInfos.Add(volumeInfo);

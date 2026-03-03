@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Runtime.InteropServices;
 using Ufo.Abstractions.Requests;
@@ -7,6 +8,7 @@ namespace Ufo.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class FileSystemController : ControllerBase
 {
     private readonly ILogger<FileSystemController> _logger;

@@ -1,27 +1,36 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using System.Text;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.DataProviders;
 using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
-using Ufo.Server.Models;
+using Ufo.Server.Attributes;
 
 namespace Ufo.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
+[JwtClaimsRequired]
 public class SnapshotController : ControllerBase
 {
     private readonly ILogger<SnapshotController> _logger;
     private readonly IFileSystemRepository _repository;
+    private readonly IUserRepository _userRepository;
     private readonly ISystemInfoProvider _systemInfoProvider;
 
-    public SnapshotController(ILogger<SnapshotController> logger, IFileSystemRepository repository, ISystemInfoProvider systemInfoProvider)
+    public SnapshotController(
+        ILogger<SnapshotController> logger,
+        IFileSystemRepository repository,
+        ISystemInfoProvider systemInfoProvider,
+        IUserRepository userRepository)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _systemInfoProvider = systemInfoProvider ?? throw new ArgumentNullException(nameof(systemInfoProvider));
+        _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
     }
 
     [HttpGet("latest")]
@@ -29,7 +38,8 @@ public class SnapshotController : ControllerBase
     public async Task<IActionResult> GetLatestSnapshotAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetLatestSnapshotAsync");
-        var latestSnapshot = await _repository.GetLatestSnapshotWithAllEntitiesAsync(cancellationToken);
+        var userId = HttpContext.GetUserIdAsUlid();
+        var latestSnapshot = await _repository.GetLatestSnapshotWithAllEntitiesAsync(userId, cancellationToken);
 
         if (latestSnapshot == null)
         {
@@ -46,8 +56,9 @@ public class SnapshotController : ControllerBase
     public async Task<IActionResult> GetSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetSnapshotByIdAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
 
-        var snapshot = await _repository.GetSnapshotByIdAsync(snapshotId, cancellationToken);
+        var snapshot = await _repository.GetSnapshotByIdAsync(snapshotId, userId, cancellationToken);
 
         if (snapshot == null)
         {
@@ -60,30 +71,33 @@ public class SnapshotController : ControllerBase
     }
 
     [HttpGet("all")]
-    public async Task<IEnumerable<SnapshotEntity>> GetAllSnapshotsAsync(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAllSnapshotsAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetAllSnapshotsAsync");
-        var snapshots = await _repository.GetAllSnapshotsAsync(cancellationToken);
+        var userId = HttpContext.GetUserIdAsUlid();
+        var snapshots = await _repository.GetAllSnapshotsAsync(userId, cancellationToken);
         _logger.LogInformation("Snapshots retrieved from DB");
 
-        return snapshots;
+        return Ok(snapshots);
     }
 
     [HttpPost("create")]
     public async Task<string> CreateSnapshotAsync([FromBody] PathRequest folderPath, CancellationToken cancellationToken)
     {
         _logger.LogInformation("CreateSnapshotAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
 
         if (!Directory.Exists(folderPath.Path))
         {
             throw new DirectoryNotFoundException(folderPath.Path);
         }
 
-        var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path);
-        var folderTree = CreateFolderTree(folderPath.Path, snapshot, null);
+        var user = await _userRepository.GetUserByIdAsync(userId);
+        var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path, user);        
+        var folderTree = CreateFolderTree(folderPath.Path, snapshot, null, user);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
-        await _repository.AddSnapshotAsync(snapshot, cancellationToken);
+        await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);
         _logger.LogInformation("Snapshot saved to DB");
 
         // TODO LA - Return OK(snapshot)
@@ -94,14 +108,15 @@ public class SnapshotController : ControllerBase
     public async Task<IActionResult> DeleteSnapshotByIdAsync(Ulid id, CancellationToken cancellationToken)
     {
         _logger.LogInformation("DeleteSnapshotByIdAsync");
-        var result = await _repository.DeleteSnapshotByIdAsync(id, cancellationToken);
+        var userId = HttpContext.GetUserIdAsUlid();
+        var result = await _repository.DeleteSnapshotByIdAsync(id, userId, cancellationToken);
 
         switch (result)
         {
-            case Abstractions.DeleteResult.Success:
+            case Abstractions.DatabaseActionResult.Success:
                 _logger.LogInformation("Snapshot {0} deleted in DB.", id);
                 return Ok($"Snapshot with Id: {id} was sucessfully deleted.");
-            case Abstractions.DeleteResult.NotFound:
+            case Abstractions.DatabaseActionResult.NotFound:
                 _logger.LogInformation("Snapshot {0} was not found.", id);
                 return NotFound($"Snapshot with Id: {id} was not found.");
             default:
@@ -109,7 +124,7 @@ public class SnapshotController : ControllerBase
         }
     }
 
-    private FsFolderEntity CreateFolderTree(string path, SnapshotEntity snapshot, FsFolderEntity? parentFolder)
+    private FsFolderEntity CreateFolderTree(string path, SnapshotEntity snapshot, FsFolderEntity? parentFolder, UserEntity user)
     {// TODO LA - move to a separate service
         _logger.LogInformation($"Indexing {path}");
         var directoryInfo = new DirectoryInfo(path);
@@ -117,7 +132,9 @@ public class SnapshotController : ControllerBase
         var folder = new FsFolderEntity
         {
             Name = directoryInfo.Name,
-            Sha256Hash = string.Empty
+            Sha256Hash = string.Empty, 
+            User = user, 
+            UserId = user.Id
         };
         folder.Snapshots.Add(snapshot);
         if (parentFolder is not null)
@@ -127,7 +144,7 @@ public class SnapshotController : ControllerBase
 
         foreach (var subFolderPath in Directory.EnumerateDirectories(path))
         {
-            var subFolder = CreateFolderTree(subFolderPath, snapshot, folder);
+            var subFolder = CreateFolderTree(subFolderPath, snapshot, folder, user);
             folder.ChildFolders.Add(subFolder);
         }
 
@@ -139,7 +156,9 @@ public class SnapshotController : ControllerBase
                 Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
                 Size = fileInfo.Length,
                 Sha256Hash = fileInfo.GetFileHashSha256(),
-                FileExtension = fileInfo.Extension
+                FileExtension = fileInfo.Extension,
+                User = user,
+                UserId = user.Id
             };
             file.Snapshots.Add(snapshot);
             file.ParentFolders.Add(folder);

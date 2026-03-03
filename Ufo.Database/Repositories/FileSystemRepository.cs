@@ -36,8 +36,10 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<IEnumerable<FsFileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<FsFileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default)
     {
+        // TODO LA - Use UserId
+        _logger.LogInformation("GetFilesByNameAndExtensionAsync - UserId: {UserId}", userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -52,8 +54,10 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<IEnumerable<FsFolderEntity>> GetFoldersByNameAsync(string name, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<FsFolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default)
     {
+        // TODO LA - Use UserId
+        _logger.LogInformation("GetFoldersByNameAsync - UserId: {UserId}", userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -68,8 +72,10 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
-    { // TODO LA - Filter by User
+    public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
+    {
+        // TODO LA - Use UserId
+        _logger.LogInformation("GetSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -221,8 +227,10 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(CancellationToken cancellationToken = default)
-    { // TODO LA - Filter by User
+    public async Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        // TODO LA - Use UserId
+        _logger.LogInformation("GetLatestSnapshotWithAllEntitiesAsync - UserId: {UserId}", userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -374,8 +382,10 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<IList<SnapshotEntity>> GetAllSnapshotsAsync(CancellationToken cancellationToken = default)
-    { // TODO LA - Filter by User
+    public async Task<IList<SnapshotEntity>> GetAllSnapshotsAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        // TODO LA - Use UserId
+        _logger.LogInformation("GetAllSnapshotsAsync - UserId: {UserId}", userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
@@ -420,8 +430,10 @@ public class FileSystemRepository : IFileSystemRepository
 
     #region DeleteSnapshotByIdAsync
 
-    public async Task<DeleteResult> DeleteSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken = default)
-    { // TODO LA - Filter by User
+    public async Task<DatabaseActionResult> DeleteSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
+    {
+        // TODO LA - Use UserId
+        _logger.LogInformation("DeleteSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
@@ -438,7 +450,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             if (snapshot == null)
             {
-                return DeleteResult.NotFound;
+                return DatabaseActionResult.NotFound;
             }
 
             // 1. Delete FilesToFolders entries for this snapshot
@@ -520,7 +532,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             await transaction.CommitAsync(cancellationToken);
 
-            return DeleteResult.Success;
+            return DatabaseActionResult.Success;
         }
         catch (Exception exception)
         {
@@ -534,28 +546,33 @@ public class FileSystemRepository : IFileSystemRepository
 
     #region AddSnapshotAsync
 
-    public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, CancellationToken cancellationToken = default)
-    { // TODO LA - Bind to User
+    public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, Ulid userId, CancellationToken cancellationToken = default)
+    {
+        // TODO LA - Use UserId
+        _logger.LogInformation("AddSnapshotAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotEntity.Id, userId);
         await using var sqLiteConnection = new SqliteConnection(_connectionString);
         await sqLiteConnection.OpenAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            _logger.LogInformation($"Insert snapshot: {snapshotEntity.Id}");
+            _logger.LogInformation($"Insert snapshot: {snapshotEntity.Id} for UserId: {userId}");
             // add snapshot to DB
+            snapshotEntity.UserId = userId;
             await sqLiteConnection.ExecuteAsync(SqlScripts.InsertSnapshotSql, snapshotEntity, transaction);
 
             var volumeEntity = snapshotEntity.VolumeInfo!.Volume;
             var storageDriveEntity = volumeEntity!.StorageDrive;
 
             // Find same PC in DB
-            var pcEntity = storageDriveEntity!.Pcs[0];
-            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, new { PcName = pcEntity.Name, DeviceId = pcEntity.DeviceId });
+            var pcEntity = storageDriveEntity!.Pcs[0];            
+            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, 
+                new { PcName = pcEntity.Name, pcEntity.DeviceId, UserId = userId.ToString() });
             if (pcInDb == null)
             {
                 _logger.LogInformation($"Insert PC: {pcEntity.Id}");
                 // add pc to DB
+                pcEntity.UserId = userId;
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertPcSql, pcEntity, transaction);
             }
             else
@@ -564,11 +581,12 @@ public class FileSystemRepository : IFileSystemRepository
             }
 
             var storageDriveInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<StorageDriveEntity>(SqlScripts.SelectStorageDriveSql,
-                new { storageDriveEntity.SerialNumber, storageDriveEntity.DeviceId, storageDriveEntity.Name });
+                new { storageDriveEntity.SerialNumber, storageDriveEntity.DeviceId, storageDriveEntity.Name, UserId = userId.ToString() });
             if (storageDriveInDb == null)
             {
                 _logger.LogInformation($"Insert StorageDrive: {storageDriveEntity.Id}");
                 // add StorageDrive to DB
+                storageDriveEntity.UserId = userId;
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertStorageDriveSql, storageDriveEntity, transaction);
             }
             else
@@ -581,11 +599,12 @@ public class FileSystemRepository : IFileSystemRepository
 
             // Check if Volume is in DB
             var volumeInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<VolumeEntity>(SqlScripts.SelectVolumeSql,
-                new { volumeEntity.VolumeSerialNumber });
+                new { volumeEntity.VolumeSerialNumber, UserId = userId.ToString() });
             if (volumeInDb == null)
             {
                 _logger.LogInformation($"Insert Volume: {volumeEntity.Id}");
                 // add Volume to DB
+                volumeEntity.UserId = userId;
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertVolumeSql, volumeEntity, transaction);
             }
             else
@@ -596,13 +615,14 @@ public class FileSystemRepository : IFileSystemRepository
 
             _logger.LogInformation($"Insert VolumeInfo: {snapshotEntity.VolumeInfo.Id}");
             // add VolumeInfo to DB
+            snapshotEntity.VolumeInfo.UserId = userId;
             await sqLiteConnection.ExecuteAsync(SqlScripts.InsertVolumeInfoSql, snapshotEntity.VolumeInfo, transaction);
 
             // add Folder Tree to DB
-            await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, snapshotEntity.RootFolder!, null, snapshotEntity, transaction);
+            await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, userId, snapshotEntity.RootFolder!, null, snapshotEntity, transaction);
 
             // Add Labels and associations
-            await AddLabelsAndAssighnToSnapshotAsync(sqLiteConnection, snapshotEntity, transaction);
+            await AddLabelsAndAssighnToSnapshotAsync(sqLiteConnection, userId, snapshotEntity, transaction);
 
             await transaction.CommitAsync(cancellationToken);
         }
@@ -616,12 +636,12 @@ public class FileSystemRepository : IFileSystemRepository
         return 1;
     }
 
-    private async Task AddFolderWithFilesRecursivelyAsync(IDbConnection sqLiteConnection, FsFolderEntity folderEntity, FsFolderEntity? parentFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task AddFolderWithFilesRecursivelyAsync(IDbConnection sqLiteConnection, Ulid userId, FsFolderEntity folderEntity, FsFolderEntity? parentFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
         { // check if Folder in DB
             var folderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FsFolderEntity>(SqlScripts.SelectFolderByNameAndParentFolderPathAndStorageDriveIdSql,
-                new { folderEntity.Name, folderEntity.Size, folderEntity.Sha256Hash }, transaction);
+                new { folderEntity.Name, folderEntity.Size, folderEntity.Sha256Hash, UserId = userId }, transaction);
 
             if (folderInDb == null) // Folder does not exist in DB
             {
@@ -634,13 +654,13 @@ public class FileSystemRepository : IFileSystemRepository
                 folderEntity.Id = folderInDb.Id;
             }
 
-            await BindFolderWithFolderAndSnapshotAsync(sqLiteConnection, parentFolderEntity, folderEntity, snapshotEntity, transaction);
+            await BindFolderWithFolderAndSnapshotAsync(sqLiteConnection, userId, parentFolderEntity, folderEntity, snapshotEntity, transaction);
 
             // add child Folders (sorted by name)
             //var sortedChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
             foreach (var childFolder in folderEntity.ChildFolders)
             {
-                await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, childFolder, folderEntity, snapshotEntity, transaction);
+                await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, userId, childFolder, folderEntity, snapshotEntity, transaction);
             }
 
             // add Files (sorted by name)
@@ -648,7 +668,7 @@ public class FileSystemRepository : IFileSystemRepository
             foreach (var fileEntity in folderEntity.Files)
             { // check if File in DB
                 var fileInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FsFileEntity>(SqlScripts.SelectFileByNameAndParentFolderPathAndStorageDriveIdSql,
-                    new { fileEntity.Name, fileEntity.Size, fileEntity.FileExtension, fileEntity.Sha256Hash }, transaction);
+                    new { fileEntity.Name, fileEntity.Size, fileEntity.FileExtension, fileEntity.Sha256Hash, UserId = userId }, transaction);
 
                 if (fileInDb == null) // File does not exist in DB
                 {
@@ -671,7 +691,7 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    private async Task BindFolderWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, FsFolderEntity? parentFolderEntity, FsFolderEntity childFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task BindFolderWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, FsFolderEntity? parentFolderEntity, FsFolderEntity childFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
         {
@@ -734,7 +754,7 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    private async Task AddLabelsAndAssighnToSnapshotAsync(IDbConnection sqLiteConnection, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task AddLabelsAndAssighnToSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         // TODO LA - Add Integration tests for this case
         try
@@ -748,6 +768,7 @@ public class FileSystemRepository : IFileSystemRepository
                 {
                     _logger.LogInformation($"Insert Label: {labelEntity.Id}");
                     // add new Label to DB
+                    labelEntity.UserId = userId;
                     await sqLiteConnection.ExecuteAsync(SqlScripts.InsertLabelSql, labelEntity, transaction);
                 }
                 else

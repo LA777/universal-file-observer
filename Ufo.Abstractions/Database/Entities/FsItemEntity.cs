@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Database.Entities;
 
-public abstract class FsItemEntity: EntityBase
+public abstract class FsItemEntity: EntityWithUserAndNameAndIdBase
 {
     [JsonPropertyOrder(2)]
     public long? Size { get; set; }

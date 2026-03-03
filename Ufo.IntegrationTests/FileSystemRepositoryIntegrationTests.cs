@@ -17,6 +17,7 @@ namespace Ufo.IntegrationTests
     public class FileSystemRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
+        private UserEntity testUser = new() { Id = Ulid.NewUlid(), Name = "TestUser" };
         private readonly Mock<ILogger<FileSystemRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
         private FileSystemRepository? _repository;
@@ -49,6 +50,13 @@ namespace Ufo.IntegrationTests
 
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
             _repository = new FileSystemRepository(_optionsMonitorMock.Object, _loggerMock.Object);
+
+            // Insert test user
+            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            await sqLiteConnection.OpenAsync();
+            await sqLiteConnection.ExecuteAsync(
+                "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                new { testUser.Id, testUser.Name, PasswordHash = "hash" });
         }
 
         private void CleanupDatabase()
@@ -118,11 +126,11 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateSnapshotWithSimpleFolder();
 
                 // Act
-                var result = await _repository!.AddSnapshotAsync(snapshot);
+                var result = await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
                 Assert.Equal(1, result);
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot);
                 Assert.Equal(snapshot.Id, retrievedSnapshot.Id);
                 Assert.Equal(snapshot.Timestamp, retrievedSnapshot.Timestamp);
@@ -145,10 +153,10 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateSnapshotWithNestedFolders();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot);
                 Assert.NotNull(retrievedSnapshot.RootFolder);
                 Assert.NotEmpty(retrievedSnapshot.RootFolder.ChildFolders);
@@ -174,10 +182,10 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateSnapshotWithFiles();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot?.RootFolder);
                 Assert.NotEmpty(retrievedSnapshot.RootFolder.Files);
                 Assert.Equal(3, retrievedSnapshot.RootFolder.Files.Count);
@@ -201,10 +209,10 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateComplexSnapshot();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot);
                 Assert.NotNull(retrievedSnapshot.RootFolder);
                 Assert.NotNull(retrievedSnapshot.VolumeInfo);
@@ -239,10 +247,10 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateSnapshotWithSystemInfo();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot.VolumeInfo);
                 Assert.NotNull(retrievedSnapshot.VolumeInfo.Volume);
                 Assert.NotNull(retrievedSnapshot.VolumeInfo.Volume.StorageDrive);
@@ -269,12 +277,12 @@ namespace Ufo.IntegrationTests
                 var snapshot2 = CreateSnapshotWithSystemInfo();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot1);
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot1 = await _repository.GetSnapshotByIdAsync(snapshot1.Id);
-                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var retrievedSnapshot1 = await _repository.GetSnapshotByIdAsync(snapshot1.Id, testUser.Id);
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot1);
                 Assert.NotNull(retrievedSnapshot2);
                 Assert.NotEqual(snapshot1.Id, snapshot2.Id);
@@ -301,10 +309,10 @@ namespace Ufo.IntegrationTests
                 var snapshot = CreateSnapshotWithSystemInfo();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot.VolumeInfo);
                 Assert.NotEqual(Ulid.Empty, retrievedSnapshot.VolumeInfo.Id);
                 Assert.NotEqual(Ulid.Empty, retrievedSnapshot.VolumeInfo.VolumeId);
@@ -328,17 +336,17 @@ namespace Ufo.IntegrationTests
                 var snapshot1 = CreateSnapshotWithSystemInfo();
                 var originalPcId = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Id;
 
-                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
 
                 var snapshot2 = CreateSnapshotWithSystemInfo();
                 snapshot2.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Name = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].Name;
                 snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId;
 
                 // Act
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 var pcFromSnapshot2 = retrievedSnapshot2.VolumeInfo!.Volume!.StorageDrive!.Pcs.First();
                 Assert.Equal(originalPcId, pcFromSnapshot2.Id);
             }
@@ -358,16 +366,16 @@ namespace Ufo.IntegrationTests
                 var snapshot1 = CreateSnapshotWithSystemInfo();
                 var originalVolumeId = snapshot1.VolumeInfo!.Volume!.Id;
 
-                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
 
                 var snapshot2 = CreateSnapshotWithSystemInfo();
                 snapshot2.VolumeInfo!.Volume!.VolumeSerialNumber = snapshot1.VolumeInfo.Volume.VolumeSerialNumber;
 
                 // Act
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 Assert.Equal(originalVolumeId, retrievedSnapshot2.VolumeInfo!.VolumeId);
             }
             finally
@@ -387,12 +395,12 @@ namespace Ufo.IntegrationTests
                 var stopwatch = Stopwatch.StartNew();
 
                 // Act
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
                 stopwatch.Stop();
 
                 // Assert
                 Assert.True(stopwatch.ElapsedMilliseconds < 10000, $"Operation took {stopwatch.ElapsedMilliseconds}ms");
-                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id);
+                var retrievedSnapshot = await _repository.GetSnapshotByIdAsync(snapshot.Id, testUser.Id);
                 Assert.NotNull(retrievedSnapshot);
                 var allFolders = GetAllFolders(retrievedSnapshot!.RootFolder!);
                 Assert.True(allFolders.Count > 10, "Expected large folder structure");
@@ -434,20 +442,27 @@ namespace Ufo.IntegrationTests
                     Name = "sharedfile",
                     FileExtension = ".txt",
                     Size = 1024,
-                    Sha256Hash = "sharedhashvalue123"
+                    Sha256Hash = "sharedhashvalue123",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 snapshot1.RootFolder!.Files.Add(sharedFile);
                 sharedFile.ParentFolders.Add(snapshot1.RootFolder);
 
-                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
                 var originalFileId = sharedFile.Id;
 
                 // Create snapshot 2 with the same file (same hash and properties)
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now,
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc5",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -457,7 +472,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -465,10 +482,23 @@ namespace Ufo.IntegrationTests
                     VolumeName = "HelperDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "H:\\", Size = 0, Sha256Hash = "h_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "H:\\", 
+                    Size = 0, 
+                    Sha256Hash = "h_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -489,10 +519,10 @@ namespace Ufo.IntegrationTests
                 sharedFile.ParentFolders.Add(rootFolder2);
 
                 // Act
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 var fileFromSnapshot2 = retrievedSnapshot2.RootFolder!.Files.First();
                 Assert.Equal(originalFileId, fileFromSnapshot2.Id);
 
@@ -523,20 +553,28 @@ namespace Ufo.IntegrationTests
                 {
                     Name = "SharedFolder",
                     Size = 5000,
-                    Sha256Hash = "sharedfolderhash456"
+                    Sha256Hash = "sharedfolderhash456",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 snapshot1.RootFolder!.ChildFolders.Add(sharedFolder);
                 sharedFolder.ParentFolders.Add(snapshot1.RootFolder);
 
-                await _repository!.AddSnapshotAsync(snapshot1);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
                 var originalFolderId = sharedFolder.Id;
 
                 // Create snapshot 2 with the same folder (same hash and properties)
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { 
+                    Timestamp = DateTimeOffset.Now,
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc6",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -546,7 +584,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -554,10 +594,22 @@ namespace Ufo.IntegrationTests
                     VolumeName = "ImageDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "I:\\", Size = 0, Sha256Hash = "i_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "I:\\", Size = 0, 
+                    Sha256Hash = "i_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -578,10 +630,10 @@ namespace Ufo.IntegrationTests
                 sharedFolder.ParentFolders.Add(rootFolder2);
 
                 // Act
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Assert
-                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var retrievedSnapshot2 = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 var folderFromSnapshot2 = retrievedSnapshot2.RootFolder!.ChildFolders.First();
                 Assert.Equal(originalFolderId, folderFromSnapshot2.Id);
 
@@ -611,15 +663,15 @@ namespace Ufo.IntegrationTests
             {
                 var snapshot = CreateSnapshotWithFiles();
 
-                await _repository!.AddSnapshotAsync(snapshot);
+                await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Act
-                var result = await _repository.DeleteSnapshotByIdAsync(snapshot.Id);
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot.Id, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.Success);
+                result.Should().Be(DatabaseActionResult.Success);
 
-                var allSnapshots = await _repository.GetAllSnapshotsAsync();
+                var allSnapshots = await _repository.GetAllSnapshotsAsync(testUser.Id);
                 allSnapshots.Should().NotContain(s => s.Id == snapshot.Id);
             }
             finally
@@ -638,10 +690,10 @@ namespace Ufo.IntegrationTests
                 var missingId = Ulid.NewUlid();
 
                 // Act
-                var result = await _repository!.DeleteSnapshotByIdAsync(missingId);
+                var result = await _repository!.DeleteSnapshotByIdAsync(missingId, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.NotFound);
+                result.Should().Be(DatabaseActionResult.NotFound);
             }
             finally
             {
@@ -662,13 +714,17 @@ namespace Ufo.IntegrationTests
                 {
                     Name = "SharedFolder",
                     Size = 100,
-                    Sha256Hash = "sharedhash"
+                    Sha256Hash = "sharedhash",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var uniqueFolder1 = new FsFolderEntity
                 {
                     Name = "UniqueFolder1",
                     Size = 200,
-                    Sha256Hash = "uniquehash1"
+                    Sha256Hash = "uniquehash1",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 snapshot1.RootFolder!.ChildFolders.Add(sharedFolder);
                 sharedFolder.ParentFolders.Add(snapshot1.RootFolder);
@@ -676,11 +732,17 @@ namespace Ufo.IntegrationTests
                 uniqueFolder1.ParentFolders.Add(snapshot1.RootFolder);
 
                 // Create snapshot 2 with shared folder but different PC and StorageDrive
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { 
+                    Timestamp = DateTimeOffset.Now,
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc2",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -690,7 +752,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -698,10 +762,23 @@ namespace Ufo.IntegrationTests
                     VolumeName = "DataDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "D:\\", Size = 0, Sha256Hash = "d_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "D:\\", 
+                    Size = 0, 
+                    Sha256Hash = "d_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -721,27 +798,27 @@ namespace Ufo.IntegrationTests
                 rootFolder2.ChildFolders.Add(sharedFolder);
                 sharedFolder.ParentFolders.Add(rootFolder2);
 
-                await _repository!.AddSnapshotAsync(snapshot1);
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
                 var sharedFolderId = sharedFolder.Id;
                 var uniqueFolderId = uniqueFolder1.Id;
 
                 var jsonSnapshot1BeforeDb = System.Text.Json.JsonSerializer.Serialize(snapshot1);
                 var jsonSnapshot2BeforeDb = System.Text.Json.JsonSerializer.Serialize(snapshot2);
-                var snapshot1FromDb = await _repository.GetSnapshotByIdAsync(snapshot1.Id);
-                var snapshot2FromDb = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var snapshot1FromDb = await _repository.GetSnapshotByIdAsync(snapshot1.Id, testUser.Id);
+                var snapshot2FromDb = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 var jsonSnapshot1FromDb = System.Text.Json.JsonSerializer.Serialize(snapshot1FromDb);
                 var jsonSnapshot2FromDb = System.Text.Json.JsonSerializer.Serialize(snapshot2FromDb);
 
 
                 // Act - Delete snapshot 1
-                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.Success);
+                result.Should().Be(DatabaseActionResult.Success);
 
                 // Shared folder should still exist (used by snapshot 2)
-                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 var allFolders = GetAllFolders(snapshot2After.RootFolder!);
                 allFolders.Should().Contain(f => f.Id == sharedFolderId);
 
@@ -772,14 +849,18 @@ namespace Ufo.IntegrationTests
                     Name = "shared",
                     FileExtension = ".txt",
                     Size = 100,
-                    Sha256Hash = "sharedhashfile"
+                    Sha256Hash = "sharedhashfile",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var uniqueFile = new FsFileEntity
                 {
                     Name = "unique",
                     FileExtension = ".txt",
                     Size = 200,
-                    Sha256Hash = "uniquehashfile"
+                    Sha256Hash = "uniquehashfile",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 snapshot1.RootFolder!.Files.Add(sharedFile);
                 sharedFile.ParentFolders.Add(snapshot1.RootFolder);
@@ -787,11 +868,17 @@ namespace Ufo.IntegrationTests
                 uniqueFile.ParentFolders.Add(snapshot1.RootFolder);
 
                 // Create snapshot 2 with shared file but different PC and StorageDrive
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { 
+                    Timestamp = DateTimeOffset.Now,
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc3",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -801,7 +888,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -809,10 +898,23 @@ namespace Ufo.IntegrationTests
                     VolumeName = "ExtraDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "E:\\", Size = 0, Sha256Hash = "e_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "E:\\", 
+                    Size = 0, 
+                    Sha256Hash = "e_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -832,19 +934,19 @@ namespace Ufo.IntegrationTests
                 rootFolder2.Files.Add(sharedFile);
                 sharedFile.ParentFolders.Add(rootFolder2);
 
-                await _repository!.AddSnapshotAsync(snapshot1);
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
                 var sharedFileId = sharedFile.Id;
                 var uniqueFileId = uniqueFile.Id;
 
                 // Act - Delete snapshot 1
-                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.Success);
+                result.Should().Be(DatabaseActionResult.Success);
 
                 // Shared file should still exist (used by snapshot 2)
-                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 snapshot2After.RootFolder!.Files.Should().Contain(f => f.Id == sharedFileId);
 
                 // Unique file should be deleted
@@ -872,11 +974,17 @@ namespace Ufo.IntegrationTests
                 var pcId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Id;
 
                 // Create snapshot 2 with different PC
-                var snapshot2 = new SnapshotEntity { Timestamp = DateTimeOffset.Now };
+                var snapshot2 = new SnapshotEntity { 
+                    Timestamp = DateTimeOffset.Now,
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "UniqueTestPc",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -886,7 +994,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -894,10 +1004,23 @@ namespace Ufo.IntegrationTests
                     VolumeName = "FileDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "F:\\", Size = 0, Sha256Hash = "f_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "F:\\", 
+                    Size = 0, 
+                    Sha256Hash = "f_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -913,18 +1036,18 @@ namespace Ufo.IntegrationTests
                 snapshot2.VolumeInfo = volumeInfo2;
                 snapshot2.RootFolder = rootFolder2;
 
-                await _repository!.AddSnapshotAsync(snapshot1);
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
                 var pc2Id = pc2.Id;
 
                 // Act - Delete snapshot 1
-                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.Success);
+                result.Should().Be(DatabaseActionResult.Success);
 
                 // PC from snapshot 2 should still exist
-                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 snapshot2After.VolumeInfo!.Volume!.StorageDrive!.Pcs.Should().Contain(p => p.Id == pc2Id);
 
                 // PC from snapshot 1 should be deleted
@@ -953,11 +1076,17 @@ namespace Ufo.IntegrationTests
                 var volumerId1 = snapshot1.VolumeInfo!.Volume!.Id;
 
                 // Create snapshot 2 with different StorageDrive
-                var snapshot2 = new SnapshotEntity { Description = "Test Snapshot 28171" };
+                var snapshot2 = new SnapshotEntity { 
+                    Description = "Test Snapshot 28171",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
                 var pc2 = new PcEntity
                 {
                     Name = "TestPc4",
-                    DeviceId = Guid.NewGuid().ToString()
+                    DeviceId = Guid.NewGuid().ToString(),
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var storageDrive2 = new StorageDriveEntity
                 {
@@ -967,7 +1096,9 @@ namespace Ufo.IntegrationTests
                     TotalSize = 1099511627776,
                     Description = "Disk drive",
                     MediaType = "Fixed hard disk media",
-                    InterfaceType = "SATA"
+                    InterfaceType = "SATA",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
                 var volume2 = new VolumeEntity
                 {
@@ -975,10 +1106,23 @@ namespace Ufo.IntegrationTests
                     VolumeName = "GameDrive",
                     VolumeSerialNumber = Guid.NewGuid().ToString(),
                     VolumeSize = 549755813888,
-                    Description = "Local Fixed Disk"
+                    Description = "Local Fixed Disk",
+                    UserId = testUser.Id,
+                    User = testUser
                 };
-                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 274877906944, DriveStatus = "OK" };
-                var rootFolder2 = new FsFolderEntity { Name = "G:\\", Size = 0, Sha256Hash = "g_drive_hash" };
+                var volumeInfo2 = new VolumeInfoEntity { 
+                    FreeSpace = 274877906944, 
+                    DriveStatus = "OK",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
+                var rootFolder2 = new FsFolderEntity { 
+                    Name = "G:\\", 
+                    Size = 0, 
+                    Sha256Hash = "g_drive_hash",
+                    UserId = testUser.Id,
+                    User = testUser
+                };
 
                 pc2.Snapshots.Add(snapshot2);
                 pc2.StorageDrives.Add(storageDrive2);
@@ -994,18 +1138,18 @@ namespace Ufo.IntegrationTests
                 snapshot2.VolumeInfo = volumeInfo2;
                 snapshot2.RootFolder = rootFolder2;
 
-                await _repository!.AddSnapshotAsync(snapshot1);
-                await _repository.AddSnapshotAsync(snapshot2);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, testUser.Id);
                 var storageDrive2Id = storageDrive2.Id;  
 
                 // Act - Delete snapshot 1
-                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id);
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot1.Id, testUser.Id);
 
                 // Assert
-                result.Should().Be(DeleteResult.Success);
+                result.Should().Be(DatabaseActionResult.Success);
 
                 // StorageDrive from snapshot 2 should still exist
-                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id);
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id, testUser.Id);
                 snapshot2After.VolumeInfo!.Volume!.StorageDrive!.Id.Should().Be(storageDrive2Id);
 
                 // StorageDrive from snapshot 1 should be deleted
@@ -1034,8 +1178,17 @@ namespace Ufo.IntegrationTests
         // Helper methods
         private SnapshotEntity CreateSnapshotWithSimpleFolder()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { 
+                Description = "Test Snapshot 93853",
+                UserId = testUser.Id,
+                User = testUser
+            };
+            var pc = new PcEntity { 
+                Name = "TestPC", 
+                DeviceId = Guid.NewGuid().ToString(),
+                UserId = testUser.Id,
+                User = testUser
+            };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -1044,7 +1197,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -1052,18 +1207,24 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 250000,
-                DriveStatus = "OK"
+                DriveStatus = "OK",
+                UserId = testUser.Id,
+                User = testUser
             };
             var rootFolder = new FsFolderEntity
             {
                 Name = "Root",
                 Size = 0,
-                Sha256Hash = "abc123"
+                Sha256Hash = "abc123",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             pc.Snapshots.Add(snapshot);
@@ -1092,14 +1253,18 @@ namespace Ufo.IntegrationTests
             {
                 Name = "ChildFolder1",
                 Size = 100,
-                Sha256Hash = "child1hash"
+                Sha256Hash = "child1hash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             var grandchildFolder = new FsFolderEntity
             {
                 Name = "GrandchildFolder",
                 Size = 50,
-                Sha256Hash = "grandchildhash"
+                Sha256Hash = "grandchildhash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             rootFolder!.ChildFolders.Add(childFolder1);
@@ -1121,7 +1286,9 @@ namespace Ufo.IntegrationTests
                 Name = "file1",
                 FileExtension = ".txt",
                 Size = 100,
-                Sha256Hash = "filehash1"
+                Sha256Hash = "filehash1",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             var file2 = new FsFileEntity
@@ -1129,7 +1296,9 @@ namespace Ufo.IntegrationTests
                 Name = "file2",
                 FileExtension = ".pdf",
                 Size = 200,
-                Sha256Hash = "filehash2"
+                Sha256Hash = "filehash2",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             var file3 = new FsFileEntity
@@ -1137,7 +1306,9 @@ namespace Ufo.IntegrationTests
                 Name = "file3",
                 FileExtension = ".jpg",
                 Size = 300,
-                Sha256Hash = "filehash3"
+                Sha256Hash = "filehash3",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             rootFolder!.Files.Add(file1);
@@ -1160,14 +1331,18 @@ namespace Ufo.IntegrationTests
             {
                 Name = "Documents",
                 Size = 500,
-                Sha256Hash = "dochash"
+                Sha256Hash = "dochash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             var folder2 = new FsFolderEntity
             {
                 Name = "SubDocuments",
                 Size = 300,
-                Sha256Hash = "subdochash"
+                Sha256Hash = "subdochash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             rootFolder!.ChildFolders.Add(folder1);
@@ -1181,7 +1356,9 @@ namespace Ufo.IntegrationTests
                 Name = "document",
                 FileExtension = ".docx",
                 Size = 150,
-                Sha256Hash = "docfilehash"
+                Sha256Hash = "docfilehash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             folder1.Files.Add(docFile);
@@ -1192,7 +1369,9 @@ namespace Ufo.IntegrationTests
                 Name = "subdocument",
                 FileExtension = ".doc",
                 Size = 120,
-                Sha256Hash = "subdocfilehash"
+                Sha256Hash = "subdocfilehash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             folder2.Files.Add(subDocFile);
@@ -1203,11 +1382,17 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithSystemInfo()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot 35464" };
+            var snapshot = new SnapshotEntity { 
+                Description = "Test Snapshot 35464",
+                UserId = testUser.Id,
+                User = testUser
+            };
             var pc = new PcEntity
             {
                 Name = "TestPc30290",
-                DeviceId = Guid.NewGuid().ToString()
+                DeviceId = Guid.NewGuid().ToString(),
+                UserId = testUser.Id,
+                User = testUser
             };
             var storageDrive = new StorageDriveEntity
             {
@@ -1217,7 +1402,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1099511627776,
                 Description = "Disk drive",
                 MediaType = "Fixed hard disk media",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -1225,18 +1412,24 @@ namespace Ufo.IntegrationTests
                 VolumeName = "SystemDrive",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 549755813888,
-                Description = "Local Fixed Disk"
+                Description = "Local Fixed Disk",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 274877906944,
-                DriveStatus = "OK"
+                DriveStatus = "OK",
+                UserId = testUser.Id,
+                User = testUser
             };
             var rootFolder = new FsFolderEntity
             {
                 Name = "C:\\",
                 Size = 0,
-                Sha256Hash = "c_drive_hash"
+                Sha256Hash = "c_drive_hash",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             pc.Snapshots.Add(snapshot);
@@ -1275,7 +1468,9 @@ namespace Ufo.IntegrationTests
                     {
                         Name = $"Folder_{folderCount}_{i}",
                         Size = random.Next(100, 1000),
-                        Sha256Hash = $"hash_{folderCount}_{i}"
+                        Sha256Hash = $"hash_{folderCount}_{i}",
+                        UserId = testUser.Id,
+                        User = testUser
                     };
 
                     currentFolder.ChildFolders.Add(newFolder);
@@ -1288,7 +1483,9 @@ namespace Ufo.IntegrationTests
                             Name = $"File_{folderCount}_{i}_{j}",
                             FileExtension = ".txt",
                             Size = random.Next(10, 500),
-                            Sha256Hash = $"filehash_{folderCount}_{i}_{j}"
+                            Sha256Hash = $"filehash_{folderCount}_{i}_{j}",
+                            UserId = testUser.Id,
+                            User = testUser
                         };
 
                         newFolder.Files.Add(file);

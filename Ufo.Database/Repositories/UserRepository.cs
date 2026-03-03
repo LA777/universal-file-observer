@@ -98,4 +98,25 @@ public class UserRepository : IUserRepository
             throw;
         }        
     }
+
+    public async Task<UserEntity> GetUserByIdAsync(Ulid userId)
+    {
+        using var sqLiteConnection = new SqliteConnection(_connectionString);
+        const string sql = @"SELECT * FROM Users WHERE Id = @UserId"; // TODO LA - Move to SqlScript class
+        try
+        {
+            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { UserId = userId.ToString() });
+            if (userEntity == null)
+            {
+                throw new Exception($"User with ID ({userId}) was not found.");
+            }
+
+            _logger.LogInformation("Retrieved user by ID: {UserId}", userId);
+            return userEntity;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+    }
 }

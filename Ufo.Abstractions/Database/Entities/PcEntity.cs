@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("Pcs")]
-public class PcEntity : EntityBase
+public class PcEntity : EntityWithUserAndNameAndIdBase
 {
     public string? DeviceId { get; set; }
 

@@ -17,6 +17,7 @@ namespace Ufo.IntegrationTests
     public class SearchRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
+        private UserEntity testUser = new() { Id = Ulid.NewUlid(), Name = "TestUser" };
         private readonly Mock<ILogger<SearchRepository>> _loggerMock;
         private readonly Mock<ILogger<FileSystemRepository>> _fsLoggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
@@ -53,6 +54,13 @@ namespace Ufo.IntegrationTests
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
             _searchRepository = new SearchRepository(_optionsMonitorMock.Object, _loggerMock.Object);
             _fileSystemRepository = new FileSystemRepository(_optionsMonitorMock.Object, _fsLoggerMock.Object);
+
+            // Insert test user
+            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            await sqLiteConnection.OpenAsync();
+            await sqLiteConnection.ExecuteAsync(
+                "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                new { testUser.Id, testUser.Name, PasswordHash = "hash" });
         }
 
         private void CleanupDatabase()
@@ -121,12 +129,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().NotBeEmpty();
@@ -151,7 +159,7 @@ namespace Ufo.IntegrationTests
             {
                 // Seed data to ensure we aren't just getting an empty result because the DB is empty
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest
                 {
@@ -161,7 +169,7 @@ namespace Ufo.IntegrationTests
                 };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Should().NotBeNull();
@@ -182,12 +190,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "nonexistent", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().BeEmpty();
@@ -207,12 +215,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "fil", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().NotBeEmpty();
@@ -232,12 +240,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "file", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().NotBeEmpty();
@@ -261,12 +269,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFolders();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "Documents", IncludeFiles = false, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Folders.Should().NotBeEmpty();
@@ -287,12 +295,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFolders();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "document", IncludeFiles = false, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Folders.Should().NotBeEmpty();  
@@ -319,12 +327,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateLargeSnapshot();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "folder", IncludeFiles = false, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Folders.Should().HaveCount(50);
@@ -351,12 +359,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFilesAndFolders();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "Doc", IncludeFiles = true, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Should().NotBeNull();
@@ -377,12 +385,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFilesAndFolders();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "xyz123", IncludeFiles = true, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().BeEmpty();
@@ -402,12 +410,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFilesAndFolders();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "document", IncludeFiles = true, IncludeFolders = true };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Should().NotBeNull();
@@ -432,12 +440,12 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "FILE", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert - SQLite FTS is typically case-insensitive
                 result.Files.Should().NotBeEmpty();
@@ -457,14 +465,14 @@ namespace Ufo.IntegrationTests
             {
                 var snapshot1 = CreateSnapshotWithFiles();
                 var snapshot2 = CreateSnapshotWithFiles();
-                
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
-                await _fileSystemRepository.AddSnapshotAsync(snapshot2);
+
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _fileSystemRepository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "file", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().NotBeEmpty();
@@ -485,13 +493,13 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Test with special characters that might be in filenames
                 var searchRequest = new SearchRequest { Query = ".", IncludeFiles = true, IncludeFolders = false };
 
                 // Act & Assert - Should not throw
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
                 result.Should().NotBeNull();
             }
             finally
@@ -508,7 +516,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateSnapshotWithFiles();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest 
                 { 
@@ -518,7 +526,7 @@ namespace Ufo.IntegrationTests
                 };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 result.Files.Should().BeEmpty();
@@ -539,14 +547,14 @@ namespace Ufo.IntegrationTests
                 var snapshot1 = CreateSnapshotWithFiles();
                 var snapshot2 = CreateSnapshotWithFiles();
                 // Create same files in second snapshot
-                
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
-                await _fileSystemRepository.AddSnapshotAsync(snapshot2);
+
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _fileSystemRepository.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 // Assert
                 // Should return the same file with multiple snapshots, not duplicated
@@ -572,14 +580,14 @@ namespace Ufo.IntegrationTests
             try
             {
                 var snapshot = CreateLargeSnapshot();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 var searchRequest = new SearchRequest { Query = "File", IncludeFiles = true, IncludeFolders = true };
 
                 var stopwatch = Stopwatch.StartNew();
 
                 // Act
-                var result = await _searchRepository!.SearchAsync(searchRequest);
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
                 stopwatch.Stop();
 
@@ -599,8 +607,8 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithFiles()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files", UserId = testUser.Id, User = testUser };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -609,7 +617,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -617,14 +627,16 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
-            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK" };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123" };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = testUser.Id, User = testUser };
 
-            var file1 = new FsFileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1" };
-            var file2 = new FsFileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2" };
-            var file3 = new FsFileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3" };
+            var file1 = new FsFileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = testUser.Id, User = testUser };
+            var file2 = new FsFileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = testUser.Id, User = testUser };
+            var file3 = new FsFileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = testUser.Id, User = testUser };
 
             rootFolder.Files.Add(file1);
             rootFolder.Files.Add(file2);
@@ -652,8 +664,8 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithFolders()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders", UserId = testUser.Id, User = testUser };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -662,7 +674,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -670,13 +684,15 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
-            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK" };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root" };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
-            var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc" };
-            var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc" };
+            var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
+            var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = testUser.Id, User = testUser };
 
             rootFolder.ChildFolders.Add(folder1);
             folder1.ParentFolders.Add(rootFolder);
@@ -702,8 +718,8 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithFilesAndFolders()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files and Folders" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files and Folders", UserId = testUser.Id, User = testUser };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -712,7 +728,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -720,23 +738,25 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
-            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK" };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root" };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
             // Add folders
-            var documentsFolder = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc" };
+            var documentsFolder = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
             rootFolder.ChildFolders.Add(documentsFolder);
             documentsFolder.ParentFolders.Add(rootFolder);
 
             // Add files to folders
-            var docFile = new FsFileEntity { Name = "document.docx", FileExtension = ".docx", Size = 150, Sha256Hash = "docfile" };
+            var docFile = new FsFileEntity { Name = "document.docx", FileExtension = ".docx", Size = 150, Sha256Hash = "docfile", UserId = testUser.Id, User = testUser };
             documentsFolder.Files.Add(docFile);
             docFile.ParentFolders.Add(documentsFolder);
 
             // Add files to root
-            var textFile = new FsFileEntity { Name = "readme.txt", FileExtension = ".txt", Size = 100, Sha256Hash = "txtfile" };
+            var textFile = new FsFileEntity { Name = "readme.txt", FileExtension = ".txt", Size = 100, Sha256Hash = "txtfile", UserId = testUser.Id, User = testUser };
             rootFolder.Files.Add(textFile);
             textFile.ParentFolders.Add(rootFolder);
 
@@ -759,8 +779,8 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateLargeSnapshot()
         {
-            var snapshot = new SnapshotEntity { Description = "Large Test Snapshot" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { Description = "Large Test Snapshot", UserId = testUser.Id, User = testUser };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -769,7 +789,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -777,10 +799,12 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
-            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK" };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root" };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
             // Create many folders and files
             var random = new Random(42);
@@ -797,7 +821,9 @@ namespace Ufo.IntegrationTests
                     {
                         Name = $"Folder_{folderCount}_{i}",
                         Size = random.Next(100, 1000),
-                        Sha256Hash = $"hash_{folderCount}_{i}"
+                        Sha256Hash = $"hash_{folderCount}_{i}",
+                        UserId = testUser.Id,
+                        User = testUser
                     };
 
                     currentFolder.ChildFolders.Add(newFolder);
@@ -810,7 +836,9 @@ namespace Ufo.IntegrationTests
                             Name = $"File_{folderCount}_{i}_{j}",
                             FileExtension = ".txt",
                             Size = random.Next(10, 500),
-                            Sha256Hash = $"filehash_{folderCount}_{i}_{j}"
+                            Sha256Hash = $"filehash_{folderCount}_{i}_{j}",
+                            UserId = testUser.Id,
+                            User = testUser
                         };
 
                         newFolder.Files.Add(file);

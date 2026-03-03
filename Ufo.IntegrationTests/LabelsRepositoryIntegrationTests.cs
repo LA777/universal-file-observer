@@ -1,4 +1,5 @@
 ﻿using Dapper;
+using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,13 +10,13 @@ using Ufo.Abstractions.Options;
 using Ufo.Database.Contexts;
 using Ufo.Database.Handlers;
 using Ufo.Database.Repositories;
-using FluentAssertions;
 
 namespace Ufo.IntegrationTests
 {
     public class LabelsRepositoryIntegrationTests : IAsyncDisposable
     {
         private readonly string _connectionString;
+        private UserEntity testUser = new() { Id = Ulid.NewUlid(), Name = "TestUser" };
         private readonly Mock<ILogger<LabelsRepository>> _loggerMock;
         private readonly Mock<IOptionsMonitor<DatabaseOptions>> _optionsMonitorMock;
         private FileSystemRepository? _fileSystemRepository;
@@ -52,6 +53,13 @@ namespace Ufo.IntegrationTests
 
             await DapperDataContext.InitiateDatabaseAsync(_connectionString);
             _repository = new LabelsRepository(_optionsMonitorMock.Object, _loggerMock.Object);
+
+            // Insert test user
+            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            await sqLiteConnection.OpenAsync();
+            await sqLiteConnection.ExecuteAsync(
+                "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                new { testUser.Id, testUser.Name, PasswordHash = "hash" });
         }
 
         private void CleanupDatabase()
@@ -118,14 +126,14 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "Important", ColorHex = "#FF0000" };
+                var label = new LabelEntity { Name = "Important", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
 
                 // Act
-                var result = await _repository!.AddLabelAsync(label);
+                var result = await _repository!.AddLabelAsync(label, testUser.Id);
 
                 // Assert
-                Assert.Equal(1, result);
-                var allLabels = await _repository.GetAllLabelsAsync();
+                result.All(r => r.Result == Result.Success).Should().BeTrue();
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 allLabels.Should().Contain(l => l.Name == "Important" && l.ColorHex == "#FF0000");
             }
             finally
@@ -141,17 +149,20 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Important", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Archived", ColorHex = "#808080" };
-                var label3 = new LabelEntity { Name = "Recent", ColorHex = "#00FF00" };
+                var label1 = new LabelEntity { Name = "Important", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Archived", ColorHex = "#808080", UserId = testUser.Id, User = testUser };
+                var label3 = new LabelEntity { Name = "Recent", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
 
                 // Act
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
-                await _repository.AddLabelAsync(label3);
+                var result1 = await _repository!.AddLabelAsync(label1, testUser.Id);
+                var result2 = await _repository.AddLabelAsync(label2, testUser.Id);
+                var result3 = await _repository.AddLabelAsync(label3, testUser.Id);
 
                 // Assert
-                var allLabels = await _repository.GetAllLabelsAsync();
+                result1.All(r => r.Result == Result.Success).Should().BeTrue();
+                result2.All(r => r.Result == Result.Success).Should().BeTrue();
+                result3.All(r => r.Result == Result.Success).Should().BeTrue();
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 allLabels.Should().HaveCount(3);
                 allLabels.Should().Contain(l => l.Name == "Important");
                 allLabels.Should().Contain(l => l.Name == "Archived");
@@ -175,7 +186,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 // Act
-                var labels = await _repository!.GetAllLabelsAsync();
+                var labels = await _repository!.GetAllLabelsAsync(testUser.Id);
 
                 // Assert
                 labels.Should().BeEmpty();
@@ -193,14 +204,14 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Priority1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Priority2", ColorHex = "#FFFF00" };
+                var label1 = new LabelEntity { Name = "Priority1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Priority2", ColorHex = "#FFFF00", UserId = testUser.Id, User = testUser };
 
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
 
                 // Act
-                var labels = await _repository.GetAllLabelsAsync();
+                var labels = await _repository.GetAllLabelsAsync(testUser.Id);
 
                 // Assert
                 labels.Should().HaveCount(2);
@@ -227,7 +238,7 @@ namespace Ufo.IntegrationTests
                 var snapshotId = Ulid.NewUlid();
 
                 // Act
-                var labels = await _repository!.GetLabelsBySnapshotIdAsync(snapshotId);
+                var labels = await _repository!.GetLabelsBySnapshotIdAsync(snapshotId, testUser.Id);
 
                 // Assert
                 labels.Should().BeEmpty();
@@ -245,20 +256,20 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Tagged", ColorHex = "#0000FF" };
-                var label2 = new LabelEntity { Name = "Unrelated", ColorHex = "#00FF00" };
+                var label1 = new LabelEntity { Name = "Tagged", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Unrelated", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Add labels
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
 
                 // Associate label1 with snapshot
-                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id, testUser.Id);
 
                 // Act
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
 
                 // Assert
                 labels.Should().HaveCount(1);
@@ -277,23 +288,23 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
-                var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF" };
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+                var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Add labels
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
-                await _repository.AddLabelAsync(label3);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
+                await _repository.AddLabelAsync(label3, testUser.Id);
 
                 // Associate label1 and label2 with snapshot
-                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
-                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
-                
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id, testUser.Id);
+
                 // Act
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
 
                 // Assert
                 labels.Should().HaveCount(2);
@@ -318,18 +329,18 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "Original", ColorHex = "#FF0000" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "Original", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
 
                 label.Name = "Updated";
                 label.ColorHex = "#00FF00";
 
                 // Act
-                var result = await _repository.UpdateLabelAsync(label);
+                var result = await _repository.UpdateLabelAsync(label, testUser.Id);
 
                 // Assert
-                Assert.Equal(1, result);
-                var allLabels = await _repository.GetAllLabelsAsync();
+                Assert.Equal(Result.Success, result.Result);
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 var updatedLabel = allLabels.FirstOrDefault(l => l.Id == label.Id);
                 updatedLabel.Should().NotBeNull();
                 updatedLabel!.Name.Should().Be("Updated");
@@ -348,12 +359,12 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var nonExistentLabel = new LabelEntity { Name = "NonExistent", ColorHex = "#FFFFFF" };
+                var nonExistentLabel = new LabelEntity { Name = "NonExistent", ColorHex = "#FFFFFF", UserId = testUser.Id, User = testUser };
                 nonExistentLabel.GetType().GetProperty("Id")?.SetValue(nonExistentLabel, Ulid.NewUlid());
 
                 // Act & Assert - Should not throw
-                var result = await _repository!.UpdateLabelAsync(nonExistentLabel);
-                Assert.Equal(0, result); // No rows updated
+                var result = await _repository!.UpdateLabelAsync(nonExistentLabel, testUser.Id);
+                Assert.Equal(Result.NotFound, result.Result);
             }
             finally
             {
@@ -368,19 +379,22 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
 
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
+                var addLabelResult1 = await _repository!.AddLabelAsync(label1, testUser.Id);
+                var addLabelResult2 = await _repository.AddLabelAsync(label2, testUser.Id);
 
                 label1.Name = "ModifiedLabel1";
 
                 // Act
-                await _repository.UpdateLabelAsync(label1);
+                var updateLabelResult = await _repository.UpdateLabelAsync(label1, testUser.Id);
 
                 // Assert
-                var allLabels = await _repository.GetAllLabelsAsync();
+                addLabelResult1.All(r => r.Result == Result.Success).Should().BeTrue();
+                addLabelResult2.All(r => r.Result == Result.Success).Should().BeTrue();
+                Assert.Equal(Result.Success, updateLabelResult.Result);
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 var updatedLabel1 = allLabels.First(l => l.Id == label1.Id);
                 var unchangedLabel2 = allLabels.First(l => l.Id == label2.Id);
 
@@ -404,15 +418,15 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "ToDelete", ColorHex = "#FF0000" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "ToDelete", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
 
                 // Act
-                var result = await _repository.DeleteLabelByIdAsync(label.Id);
+                var deleteResult = await _repository.DeleteLabelByIdAsync(label.Id, testUser.Id);
 
                 // Assert
-                Assert.Equal(1, result);
-                var allLabels = await _repository.GetAllLabelsAsync();
+                Assert.Equal(Result.Success, deleteResult.Result);
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 allLabels.Should().NotContain(l => l.Id == label.Id);
             }
             finally
@@ -431,10 +445,10 @@ namespace Ufo.IntegrationTests
                 var nonExistentLabelId = Ulid.NewUlid();
 
                 // Act
-                var result = await _repository!.DeleteLabelByIdAsync(nonExistentLabelId);
+                var deleteResult = await _repository!.DeleteLabelByIdAsync(nonExistentLabelId, testUser.Id);
 
                 // Assert
-                Assert.Equal(0, result);
+                Assert.Equal(Result.NotFound, deleteResult.Result);
             }
             finally
             {
@@ -449,19 +463,19 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "AssociatedLabel", ColorHex = "#00FF00" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "AssociatedLabel", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
 
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
 
                 // Act
-                await _repository.DeleteLabelByIdAsync(label.Id);
+                await _repository.DeleteLabelByIdAsync(label.Id, testUser.Id);
 
                 // Assert
                 // Verify label is deleted
-                var allLabels = await _repository.GetAllLabelsAsync();
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 allLabels.Should().NotContain(l => l.Id == label.Id);
 
                 // Verify association is deleted
@@ -484,17 +498,17 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
 
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
 
                 // Act
-                await _repository.DeleteLabelByIdAsync(label1.Id);
+                await _repository.DeleteLabelByIdAsync(label1.Id, testUser.Id);
 
                 // Assert
-                var allLabels = await _repository.GetAllLabelsAsync();
+                var allLabels = await _repository.GetAllLabelsAsync(testUser.Id);
                 allLabels.Should().HaveCount(1);
                 allLabels.Should().Contain(l => l.Id == label2.Id);
                 allLabels.Should().NotContain(l => l.Id == label1.Id);
@@ -516,17 +530,17 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "TestLabel", ColorHex = "#0000FF" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "TestLabel", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Act
-                var result = await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+                var result = await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
 
                 // Assert
-                Assert.Equal(1, result);
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                Assert.Equal(Result.Success, result.Result);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
                 labels.Should().HaveCount(1);
                 labels.Should().Contain(l => l.Id == label.Id);
             }
@@ -543,24 +557,24 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
-                var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF" };
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+                var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
 
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
-                await _repository.AddLabelAsync(label3);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
+                await _repository.AddLabelAsync(label3, testUser.Id);
 
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
                 // Act
-                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
-                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
-                await _repository.AddLabelToSnapshotAsync(label3.Id, snapshot.Id);
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label3.Id, snapshot.Id, testUser.Id);
 
                 // Assert
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
                 labels.Should().HaveCount(3);
                 labels.Should().Contain(l => l.Id == label1.Id);
                 labels.Should().Contain(l => l.Id == label2.Id);
@@ -579,21 +593,21 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "SharedLabel", ColorHex = "#FFFF00" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "SharedLabel", ColorHex = "#FFFF00", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
 
                 var snapshot1 = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
                 var snapshot2 = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot2);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot2, testUser.Id);
 
                 // Act
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id);
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id, testUser.Id);
 
                 // Assert
-                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id);
-                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id);
+                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id, testUser.Id);
+                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id, testUser.Id);
 
                 labels1.Should().HaveCount(1);
                 labels2.Should().HaveCount(1);
@@ -617,18 +631,18 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "RemoveLabel", ColorHex = "#FF00FF" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "RemoveLabel", ColorHex = "#FF00FF", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
 
                 // Act
-                var result = await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot.Id);
+                var result = await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
 
                 // Assert
-                Assert.Equal(1, result);
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                Assert.Equal(Result.Success, result.Result);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
                 labels.Should().BeEmpty();
             }
             finally
@@ -638,20 +652,71 @@ namespace Ufo.IntegrationTests
         }
 
         [Fact]
-        public async Task RemoveLabelFromSnapshotAsync_WhenAssociationNotFound_ReturnsZero()
+        public async Task RemoveLabelFromSnapshotAsync_WhenLabelDoesNotExistInDatabase_ReturnsNotFound()
         {
             // Arrange
             await InitializeDatabaseAsync();
             try
             {
                 var labelId = Ulid.NewUlid();
+
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+
+                // Act
+                var result = await _repository!.RemoveLabelFromSnapshotAsync(labelId, snapshot.Id, testUser.Id);
+
+                // Assert
+                Assert.Equal(Result.NotFound, result.Result);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_WhenSnapshotDoesNotExistInDatabase_ReturnsNotFound()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "TestLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
+
                 var snapshotId = Ulid.NewUlid();
 
                 // Act
-                var result = await _repository!.RemoveLabelFromSnapshotAsync(labelId, snapshotId);
+                var result = await _repository!.RemoveLabelFromSnapshotAsync(label.Id, snapshotId, testUser.Id);
 
                 // Assert
-                Assert.Equal(0, result);
+                Assert.Equal(Result.NotFound, result.Result);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task RemoveLabelFromSnapshotAsync_WhenAssociationNotFound_ReturnsNotFound()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var label = new LabelEntity { Name = "TestLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
+
+                var snapshot = CreateSnapshotWithSimpleFolder();
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+
+                // Act
+                var result = await _repository!.RemoveLabelFromSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
+
+                // Assert
+                Assert.Equal(Result.NotFound, result.Result);
             }
             finally
             {
@@ -666,22 +731,22 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000" };
-                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00" };
+                var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+                var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
 
-                await _repository!.AddLabelAsync(label1);
-                await _repository.AddLabelAsync(label2);
+                await _repository!.AddLabelAsync(label1, testUser.Id);
+                await _repository.AddLabelAsync(label2, testUser.Id);
 
                 var snapshot = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot);
-                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id);
-                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label1.Id, snapshot.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label2.Id, snapshot.Id, testUser.Id);
 
                 // Act
-                await _repository.RemoveLabelFromSnapshotAsync(label1.Id, snapshot.Id);
+                await _repository.RemoveLabelFromSnapshotAsync(label1.Id, snapshot.Id, testUser.Id);
 
                 // Assert
-                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id);
+                var labels = await _repository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
                 labels.Should().HaveCount(1);
                 labels.Should().Contain(l => l.Id == label2.Id);
                 labels.Should().NotContain(l => l.Id == label1.Id);
@@ -699,23 +764,23 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var label = new LabelEntity { Name = "Label", ColorHex = "#0000FF" };
-                await _repository!.AddLabelAsync(label);
+                var label = new LabelEntity { Name = "Label", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+                await _repository!.AddLabelAsync(label, testUser.Id);
 
                 var snapshot1 = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot1);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
                 var snapshot2 = CreateSnapshotWithSimpleFolder();
-                await _fileSystemRepository!.AddSnapshotAsync(snapshot2);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot2, testUser.Id);
 
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id);
-                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot1.Id, testUser.Id);
+                await _repository.AddLabelToSnapshotAsync(label.Id, snapshot2.Id, testUser.Id);
 
                 // Act
-                await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot1.Id);
+                await _repository.RemoveLabelFromSnapshotAsync(label.Id, snapshot1.Id, testUser.Id);
 
                 // Assert
-                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id);
-                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id);
+                var labels1 = await _repository.GetLabelsBySnapshotIdAsync(snapshot1.Id, testUser.Id);
+                var labels2 = await _repository.GetLabelsBySnapshotIdAsync(snapshot2.Id, testUser.Id);
 
                 labels1.Should().BeEmpty();
                 labels2.Should().HaveCount(1);
@@ -731,8 +796,9 @@ namespace Ufo.IntegrationTests
 
         private SnapshotEntity CreateSnapshotWithSimpleFolder()
         {
-            var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853" };
-            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString() };
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853", UserId = testUser.Id, User = testUser };
+
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
             var storageDrive = new StorageDriveEntity
             {
                 Name = "Test Drive",
@@ -741,7 +807,9 @@ namespace Ufo.IntegrationTests
                 TotalSize = 1000000,
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
-                InterfaceType = "SATA"
+                InterfaceType = "SATA",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volume = new VolumeEntity
             {
@@ -749,18 +817,24 @@ namespace Ufo.IntegrationTests
                 VolumeName = "TestVolume",
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
-                Description = "Test Volume"
+                Description = "Test Volume",
+                UserId = testUser.Id,
+                User = testUser
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 250000,
-                DriveStatus = "OK"
+                DriveStatus = "OK",
+                UserId = testUser.Id,
+                User = testUser
             };
             var rootFolder = new FsFolderEntity
             {
                 Name = "Root",
                 Size = 0,
-                Sha256Hash = "abc123"
+                Sha256Hash = "abc123",
+                UserId = testUser.Id,
+                User = testUser
             };
 
             pc.Snapshots.Add(snapshot);

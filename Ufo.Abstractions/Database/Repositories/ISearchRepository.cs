@@ -5,5 +5,5 @@ namespace Ufo.Abstractions.Database.Repositories;
 
 public interface ISearchRepository
 {
-    public Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default);
+    public Task<SearchResponse> SearchAsync(SearchRequest request, Ulid userId, CancellationToken cancellationToken = default);
 }

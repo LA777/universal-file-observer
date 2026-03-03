@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("StorageDrives")]
-public class StorageDriveEntity: EntityBase
+public class StorageDriveEntity: EntityWithUserAndNameAndIdBase
 {
     [JsonPropertyOrder(10)]
     [MaxLength(128)]

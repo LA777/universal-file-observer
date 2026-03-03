@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities
 {
     [Table("Labels")]
-    public class LabelEntity: EntityBase
+    public class LabelEntity: EntityWithUserAndNameAndIdBase
     {
         [JsonPropertyOrder(14)]
         [MaxLength(32)]

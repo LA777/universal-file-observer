@@ -22,8 +22,10 @@ public class SearchRepository : ISearchRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<SearchResponse> SearchAsync(SearchRequest request, CancellationToken cancellationToken = default)
+    public async Task<SearchResponse> SearchAsync(SearchRequest request, Ulid userId, CancellationToken cancellationToken = default)
     {
+        // TODO LA - Update search to filter data by UserId
+        _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", request.Query, userId);
         // TODO LA - Refactor
         if (string.IsNullOrWhiteSpace(request.Query))
         {

@@ -6,13 +6,8 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("VolumeInfos")]
-public class VolumeInfoEntity
+public class VolumeInfoEntity: EntityWithUserAndIdBase
 {
-    [JsonConverter(typeof(UlidJsonConverter))]
-    [JsonPropertyOrder(0)]
-    [PrimaryKey]
-    public Ulid Id { get; set; } = Ulid.NewUlid();
-
     [JsonPropertyOrder(5)]
     public long FreeSpace { get; set; }
 
