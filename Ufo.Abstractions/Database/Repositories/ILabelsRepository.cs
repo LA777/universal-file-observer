@@ -11,4 +11,5 @@ public interface ILabelsRepository
     public Task<ServerResult> AddLabelToSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
     public Task<ServerResult> RemoveLabelFromSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
     public Task<ServerResult> DeleteLabelByIdAsync(Ulid labelId, Ulid userId, CancellationToken cancellationToken = default);
+    public Task<LabelEntity?> GetLabelByNameAsync(string labelName, Ulid userId, CancellationToken cancellationToken = default);
 }

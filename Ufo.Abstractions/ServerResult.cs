@@ -7,6 +7,8 @@
         public Result Result { get; set; }
 
         public ActionPriority Priority { get; set; }
+
+        public string Message { get; set; } = string.Empty;
     }
 }
 

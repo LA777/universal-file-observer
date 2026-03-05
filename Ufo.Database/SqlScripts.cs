@@ -297,6 +297,7 @@ public class SqlScripts
                                            "VALUES " +
                                            "(@Id, @Name, @ColorHex, @UserId)";
     public const string SelectLabelByIdSql = "SELECT * FROM Labels WHERE Id = @LabelId AND UserId = @UserId;";
+    public const string SelectLabelByNameSql = "SELECT * FROM Labels WHERE Name = @Name AND UserId = @UserId;";
     public const string InsertLabelsToSnapshotsSql = "INSERT INTO LabelsToSnapshots " +
                                                         "(LabelId, SnapshotId) " +
                                                         "VALUES " +

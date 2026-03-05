@@ -13,6 +13,6 @@ namespace Ufo.Abstractions.Database.Entities
 
         [JsonIgnore]
         [ManyToMany(typeof(LabelsToSnapshotsEntity))]
-        public IList<SnapshotEntity> Snapshots { get; } = [];
+        public IList<SnapshotEntity> Snapshots { get; set; } = [];
     }
 }
