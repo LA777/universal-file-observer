@@ -6,6 +6,7 @@ using Ufo.Abstractions;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.Options;
+using Ufo.Abstractions.Requests;
 
 namespace Ufo.Database.Repositories;
 
@@ -20,61 +21,61 @@ public class LabelsRepository : ILabelsRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IList<ServerResult>> AddLabelAsync(LabelEntity labelEntity, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<IList<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("AddLabelAsync - LabelId: {LabelId}, UserId: {UserId}", labelEntity.Id, userId);
+        _logger.LogInformation("AddLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
 
             var labelInDatabase = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByNameSql,
-                new { labelEntity.Name, UserId = userId });
+                new { label.Name, UserId = userId });
             if (labelInDatabase is not null)
             {
                 return new List<ServerResult>
                 {
                     new() {
-                        ActionName = $"Adding Label '{labelEntity.Name}'.",
+                        ActionName = $"Adding Label '{label.Name}'.",
                         Result = Result.Error,
                         Priority = ActionPriority.Highest,
-                        Message = $"Label with name '{labelEntity.Name} already exists."
+                        Message = $"Label with name '{label.Name} already exists."
                     }
                 };
             }
 
             var rowsAffectedInLabels = await sqLiteConnection.ExecuteAsync(SqlScripts.InsertLabelSql,
-                new { labelEntity.Id, labelEntity.Name, labelEntity.ColorHex, UserId = userId });
-            _logger.LogInformation($"Added label with id: {labelEntity.Id}");
+                new { label.Id, label.Name, label.ColorHex, UserId = userId });
+            _logger.LogInformation($"Added label with id: {label.Id}");
 
             var serverResults = new List<ServerResult>
             {
                 new() {
-                    ActionName = $"Adding Label '{labelEntity.Name}'.",
+                    ActionName = $"Adding Label '{label.Name}'.",
                     Result = rowsAffectedInLabels == 1 ? Result.Success : Result.Error,
                     Priority = ActionPriority.Highest
                 }
             };
 
             // If Label has Snapshots - add associations in LabelsToSnapshots table
-            if (labelEntity.Snapshots is { Count: > 0 })
+            if (label.SnapshotIds is { Count: > 0 })
             {
-                foreach (var snapshot in labelEntity.Snapshots)
+                foreach (var snapshotId in label.SnapshotIds)
                 {
                     // Check if Snapshot exists
                     var snapshotEntity = await sqLiteConnection.QueryFirstAsync<SnapshotEntity>(
                         SqlScripts.SelectSnapshotOnlyByIdSql,
-                        new { SnapshotId = snapshot.Id, UserId = userId });
+                        new { SnapshotId = snapshotId, UserId = userId });
                     if (snapshotEntity is not null)
                     {
                         var rowsAffectedInLabelsToSnapshots = await sqLiteConnection.ExecuteAsync(
                         SqlScripts.InsertLabelsToSnapshotsSql,
-                        new { LabelId = labelEntity.Id, SnapshotId = snapshot.Id });
-                        _logger.LogInformation($"Assigned label with id: {labelEntity.Id} to snapshot: {snapshot.Id}");
+                        new { LabelId = label.Id, SnapshotId = snapshotId });
+                        _logger.LogInformation($"Assigned label with id: {label.Id} to snapshot: {snapshotId}");
 
                         serverResults.Add(new ServerResult
                         {
-                            ActionName = $"Assigning Label '{labelEntity.Name}' to Snapshot with id: {snapshot.Id}.",
+                            ActionName = $"Assigning Label '{label.Name}' to Snapshot with id: {snapshotId}.",
                             Result = rowsAffectedInLabelsToSnapshots == 1 ? Result.Success : Result.Error,
                             Priority = ActionPriority.Optional
                         });
@@ -326,22 +327,22 @@ public class LabelsRepository : ILabelsRepository
         }
     }
 
-    public async Task<ServerResult> UpdateLabelAsync(LabelEntity labelEntity, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<ServerResult> UpdateLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("UpdateLabelAsync - LabelId: {LabelId}, UserId: {UserId}", labelEntity.Id, userId);
+        _logger.LogInformation("UpdateLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         try
         {
             await using var sqLiteConnection = new SqliteConnection(_connectionString);
 
             var labelToUpdate = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByIdSql,
-                new { LabelId = labelEntity.Id, UserId = userId });
+                new { LabelId = label.Id, UserId = userId });
 
             if (labelToUpdate == null)
             {
                 return new ServerResult
                 {
-                    ActionName = $"Updating Label '{labelEntity.Name}'. Label with ID: {labelEntity.Id} was not found in Database.",
+                    ActionName = $"Updating Label '{label.Name}'. Label with ID: {label.Id} was not found in Database.",
                     Result = Result.NotFound,
                     Priority = ActionPriority.Highest
                 };
@@ -349,27 +350,27 @@ public class LabelsRepository : ILabelsRepository
 
             var labelWithSameName = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByNameSql,
-                new { Name = labelEntity.Name, UserId = userId });
+                new { Name = label.Name, UserId = userId });
 
-            if (labelWithSameName != null && labelWithSameName.Id != labelEntity.Id)
+            if (labelWithSameName != null && labelWithSameName.Id != label.Id)
             {
                 return new ServerResult
                 {
-                    ActionName = $"Updating Label '{labelEntity.Name}'.",
+                    ActionName = $"Updating Label '{label.Name}'.",
                     Result = Result.Error,
                     Priority = ActionPriority.Highest,
-                    Message = $"The Label with name '{labelEntity.Name}' already exists."
+                    Message = $"The Label with name '{label.Name}' already exists."
                 };
             }
 
             var rowsAffected = await sqLiteConnection.ExecuteAsync(
                 SqlScripts.UpdateLabelSql,
-                new { labelEntity.Id, labelEntity.Name, labelEntity.ColorHex, UserId = userId });
-            _logger.LogInformation($"Updated label with id: {labelEntity.Id}");
+                new { label.Id, label.Name, label.ColorHex, UserId = userId });
+            _logger.LogInformation($"Updated label with id: {label.Id}");
                
             var serverResult = new ServerResult
             {
-                ActionName = $"Updating Label '{labelEntity.Name}'.",
+                ActionName = $"Updating Label '{label.Name}'.",
                 Result = rowsAffected == 1 ? Result.Success : Result.Error,
                 Priority = ActionPriority.Highest
             };

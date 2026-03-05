@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Ufo.Abstractions;
-using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
+using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
 using Ufo.Server.Attributes;
 
@@ -24,7 +23,7 @@ public class LabelController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> AddLabelAsync(LabelEntity label, CancellationToken cancellationToken)
+    public async Task<IActionResult> AddLabelAsync([FromBody] LabelRequest label, CancellationToken cancellationToken)
     {
         _logger.LogInformation("AddLabelAsync");
         var userId = HttpContext.GetUserIdAsUlid();
@@ -69,7 +68,7 @@ public class LabelController : ControllerBase
     }
 
     [HttpPut]
-    public async Task<IActionResult> UpdateLabelAsync([FromBody] LabelEntity label, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateLabelAsync([FromBody] LabelRequest label, CancellationToken cancellationToken)
     {
         _logger.LogInformation("UpdateLabelAsync");
         var userId = HttpContext.GetUserIdAsUlid();

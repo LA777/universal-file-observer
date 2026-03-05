@@ -7,6 +7,7 @@ using Moq;
 using System.Diagnostics;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Options;
+using Ufo.Abstractions.Requests;
 using Ufo.Database.Contexts;
 using Ufo.Database.Handlers;
 using Ufo.Database.Repositories;
@@ -124,13 +125,11 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelAsync_WithValidLabel_CreatesLabelSuccessfully()
         {
-            var label = new LabelEntity 
+            var label = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Important", 
-                ColorHex = "#FF0000", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#FF0000"
             };
 
             var result = await _repository!.AddLabelAsync(label, testUser.Id);
@@ -152,18 +151,16 @@ namespace Ufo.IntegrationTests
             await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
             await _fileSystemRepository.AddSnapshotAsync(snapshot2, testUser.Id);
 
-            var label = new LabelEntity
+            var label = new LabelRequest
             {
                 Id = Ulid.NewUlid(),
                 Name = "SnapshotLabel",
-                ColorHex = "#FF5500",
-                UserId = testUser.Id,
-                User = testUser
+                ColorHex = "#FF5500"
             };
 
             // Manually add snapshots to test snapshot association feature
-            label.Snapshots.Add(snapshot1);
-            label.Snapshots.Add(snapshot2);
+            label.SnapshotIds.Add(snapshot1.Id);
+            label.SnapshotIds.Add(snapshot2.Id);
 
             // Act
             var result = await _repository!.AddLabelAsync(label, testUser.Id);
@@ -196,13 +193,11 @@ namespace Ufo.IntegrationTests
         public async Task AddLabelAsync_WithValidLabel_ThenAddSnapshotsAfter_WorksCorrectly()
         {
             // Arrange
-            var label = new LabelEntity
+            var label = new LabelRequest
             {
                 Id = Ulid.NewUlid(),
                 Name = "LabelForLaterAssociation",
-                ColorHex = "#00FF88",
-                UserId = testUser.Id,
-                User = testUser
+                ColorHex = "#00FF88"
             };
 
             // Act 1: Create label without snapshots
@@ -244,20 +239,16 @@ namespace Ufo.IntegrationTests
             await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
             await _fileSystemRepository.AddSnapshotAsync(snapshot2, testUser.Id);
 
-            var label1 = new LabelEntity
+            var label1 = new LabelRequest
             {
                 Name = "ImportantDocs",
-                ColorHex = "#FF0000",
-                UserId = testUser.Id,
-                User = testUser
+                ColorHex = "#FF0000"
             };
 
-            var label2 = new LabelEntity
+            var label2 = new LabelRequest
             {
                 Name = "ArchiveDocs",
-                ColorHex = "#808080",
-                UserId = testUser.Id,
-                User = testUser
+                ColorHex = "#808080"
             };
 
             // Act 1: Create labels and associate with different snapshots
@@ -278,34 +269,26 @@ namespace Ufo.IntegrationTests
             snapshot2Labels.First().Name.Should().Be("ArchiveDocs");
         }
 
-
-
         [Fact]
         public async Task AddLabelAsync_WithMultipleLabels_CreatesAllLabelsSuccessfully()
         {
-            var label1 = new LabelEntity 
+            var label1 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Important", 
-                ColorHex = "#FF0000", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#FF0000"
             };
-            var label2 = new LabelEntity 
+            var label2 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Archived", 
-                ColorHex = "#808080", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#808080"
             };
-            var label3 = new LabelEntity 
+            var label3 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Recent", 
-                ColorHex = "#00FF00", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#00FF00" 
             };
 
             var result1 = await _repository!.AddLabelAsync(label1, testUser.Id);
@@ -329,21 +312,17 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelAsync_WithDuplicateNameForSameUser_ReturnsDuplicateErrorResult()
         {
-            var label1 = new LabelEntity 
+            var label1 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Urgent", 
-                ColorHex = "#FF0000", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#FF0000"
             };
-            var label2 = new LabelEntity 
+            var label2 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Urgent", 
-                ColorHex = "#00FF00", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#00FF00"
             };
 
             var result1 = await _repository!.AddLabelAsync(label1, testUser.Id);
@@ -372,21 +351,17 @@ namespace Ufo.IntegrationTests
                 "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
                 new { otherUser.Id, otherUser.Name, PasswordHash = "hash" });
 
-            var label1 = new LabelEntity 
+            var label1 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Archive", 
-                ColorHex = "#808080", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#808080"
             };
-            var label2 = new LabelEntity 
+            var label2 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Archive", 
-                ColorHex = "#FFFFFF", 
-                UserId = otherUser.Id, 
-                User = otherUser 
+                ColorHex = "#FFFFFF"
             };
 
             var result1 = await _repository!.AddLabelAsync(label1, testUser.Id);
@@ -412,21 +387,17 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelAsync_WithDuplicateNameAfterDeletion_AllowsRecreation()
         {
-            var label1 = new LabelEntity 
+            var label1 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Temporary", 
-                ColorHex = "#FF0000", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#FF0000"
             };
-            var label2 = new LabelEntity 
+            var label2 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Temporary", 
-                ColorHex = "#00FF00", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#00FF00"
             };
 
             var addResult1 = await _repository!.AddLabelAsync(label1, testUser.Id);
@@ -454,21 +425,17 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelAsync_WithDuplicateNameCaseInsensitive_HandlesConsistently()
         {
-            var label1 = new LabelEntity 
+            var label1 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "Important", 
-                ColorHex = "#FF0000", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#FF0000"
             };
-            var label2 = new LabelEntity 
+            var label2 = new LabelRequest
             { 
                 Id = Ulid.NewUlid(),
                 Name = "IMPORTANT", 
-                ColorHex = "#00FF00", 
-                UserId = testUser.Id, 
-                User = testUser 
+                ColorHex = "#00FF00"
             };
 
             var result1 = await _repository!.AddLabelAsync(label1, testUser.Id);
@@ -497,8 +464,8 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetAllLabelsAsync_WhenLabelsExist_ReturnsAllLabels()
         {
-            var label1 = new LabelEntity { Name = "Priority1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Priority2", ColorHex = "#FFFF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Priority1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Priority2", ColorHex = "#FFFF00" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -521,9 +488,9 @@ namespace Ufo.IntegrationTests
                 "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
                 new { otherUser.Id, otherUser.Name, PasswordHash = "hash" });
 
-            var testUserLabel1 = new LabelEntity { Name = "UserLabel1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var testUserLabel2 = new LabelEntity { Name = "UserLabel2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var otherUserLabel1 = new LabelEntity { Name = "OtherLabel1", ColorHex = "#0000FF", UserId = otherUser.Id, User = otherUser };
+            var testUserLabel1 = new LabelRequest { Name = "UserLabel1", ColorHex = "#FF0000" };
+            var testUserLabel2 = new LabelRequest { Name = "UserLabel2", ColorHex = "#00FF00" };
+            var otherUserLabel1 = new LabelRequest { Name = "OtherLabel1", ColorHex = "#0000FF" };
 
             await _repository!.AddLabelAsync(testUserLabel1, testUser.Id);
             await _repository.AddLabelAsync(testUserLabel2, testUser.Id);
@@ -555,8 +522,8 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelsBySnapshotIdAsync_WhenSnapshotHasLabels_ReturnsOnlyAssociatedLabels()
         {
-            var label1 = new LabelEntity { Name = "Tagged", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Unrelated", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Tagged", ColorHex = "#0000FF" };
+            var label2 = new LabelRequest { Name = "Unrelated", ColorHex = "#00FF00" };
             var snapshot = CreateSnapshotWithSimpleFolder();
             await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
@@ -575,9 +542,9 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelsBySnapshotIdAsync_WithMultipleLabelsOnSnapshot_ReturnsAllAssociatedLabels()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
+            var label3 = new LabelRequest { Name = "Label3", ColorHex = "#0000FF" };
             var snapshot = CreateSnapshotWithSimpleFolder();
             await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
@@ -612,8 +579,8 @@ namespace Ufo.IntegrationTests
             var snapshot = CreateSnapshotWithSimpleFolder();
             await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
 
-            var testUserLabel = new LabelEntity { Name = "MyLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var otherUserLabel = new LabelEntity { Name = "OtherLabel", ColorHex = "#00FF00", UserId = otherUser.Id, User = otherUser };
+            var testUserLabel = new LabelRequest { Name = "MyLabel", ColorHex = "#FF0000" };
+            var otherUserLabel = new LabelRequest { Name = "OtherLabel", ColorHex = "#00FF00" };
 
             await _repository!.AddLabelAsync(testUserLabel, testUser.Id);
             await _repository.AddLabelAsync(otherUserLabel, otherUser.Id);
@@ -634,7 +601,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task UpdateLabelAsync_WithValidLabel_UpdatesLabelSuccessfully()
         {
-            var label = new LabelEntity { Name = "Original", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "Original", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             label.Name = "Updated";
@@ -653,7 +620,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task UpdateLabelAsync_WithNonExistentLabel_DoesNotThrow()
         {
-            var nonExistentLabel = new LabelEntity { Name = "NonExistent", ColorHex = "#FFFFFF", UserId = testUser.Id, User = testUser };
+            var nonExistentLabel = new LabelRequest { Name = "NonExistent", ColorHex = "#FFFFFF" };
             nonExistentLabel.GetType().GetProperty("Id")?.SetValue(nonExistentLabel, Ulid.NewUlid());
 
             var result = await _repository!.UpdateLabelAsync(nonExistentLabel, testUser.Id);
@@ -663,8 +630,8 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task UpdateLabelAsync_UpdatesOnlyTargetLabel()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
 
             var addLabelResult1 = await _repository!.AddLabelAsync(label1, testUser.Id);
             var addLabelResult2 = await _repository.AddLabelAsync(label2, testUser.Id);
@@ -688,8 +655,8 @@ namespace Ufo.IntegrationTests
         public async Task UpdateLabelAsync_WithDuplicateName_ReturnsDuplicateError()
         {
             // Arrange - Create two labels
-            var label1 = new LabelEntity { Name = "Original", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "ToUpdate", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Original", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "ToUpdate", ColorHex = "#00FF00" };
 
             var addResult1 = await _repository!.AddLabelAsync(label1, testUser.Id);
             var addResult2 = await _repository.AddLabelAsync(label2, testUser.Id);
@@ -718,7 +685,7 @@ namespace Ufo.IntegrationTests
         public async Task UpdateLabelAsync_WithSameNameAsSelf_UpdatesSuccessfully()
         {
             // Arrange - Create a label
-            var label = new LabelEntity { Name = "MyLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "MyLabel", ColorHex = "#FF0000" };
             var addResult = await _repository!.AddLabelAsync(label, testUser.Id);
 
             // Get the actual ID
@@ -742,8 +709,8 @@ namespace Ufo.IntegrationTests
         public async Task UpdateLabelAsync_ChangingNameToUnique_UpdatesSuccessfully()
         {
             // Arrange - Create two labels
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -779,9 +746,9 @@ namespace Ufo.IntegrationTests
                 new { otherUser.Id, otherUser.Name, PasswordHash = "hash" });
 
             // Create same-named labels for different users
-            var testUserLabel1 = new LabelEntity { Name = "SharedName", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var testUserLabel2 = new LabelEntity { Name = "ToUpdate", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var otherUserLabel = new LabelEntity { Name = "SharedName", ColorHex = "#0000FF", UserId = otherUser.Id, User = otherUser };
+            var testUserLabel1 = new LabelRequest { Name = "SharedName", ColorHex = "#FF0000" };
+            var testUserLabel2 = new LabelRequest { Name = "ToUpdate", ColorHex = "#00FF00" };
+            var otherUserLabel = new LabelRequest { Name = "SharedName", ColorHex = "#0000FF" };
 
             await _repository!.AddLabelAsync(testUserLabel1, testUser.Id);
             await _repository.AddLabelAsync(testUserLabel2, testUser.Id);
@@ -813,7 +780,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task DeleteLabelByIdAsync_WhenLabelExists_DeletesLabelSuccessfully()
         {
-            var label = new LabelEntity { Name = "ToDelete", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "ToDelete", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var deleteResult = await _repository.DeleteLabelByIdAsync(label.Id, testUser.Id);
@@ -836,7 +803,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task DeleteLabelByIdAsync_RemovesAssociationsFromLabelsToSnapshots()
         {
-            var label = new LabelEntity { Name = "AssociatedLabel", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "AssociatedLabel", ColorHex = "#00FF00" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot = CreateSnapshotWithSimpleFolder();
@@ -859,8 +826,8 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task DeleteLabelByIdAsync_OnlyDeletesTargetLabel()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -876,7 +843,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task DeleteLabelByIdAsync_WithMultipleAssociations_DeletesAllAssociations()
         {
-            var label = new LabelEntity { Name = "MultiAssocLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "MultiAssocLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot1 = CreateSnapshotWithSimpleFolder();
@@ -907,7 +874,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task DeleteLabelByIdAsync_DeletesLabelButNotSnapshot()
         {
-            var label = new LabelEntity { Name = "LabelForSnapshot", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "LabelForSnapshot", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot = CreateSnapshotWithSimpleFolder();
@@ -931,7 +898,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelToSnapshotAsync_WithValidLabelAndSnapshot_CreatesAssociation()
         {
-            var label = new LabelEntity { Name = "TestLabel", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "TestLabel", ColorHex = "#0000FF" };
             await _repository!.AddLabelAsync(label, testUser.Id);
             var snapshot = CreateSnapshotWithSimpleFolder();
             await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -947,9 +914,9 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelToSnapshotAsync_WithMultipleLabelsSameSnapshot_CreatesAllAssociations()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
+            var label3 = new LabelRequest { Name = "Label3", ColorHex = "#0000FF" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -976,7 +943,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelToSnapshotAsync_WithSameLabelMultipleSnapshots_CreatesMultipleAssociations()
         {
-            var label = new LabelEntity { Name = "SharedLabel", ColorHex = "#FFFF00", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "SharedLabel", ColorHex = "#FFFF00" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot1 = CreateSnapshotWithSimpleFolder();
@@ -1002,7 +969,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task AddLabelToSnapshotAsync_WithDuplicateAssociation_ThrowsUniqueConstraintException()
         {
-            var label = new LabelEntity { Name = "DuplicateAssocLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "DuplicateAssocLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot = CreateSnapshotWithSimpleFolder();
@@ -1023,7 +990,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_WithValidAssociation_RemovesAssociation()
         {
-            var label = new LabelEntity { Name = "RemoveLabel", ColorHex = "#FF00FF", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "RemoveLabel", ColorHex = "#FF00FF" };
             await _repository!.AddLabelAsync(label, testUser.Id);
             var snapshot = CreateSnapshotWithSimpleFolder();
             await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -1052,7 +1019,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_WhenSnapshotDoesNotExistInDatabase_ReturnsNotFound()
         {
-            var label = new LabelEntity { Name = "TestLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "TestLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshotId = Ulid.NewUlid();
@@ -1065,7 +1032,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_WhenAssociationNotFound_ReturnsNotFound()
         {
-            var label = new LabelEntity { Name = "TestLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "TestLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot = CreateSnapshotWithSimpleFolder();
@@ -1079,8 +1046,8 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_OnlyRemovesTargetAssociation()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -1103,7 +1070,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_RemovesOnlyFromTargetSnapshot()
         {
-            var label = new LabelEntity { Name = "Label", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "Label", ColorHex = "#0000FF" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot1 = CreateSnapshotWithSimpleFolder();
@@ -1129,7 +1096,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task RemoveLabelFromSnapshotAsync_WithMultipleLabelsSameLabelDifferentSnapshots_OnlyRemovesFromTarget()
         {
-            var label = new LabelEntity { Name = "SharedLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "SharedLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot1 = CreateSnapshotWithSimpleFolder();
@@ -1162,7 +1129,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelByNameAsync_WithExistingLabel_ReturnsLabel()
         {
-            var label = new LabelEntity { Name = "Important", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "Important", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var retrievedLabel = await _repository.GetLabelByNameAsync("Important", testUser.Id);
@@ -1192,10 +1159,10 @@ namespace Ufo.IntegrationTests
                 "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
                 new { otherUser.Id, otherUser.Name, PasswordHash = "hash" });
 
-            var label1 = new LabelEntity { Name = "SharedName", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "SharedName", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label1, testUser.Id);
 
-            var label2 = new LabelEntity { Name = "SharedName", ColorHex = "#00FF00", UserId = otherUser.Id, User = otherUser };
+            var label2 = new LabelRequest { Name = "SharedName", ColorHex = "#00FF00" };
             await _repository.AddLabelAsync(label2, otherUser.Id);
 
             var retrievedLabel = await _repository.GetLabelByNameAsync("SharedName", testUser.Id);
@@ -1209,9 +1176,9 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelByNameAsync_WithMultipleLabels_ReturnsCorrectLabel()
         {
-            var label1 = new LabelEntity { Name = "Priority1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Priority2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var label3 = new LabelEntity { Name = "Priority3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Priority1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Priority2", ColorHex = "#00FF00" };
+            var label3 = new LabelRequest { Name = "Priority3", ColorHex = "#0000FF" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
@@ -1227,7 +1194,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelByNameAsync_WithExactCase_ReturnsLabel()
         {
-            var label = new LabelEntity { Name = "MixedCase", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "MixedCase", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var retrievedLabel = await _repository.GetLabelByNameAsync("MixedCase", testUser.Id);
@@ -1239,7 +1206,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task GetLabelByNameAsync_WithDifferentCase_MayBeCase_Sensitive()
         {
-            var label = new LabelEntity { Name = "TestLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "TestLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var retrievedLabel = await _repository.GetLabelByNameAsync("testlabel", testUser.Id);
@@ -1262,7 +1229,7 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task ComplexScenario_CreateUpdateDeleteLabelWithMultipleSnapshots_WorksCorrectly()
         {
-            var label = new LabelEntity { Name = "ComplexLabel", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
+            var label = new LabelRequest { Name = "ComplexLabel", ColorHex = "#FF0000" };
             await _repository!.AddLabelAsync(label, testUser.Id);
 
             var snapshot1 = CreateSnapshotWithSimpleFolder();
@@ -1301,9 +1268,9 @@ namespace Ufo.IntegrationTests
         [Fact]
         public async Task ComplexScenario_MultipleLabelsOnMultipleSnapshots_WorksCorrectly()
         {
-            var label1 = new LabelEntity { Name = "Label1", ColorHex = "#FF0000", UserId = testUser.Id, User = testUser };
-            var label2 = new LabelEntity { Name = "Label2", ColorHex = "#00FF00", UserId = testUser.Id, User = testUser };
-            var label3 = new LabelEntity { Name = "Label3", ColorHex = "#0000FF", UserId = testUser.Id, User = testUser };
+            var label1 = new LabelRequest { Name = "Label1", ColorHex = "#FF0000" };
+            var label2 = new LabelRequest { Name = "Label2", ColorHex = "#00FF00" };
+            var label3 = new LabelRequest { Name = "Label3", ColorHex = "#0000FF" };
 
             await _repository!.AddLabelAsync(label1, testUser.Id);
             await _repository.AddLabelAsync(label2, testUser.Id);
