@@ -2,7 +2,6 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Threading.Tasks;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.Options;
@@ -22,34 +21,32 @@ public class SearchRepository : ISearchRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<SearchResponse> SearchAsync(SearchRequest request, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<SearchResponse> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
     {
         // TODO LA - Update search to filter data by UserId
-        _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", request.Query, userId);
-        // TODO LA - Refactor
-        if (string.IsNullOrWhiteSpace(request.Query))
-        {
-            return new SearchResponse();
-        }
-
-        //var ftsQuery = $"{request.Query.Trim()}*";
-        var rawQuery = request.Query.Trim();
+        _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", searchRequest.Query, userId);
 
         var response = new SearchResponse();
+        if (string.IsNullOrWhiteSpace(searchRequest.Query))
+        {
+            return response;
+        }
+
+        var rawQuery = searchRequest.Query.Trim();        
 
         try
         {
             await using var connection = new SqliteConnection(_connectionString);
 
             var tasks = new List<Task>();
-            if (request.IncludeFiles)
+            if (searchRequest.IncludeFiles)
             {
-                tasks.Add(PerformFileSearch(connection, rawQuery, response));
+                tasks.Add(PerformFileSearch(connection, rawQuery, userId, response));
             }
 
-            if (request.IncludeFolders)
+            if (searchRequest.IncludeFolders)
             {
-                tasks.Add(PerformFolderSearch(connection, rawQuery, response));
+                tasks.Add(PerformFolderSearch(connection, rawQuery, userId, response));
             }
 
             await Task.WhenAll(tasks);
@@ -57,12 +54,12 @@ public class SearchRepository : ISearchRepository
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Search failed for query: {Query}", request.Query);
+            _logger.LogError(ex, "Search failed for query: {Query}", searchRequest.Query);
             throw;
         }
     }
 
-    private async Task PerformFileSearch(SqliteConnection sqLiteConnection, string query, SearchResponse searchResponse)
+    private async Task PerformFileSearch(SqliteConnection sqLiteConnection, string query, Ulid userId, SearchResponse searchResponse)
     {
         var fileDictionary = new Dictionary<Ulid, FsFileEntity>();
 
@@ -92,13 +89,13 @@ public class SearchRepository : ISearchRepository
 
                 return fileEntry;
             },
-            new { Query = query },
+            new { Query = query, UserId = userId },
             splitOn: "Id,Id");
 
         searchResponse.Files = fileDictionary.Values.ToList();
     }
 
-    private async Task PerformFolderSearch(SqliteConnection sqLiteConnection, string query, SearchResponse searchResponse)
+    private async Task PerformFolderSearch(SqliteConnection sqLiteConnection, string query, Ulid userId, SearchResponse searchResponse)
     {
         var folderDictionary = new Dictionary<Ulid, FsFolderEntity>();
 
@@ -126,7 +123,7 @@ public class SearchRepository : ISearchRepository
 
                 return folderEntry;
             },
-            new { Query = query },
+            new { Query = query, UserId = userId },
             splitOn: "Id,Id");
 
         searchResponse.Folders = folderDictionary.Values.ToList();

@@ -29,7 +29,7 @@ public class SearchController : ControllerBase
         var userId = HttpContext.GetUserIdAsUlid();
 
         var result = await _searchRepository.SearchAsync(searchRequest, userId, cancellationToken);
-        if (result.Files.Count > 0 || result.Folders.Count > 0)
+        if (result.Files.Count > 0 && result.Folders.Count > 0)
         {
             return Ok(result);
         }

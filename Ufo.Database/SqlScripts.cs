@@ -233,7 +233,7 @@ public class SqlScripts
                                                                                     "WHERE Name = @Name " +
                                                                                     "AND Size = @Size " +
                                                                                     "AND FileExtension = @FileExtension " +
-                                                                                    "AND Sha256Hash = @Sha256Hash" +
+                                                                                    "AND Sha256Hash = @Sha256Hash " +
                                                                                     "AND UserId = @UserId;";
     public const string InsertFoldersToFoldersSql = "INSERT INTO FoldersToFolders " +
                                                     "(ParentFolderId, ChildFolderId, SnapshotId) " +

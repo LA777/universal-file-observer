@@ -567,7 +567,7 @@ public class FileSystemRepository : IFileSystemRepository
             // Find same PC in DB
             var pcEntity = storageDriveEntity!.Pcs[0];            
             var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, 
-                new { PcName = pcEntity.Name, pcEntity.DeviceId, UserId = userId.ToString() });
+                new { PcName = pcEntity.Name, pcEntity.DeviceId, UserId = userId });
             if (pcInDb == null)
             {
                 _logger.LogInformation($"Insert PC: {pcEntity.Id}");
