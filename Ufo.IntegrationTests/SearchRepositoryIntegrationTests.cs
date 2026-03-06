@@ -603,6 +603,210 @@ namespace Ufo.IntegrationTests
 
         #endregion
 
+        #region SearchAsync - User Isolation Tests
+
+        [Fact]
+        public async Task SearchAsync_WithMultipleUsers_ReturnsOnlyCurrentUserResults()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create a second user
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Create snapshots with same file names for both users
+                var snapshot1 = CreateSnapshotWithFilesForUser(testUser);
+                var snapshot2 = CreateSnapshotWithFilesForUser(secondUser);
+
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _fileSystemRepository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
+
+                // Act - Search as first user
+                var result1 = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+                // Act - Search as second user
+                var result2 = await _searchRepository.SearchAsync(searchRequest, secondUser.Id);
+
+                // Assert
+                result1.Files.Count.Should().Be(1);
+                result2.Files.Count.Should().Be(1);
+
+                // Verify that each user only sees their own files
+                result1.Files.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
+                result2.Files.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
+
+                // Verify results are different (different file IDs from different users)
+                var result1Ids = result1.Files.Select(f => f.Id).ToHashSet();
+                var result2Ids = result2.Files.Select(f => f.Id).ToHashSet();
+                result1Ids.Intersect(result2Ids).Should().BeEmpty("because different users should have different file instances");
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task SearchAsync_WithUserIsolation_UserACannotSeeUserBData()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // User 2 has files with unique names
+                var snapshot2 = new SnapshotEntity 
+                { 
+                    Description = "User 2 Snapshot", 
+                    UserId = secondUser.Id, 
+                    User = secondUser 
+                };
+                var pc2 = new PcEntity { Name = "PC2", DeviceId = Guid.NewGuid().ToString(), UserId = secondUser.Id, User = secondUser };
+                var storageDrive2 = new StorageDriveEntity
+                {
+                    Name = "Drive2",
+                    DeviceId = Guid.NewGuid().ToString(),
+                    SerialNumber = Guid.NewGuid().ToString(),
+                    TotalSize = 1000000,
+                    Description = "Storage Drive 2",
+                    MediaType = "SSD",
+                    InterfaceType = "SATA",
+                    UserId = secondUser.Id,
+                    User = secondUser
+                };
+                var volume2 = new VolumeEntity
+                {
+                    DriveLetter = "D:",
+                    VolumeName = "Volume2",
+                    VolumeSerialNumber = Guid.NewGuid().ToString(),
+                    VolumeSize = 500000,
+                    Description = "Volume 2",
+                    UserId = secondUser.Id,
+                    User = secondUser
+                };
+                var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = secondUser.Id, User = secondUser };
+                var rootFolder2 = new FsFolderEntity { Name = "Root2", Size = 0, Sha256Hash = "root2", UserId = secondUser.Id, User = secondUser };
+
+                var uniqueFile = new FsFileEntity 
+                { 
+                    Name = "secretfile_user2", 
+                    FileExtension = ".txt", 
+                    Size = 100, 
+                    Sha256Hash = "secret", 
+                    UserId = secondUser.Id, 
+                    User = secondUser 
+                };
+                rootFolder2.Files.Add(uniqueFile);
+                uniqueFile.ParentFolders.Add(rootFolder2);
+
+                pc2.Snapshots.Add(snapshot2);
+                pc2.StorageDrives.Add(storageDrive2);
+                storageDrive2.Pcs.Add(pc2);
+                storageDrive2.Volumes.Add(volume2);
+                volume2.StorageDrive = storageDrive2;
+                volume2.StorageDriveId = storageDrive2.Id;
+                volume2.VolumeInfos.Add(volumeInfo2);
+                volumeInfo2.Volume = volume2;
+                volumeInfo2.VolumeId = volume2.Id;
+                volumeInfo2.Snapshot = snapshot2;
+                volumeInfo2.SnapshotId = snapshot2.Id;
+                snapshot2.VolumeInfo = volumeInfo2;
+                snapshot2.RootFolder = rootFolder2;
+
+                // Add user 2's data
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                // Act - User 1 searches for user 2's unique file
+                var searchRequest = new SearchRequest 
+                { 
+                    Query = "secretfile_user2", 
+                    IncludeFiles = true, 
+                    IncludeFolders = false 
+                };
+                var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+
+                // Assert - User 1 should get no results
+                result.Files.Should().BeEmpty("because User 1 should not be able to see User 2's files");
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task SearchAsync_WithUserIsolation_FolderIsolationWorks()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // User 1 has a folder
+                var snapshot1 = CreateSnapshotWithFoldersForUser(testUser);
+                await _fileSystemRepository!.AddSnapshotAsync(snapshot1, testUser.Id);
+
+                // User 2 has a folder with same name
+                var snapshot2 = CreateSnapshotWithFoldersForUser(secondUser);
+                await _fileSystemRepository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                var searchRequest = new SearchRequest 
+                { 
+                    Query = "Documents", 
+                    IncludeFiles = false, 
+                    IncludeFolders = true 
+                };
+
+                // Act
+                var result1 = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+                var result2 = await _searchRepository.SearchAsync(searchRequest, secondUser.Id);
+
+                // Assert
+                result1.Folders.Should().NotBeEmpty();
+                result2.Folders.Should().NotBeEmpty();
+
+                // Each user should only see their own folders
+                result1.Folders.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
+                result2.Folders.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
+
+                // Folder IDs should be different
+                var result1Ids = result1.Folders.Select(f => f.Id).ToHashSet();
+                var result2Ids = result2.Folders.Select(f => f.Id).ToHashSet();
+                result1Ids.Intersect(result2Ids).Should().BeEmpty("because different users should have different folder instances");
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        #endregion
+
         #region Helper Methods
 
         private SnapshotEntity CreateSnapshotWithFiles()
@@ -662,6 +866,63 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
+        private SnapshotEntity CreateSnapshotWithFilesForUser(UserEntity user)
+        {
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files", UserId = user.Id, User = user };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = user.Id, User = user };
+            var storageDrive = new StorageDriveEntity
+            {
+                Name = "Test Drive",
+                DeviceId = Guid.NewGuid().ToString(),
+                SerialNumber = Guid.NewGuid().ToString(),
+                TotalSize = 1000000,
+                Description = "Test Storage Drive",
+                MediaType = "SSD",
+                InterfaceType = "SATA",
+                UserId = user.Id,
+                User = user
+            };
+            var volume = new VolumeEntity
+            {
+                DriveLetter = "C:",
+                VolumeName = "TestVolume",
+                VolumeSerialNumber = Guid.NewGuid().ToString(),
+                VolumeSize = 500000,
+                Description = "Test Volume",
+                UserId = user.Id,
+                User = user
+            };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = user.Id, User = user };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = user.Id, User = user };
+
+            var file1 = new FsFileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = user.Id, User = user };
+            var file2 = new FsFileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = user.Id, User = user };
+            var file3 = new FsFileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = user.Id, User = user };
+
+            rootFolder.Files.Add(file1);
+            rootFolder.Files.Add(file2);
+            rootFolder.Files.Add(file3);
+            file1.ParentFolders.Add(rootFolder);
+            file2.ParentFolders.Add(rootFolder);
+            file3.ParentFolders.Add(rootFolder);
+
+            pc.Snapshots.Add(snapshot);
+            pc.StorageDrives.Add(storageDrive);
+            storageDrive.Pcs.Add(pc);
+            storageDrive.Volumes.Add(volume);
+            volume.StorageDrive = storageDrive;
+            volume.StorageDriveId = storageDrive.Id;
+            volume.VolumeInfos.Add(volumeInfo);
+            volumeInfo.Volume = volume;
+            volumeInfo.VolumeId = volume.Id;
+            volumeInfo.Snapshot = snapshot;
+            volumeInfo.SnapshotId = snapshot.Id;
+            snapshot.VolumeInfo = volumeInfo;
+            snapshot.RootFolder = rootFolder;
+
+            return snapshot;
+        }
+
         private SnapshotEntity CreateSnapshotWithFolders()
         {
             var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders", UserId = testUser.Id, User = testUser };
@@ -693,6 +954,60 @@ namespace Ufo.IntegrationTests
 
             var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
             var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = testUser.Id, User = testUser };
+
+            rootFolder.ChildFolders.Add(folder1);
+            folder1.ParentFolders.Add(rootFolder);
+            folder1.ChildFolders.Add(folder2);
+            folder2.ParentFolders.Add(folder1);
+
+            pc.Snapshots.Add(snapshot);
+            pc.StorageDrives.Add(storageDrive);
+            storageDrive.Pcs.Add(pc);
+            storageDrive.Volumes.Add(volume);
+            volume.StorageDrive = storageDrive;
+            volume.StorageDriveId = storageDrive.Id;
+            volume.VolumeInfos.Add(volumeInfo);
+            volumeInfo.Volume = volume;
+            volumeInfo.VolumeId = volume.Id;
+            volumeInfo.Snapshot = snapshot;
+            volumeInfo.SnapshotId = snapshot.Id;
+            snapshot.VolumeInfo = volumeInfo;
+            snapshot.RootFolder = rootFolder;
+
+            return snapshot;
+        }
+
+        private SnapshotEntity CreateSnapshotWithFoldersForUser(UserEntity user)
+        {
+            var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders", UserId = user.Id, User = user };
+            var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = user.Id, User = user };
+            var storageDrive = new StorageDriveEntity
+            {
+                Name = "Test Drive",
+                DeviceId = Guid.NewGuid().ToString(),
+                SerialNumber = Guid.NewGuid().ToString(),
+                TotalSize = 1000000,
+                Description = "Test Storage Drive",
+                MediaType = "SSD",
+                InterfaceType = "SATA",
+                UserId = user.Id,
+                User = user
+            };
+            var volume = new VolumeEntity
+            {
+                DriveLetter = "C:",
+                VolumeName = "TestVolume",
+                VolumeSerialNumber = Guid.NewGuid().ToString(),
+                VolumeSize = 500000,
+                Description = "Test Volume",
+                UserId = user.Id,
+                User = user
+            };
+            var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = user.Id, User = user };
+            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = user.Id, User = user };
+
+            var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = user.Id, User = user };
+            var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = user.Id, User = user };
 
             rootFolder.ChildFolders.Add(folder1);
             folder1.ParentFolders.Add(rootFolder);

@@ -23,7 +23,6 @@ public class SearchRepository : ISearchRepository
 
     public async Task<SearchResponse> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Update search to filter data by UserId
         _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", searchRequest.Query, userId);
 
         var response = new SearchResponse();

@@ -1,5 +1,4 @@
-﻿using Cysharp.Serialization.Json;
-using SQLite;
+﻿using SQLite;
 using SQLiteNetExtensions.Attributes;
 using System.Text.Json.Serialization;
 

@@ -353,9 +353,9 @@ public class SqlScripts
 
     public const string SearchFilesByNameSql = @"
         SELECT 
-            f.Id, f.Name, f.Size, f.Sha256Hash, f.FileExtension,
-            s.Id, s.Timestamp, s.Description,
-            l.Id, l.Name, l.ColorHex
+            f.Id, f.Name, f.Size, f.Sha256Hash, f.FileExtension, f.UserId,
+            s.Id, s.Timestamp, s.Description, s.UserId,
+            l.Id, l.Name, l.ColorHex, l.UserId
         FROM Files AS f
         JOIN FilesToFolders AS ftf ON f.Id = ftf.FileId
         JOIN Snapshots AS s ON ftf.SnapshotId = s.Id
@@ -366,9 +366,9 @@ public class SqlScripts
 
     public const string SearchFoldersByNameSql = @"
         SELECT 
-            fo.Id, fo.Name, fo.Size, fo.Sha256Hash,
-            s.Id, s.Timestamp, s.Description,
-            l.Id, l.Name, l.ColorHex
+            fo.Id, fo.Name, fo.Size, fo.Sha256Hash, fo.UserId,
+            s.Id, s.Timestamp, s.Description, s.UserId,
+            l.Id, l.Name, l.ColorHex, l.UserId
         FROM Folders AS fo
         -- We join the mapping table directly instead of the FTS table
         JOIN FoldersToFolders AS ftf ON fo.Id = ftf.ChildFolderId
