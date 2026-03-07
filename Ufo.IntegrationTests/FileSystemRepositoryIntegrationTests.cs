@@ -1181,13 +1181,13 @@ namespace Ufo.IntegrationTests
             var snapshot = new SnapshotEntity { 
                 Description = "Test Snapshot 93853",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var pc = new PcEntity { 
                 Name = "TestPC", 
                 DeviceId = Guid.NewGuid().ToString(),
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var storageDrive = new StorageDriveEntity
             {
@@ -1199,7 +1199,7 @@ namespace Ufo.IntegrationTests
                 MediaType = "SSD",
                 InterfaceType = "SATA",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var volume = new VolumeEntity
             {
@@ -1209,14 +1209,14 @@ namespace Ufo.IntegrationTests
                 VolumeSize = 500000,
                 Description = "Test Volume",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 250000,
                 DriveStatus = "OK",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var rootFolder = new FsFolderEntity
             {
@@ -1224,7 +1224,7 @@ namespace Ufo.IntegrationTests
                 Size = 0,
                 Sha256Hash = "abc123",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             pc.Snapshots.Add(snapshot);
@@ -1255,7 +1255,7 @@ namespace Ufo.IntegrationTests
                 Size = 100,
                 Sha256Hash = "child1hash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             var grandchildFolder = new FsFolderEntity
@@ -1264,7 +1264,7 @@ namespace Ufo.IntegrationTests
                 Size = 50,
                 Sha256Hash = "grandchildhash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             rootFolder!.ChildFolders.Add(childFolder1);
@@ -1288,7 +1288,7 @@ namespace Ufo.IntegrationTests
                 Size = 100,
                 Sha256Hash = "filehash1",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             var file2 = new FsFileEntity
@@ -1298,7 +1298,7 @@ namespace Ufo.IntegrationTests
                 Size = 200,
                 Sha256Hash = "filehash2",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             var file3 = new FsFileEntity
@@ -1308,7 +1308,7 @@ namespace Ufo.IntegrationTests
                 Size = 300,
                 Sha256Hash = "filehash3",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             rootFolder!.Files.Add(file1);
@@ -1333,7 +1333,7 @@ namespace Ufo.IntegrationTests
                 Size = 500,
                 Sha256Hash = "dochash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             var folder2 = new FsFolderEntity
@@ -1342,7 +1342,7 @@ namespace Ufo.IntegrationTests
                 Size = 300,
                 Sha256Hash = "subdochash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             rootFolder!.ChildFolders.Add(folder1);
@@ -1358,7 +1358,7 @@ namespace Ufo.IntegrationTests
                 Size = 150,
                 Sha256Hash = "docfilehash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             folder1.Files.Add(docFile);
@@ -1371,7 +1371,7 @@ namespace Ufo.IntegrationTests
                 Size = 120,
                 Sha256Hash = "subdocfilehash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             folder2.Files.Add(subDocFile);
@@ -1385,14 +1385,14 @@ namespace Ufo.IntegrationTests
             var snapshot = new SnapshotEntity { 
                 Description = "Test Snapshot 35464",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var pc = new PcEntity
             {
                 Name = "TestPc30290",
                 DeviceId = Guid.NewGuid().ToString(),
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var storageDrive = new StorageDriveEntity
             {
@@ -1404,7 +1404,7 @@ namespace Ufo.IntegrationTests
                 MediaType = "Fixed hard disk media",
                 InterfaceType = "SATA",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var volume = new VolumeEntity
             {
@@ -1414,14 +1414,14 @@ namespace Ufo.IntegrationTests
                 VolumeSize = 549755813888,
                 Description = "Local Fixed Disk",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 274877906944,
                 DriveStatus = "OK",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
             var rootFolder = new FsFolderEntity
             {
@@ -1429,7 +1429,7 @@ namespace Ufo.IntegrationTests
                 Size = 0,
                 Sha256Hash = "c_drive_hash",
                 UserId = testUser.Id,
-                User = testUser
+                User = null!
             };
 
             pc.Snapshots.Add(snapshot);
@@ -1470,7 +1470,7 @@ namespace Ufo.IntegrationTests
                         Size = random.Next(100, 1000),
                         Sha256Hash = $"hash_{folderCount}_{i}",
                         UserId = testUser.Id,
-                        User = testUser
+                        User = null!
                     };
 
                     currentFolder.ChildFolders.Add(newFolder);
@@ -1485,7 +1485,7 @@ namespace Ufo.IntegrationTests
                             Size = random.Next(10, 500),
                             Sha256Hash = $"filehash_{folderCount}_{i}_{j}",
                             UserId = testUser.Id,
-                            User = testUser
+                            User = null!
                         };
 
                         newFolder.Files.Add(file);

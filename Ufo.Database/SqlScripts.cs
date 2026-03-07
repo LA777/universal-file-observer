@@ -192,7 +192,7 @@ public class SqlScripts
                                                                 "LEFT JOIN FoldersToFolders AS fl2fl ON fl2fl.ChildFolderId = folder.Id " +
                                                                 "LEFT JOIN FilesToFolders AS fi2fl ON fi2fl.FolderId = folder.Id AND fi2fl.SnapshotId = @SnapshotId " +
                                                                 "LEFT JOIN Files AS file ON fi2fl.FileId = file.Id " +
-                                                                "WHERE fl2fl.SnapshotId = @SnapshotId AND snapshot.UserId = @UserId;";
+                                                                "WHERE fl2fl.SnapshotId = @SnapshotId AND folder.UserId = @UserId;";
     public const string InsertSnapshotSql = "INSERT INTO Snapshots " +
                                             "(Id, Timestamp, Description, UserId) " +
                                             "VALUES " +
@@ -285,7 +285,8 @@ public class SqlScripts
     public const string DeleteStorageDrivesWithoutVolumesAndSnapshotsSql = "DELETE FROM StorageDrives WHERE Id NOT IN " +
                                                                             "(SELECT DISTINCT StorageDriveId FROM Volumes) " +
                                                                             "AND Id NOT IN " +
-                                                                            "(SELECT DISTINCT StorageDriveId FROM PcsToStorageDrives);";
+                                                                            "(SELECT DISTINCT StorageDriveId FROM PcsToStorageDrives) " +
+                                                                            "AND UserId = @UserId;";
     public const string DeleteVolumesWithoutVolumeInfosSql = "DELETE FROM Volumes WHERE Id NOT IN " +
                                                               "(SELECT DISTINCT VolumeId FROM VolumeInfos);";
     public const string DeleteVolumeInfoBySnapshotSql = "DELETE FROM VolumeInfos WHERE SnapshotId = @SnapshotId AND UserId = @UserId;";

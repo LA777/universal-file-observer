@@ -110,7 +110,7 @@ public class FileSystemRepository : IFileSystemRepository
                     return snapshotResult;
                 },
                 splitOn: "Id, Id, Id, PcId, Id",
-                param: new { SnapshotId = snapshotId });
+                param: new { SnapshotId = snapshotId, UserId = userId });
 
             if (snapshotResult == null)
             {
@@ -212,7 +212,7 @@ public class FileSystemRepository : IFileSystemRepository
 
                         return currentFolder;
                     },
-                    param: new { SnapshotId = snapshotId },
+                    param: new { SnapshotId = snapshotId, UserId = userId },
                     splitOn: "SnapshotId, SnapshotId, Id");
 
             // Sort folders and files by name for consistent ordering
@@ -264,6 +264,7 @@ public class FileSystemRepository : IFileSystemRepository
 
                     return snapshotResult;
                 },
+                param: new { UserId = userId },
                 splitOn: "Id, Id, Id, PcId, Id");
 
             if (snapshotResult == null)
@@ -366,7 +367,7 @@ public class FileSystemRepository : IFileSystemRepository
 
                         return currentFolder;
                     },
-                    param: new { SnapshotId = snapshotResult.Id },
+                    param: new { SnapshotId = snapshotResult.Id, UserId = userId },
                     splitOn: "SnapshotId, SnapshotId, Id");
 
             // Sort folders and files by name for consistent ordering
@@ -416,6 +417,7 @@ public class FileSystemRepository : IFileSystemRepository
 
                     return snapshotEntity;
                 },
+                param: new { UserId = userId },
                 splitOn: "Id, Id, Id, Id, Id");
 
             return snapshots;
@@ -444,8 +446,8 @@ public class FileSystemRepository : IFileSystemRepository
 
             // Check if snapshot exists
             var snapshot = await sqLiteConnection.QuerySingleOrDefaultAsync<SnapshotEntity>(
-                "SELECT * FROM Snapshots WHERE Id = @SnapshotId;",
-                new { SnapshotId = snapshotId },
+                SqlScripts.SelectSnapshotOnlyByIdSql,
+                new { SnapshotId = snapshotId, UserId = userId },
                 transaction);
 
             if (snapshot == null)
@@ -498,7 +500,7 @@ public class FileSystemRepository : IFileSystemRepository
             // 7. Delete VolumeInfo entries for this snapshot
             await sqLiteConnection.ExecuteAsync(
                 SqlScripts.DeleteVolumeInfoBySnapshotSql,
-                new { SnapshotId = snapshotId },
+                new { SnapshotId = snapshotId, UserId = userId },
                 transaction);
             _logger.LogInformation($"Deleted VolumeInfo for snapshot: {snapshotId}");
 
@@ -512,7 +514,7 @@ public class FileSystemRepository : IFileSystemRepository
             // 9. Delete StorageDrives that have no other volumes and no other snapshots
             await sqLiteConnection.ExecuteAsync(
                 SqlScripts.DeleteStorageDrivesWithoutVolumesAndSnapshotsSql,
-                null,
+                new { UserId = userId },
                 transaction);
             _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");
 
@@ -526,7 +528,7 @@ public class FileSystemRepository : IFileSystemRepository
             // 10. Finally, delete the snapshot itself
             await sqLiteConnection.ExecuteAsync(
                 SqlScripts.DeleteSnapshotByIdSql,
-                new { SnapshotId = snapshotId },
+                new { SnapshotId = snapshotId, UserId = userId },
                 transaction);
             _logger.LogInformation($"Deleted snapshot: {snapshotId}");
 
