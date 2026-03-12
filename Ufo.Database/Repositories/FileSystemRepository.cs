@@ -140,7 +140,7 @@ public class FileSystemRepository : IFileSystemRepository
                             }
                             else
                             {
-                                throw new ApplicationException("Shit!");
+                                throw new ApplicationException("Error!");
                             }
                         }
 
@@ -309,31 +309,36 @@ public class FileSystemRepository : IFileSystemRepository
                             processedFolderIds.Add(fsFolderEntity.Id);
 
                             // find ParentFolder
-                            var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var parentFolder);
-                            if (parentFolderWasFound)
+
+                            if (foldersToFoldersEntity.ParentFolderId.HasValue)
                             {
-                                // Only add if not already added
-                                if (!parentFolder!.ChildFolders.Contains(fsFolderEntity))
+                                var parentFolderWasFound = folders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var parentFolder);
+
+                                if (parentFolderWasFound)
                                 {
-                                    parentFolder.ChildFolders.Add(fsFolderEntity);
-                                    fsFolderEntity.ParentFolders.Add(parentFolder);
-                                }
-                            }
-                            else
-                            {
-                                var childFolderWasFound1 = childFolders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var childFolderList);
-                                if (childFolderWasFound1)
-                                {
-                                    if (!childFolderList!.Contains(fsFolderEntity))
+                                    // Only add if not already added
+                                    if (!parentFolder!.ChildFolders.Contains(fsFolderEntity))
                                     {
-                                        childFolderList.Add(fsFolderEntity);
+                                        parentFolder.ChildFolders.Add(fsFolderEntity);
+                                        fsFolderEntity.ParentFolders.Add(parentFolder);
                                     }
                                 }
                                 else
                                 {
-                                    childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FsFolderEntity> { fsFolderEntity });
+                                    var childFolderWasFound1 = childFolders.TryGetValue(foldersToFoldersEntity.ParentFolderId.Value, out var childFolderList);
+                                    if (childFolderWasFound1)
+                                    {
+                                        if (!childFolderList!.Contains(fsFolderEntity))
+                                        {
+                                            childFolderList.Add(fsFolderEntity);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FsFolderEntity> { fsFolderEntity });
+                                    }
                                 }
-                            }
+                            }                            
 
                             // find ChildFolders
                             var childFoldersWasFound = childFolders.TryGetValue(fsFolderEntity.Id, out var childFoldersList);
@@ -791,6 +796,11 @@ public class FileSystemRepository : IFileSystemRepository
 
     private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
     {
+        if (folderEntity is null)
+        {
+            return;
+        }
+
         // Sort child folders by name
         folderEntity.ChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
 

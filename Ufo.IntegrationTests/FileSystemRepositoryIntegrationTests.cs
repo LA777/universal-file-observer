@@ -123,7 +123,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithSimpleFolder();
+                var snapshot = CreateSnapshotWithSimpleFolder(testUser.Id);
 
                 // Act
                 var result = await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -150,7 +150,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithNestedFolders();
+                var snapshot = CreateSnapshotWithNestedFolders(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -179,7 +179,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithFiles();
+                var snapshot = CreateSnapshotWithFiles(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -206,7 +206,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateComplexSnapshot();
+                var snapshot = CreateComplexSnapshot(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -244,7 +244,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithSystemInfo();
+                var snapshot = CreateSnapshotWithSystemInfo(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -273,8 +273,8 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot1 = CreateSnapshotWithSystemInfo();
-                var snapshot2 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
+                var snapshot2 = CreateSnapshotWithSystemInfo(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
@@ -306,7 +306,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithSystemInfo();
+                var snapshot = CreateSnapshotWithSystemInfo(testUser.Id);
 
                 // Act
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
@@ -333,12 +333,12 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var originalPcId = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Id;
 
                 await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
 
-                var snapshot2 = CreateSnapshotWithSystemInfo();
+                var snapshot2 = CreateSnapshotWithSystemInfo(testUser.Id);
                 snapshot2.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Name = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].Name;
                 snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId;
 
@@ -363,12 +363,12 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var originalVolumeId = snapshot1.VolumeInfo!.Volume!.Id;
 
                 await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
 
-                var snapshot2 = CreateSnapshotWithSystemInfo();
+                var snapshot2 = CreateSnapshotWithSystemInfo(testUser.Id);
                 snapshot2.VolumeInfo!.Volume!.VolumeSerialNumber = snapshot1.VolumeInfo.Volume.VolumeSerialNumber;
 
                 // Act
@@ -391,7 +391,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateLargeSnapshot();
+                var snapshot = CreateLargeSnapshot(testUser.Id);
                 var stopwatch = Stopwatch.StartNew();
 
                 // Act
@@ -436,7 +436,7 @@ namespace Ufo.IntegrationTests
             {
                 // Snapshot 1 and Snapshot 2 will share the same files.
                 // Count of files in DB should be 1 for each file after adding both snapshots.
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var sharedFile = new FsFileEntity
                 {
                     Name = "sharedfile",
@@ -548,7 +548,7 @@ namespace Ufo.IntegrationTests
             {
                 // Snapshot 1 and Snapshot 2 will share the same folder.
                 // Count of folders in DB should be 1 after adding both snapshots.
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var sharedFolder = new FsFolderEntity
                 {
                     Name = "SharedFolder",
@@ -661,7 +661,7 @@ namespace Ufo.IntegrationTests
             await InitializeDatabaseAsync();
             try
             {
-                var snapshot = CreateSnapshotWithFiles();
+                var snapshot = CreateSnapshotWithFiles(testUser.Id);
 
                 await _repository!.AddSnapshotAsync(snapshot, testUser.Id);
 
@@ -709,7 +709,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 // Create snapshot 1 with unique folder structure
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var sharedFolder = new FsFolderEntity
                 {
                     Name = "SharedFolder",
@@ -843,7 +843,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 // Create snapshot 1 with shared and unique files
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var sharedFile = new FsFileEntity
                 {
                     Name = "shared",
@@ -970,7 +970,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 // Create snapshot 1 with unique PC
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var pcId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Id;
 
                 // Create snapshot 2 with different PC
@@ -1071,7 +1071,7 @@ namespace Ufo.IntegrationTests
             try
             {
                 // Create snapshot 1 with unique StorageDrive
-                var snapshot1 = CreateSnapshotWithSystemInfo();
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
                 var storageDriveId1 = snapshot1.VolumeInfo!.Volume!.StorageDrive!.Id;
                 var volumerId1 = snapshot1.VolumeInfo!.Volume!.Id;
 
@@ -1173,20 +1173,287 @@ namespace Ufo.IntegrationTests
 
         #endregion
 
+        #region User Isolation Tests
+
+        [Fact]
+        public async Task AddSnapshotAsync_WithMultipleUsers_EachUserSeesOnlyTheirSnapshots()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                // Create a second user
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Add snapshot for user 1
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+
+                // Add snapshot for user 2
+                var snapshot2 = CreateSnapshotWithSystemInfo(secondUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                // Act & Assert - User 1 retrieves their snapshot
+                var user1Snapshot = await _repository.GetSnapshotByIdAsync(snapshot1.Id, testUser.Id);
+                user1Snapshot.Should().NotBeNull();
+                user1Snapshot.Id.Should().Be(snapshot1.Id);
+
+                // User 1 cannot retrieve user 2's snapshot (because of UserId filtering in SQL)
+                // This should return null or the method should not find it
+                var allUser1Snapshots = await _repository.GetAllSnapshotsAsync(testUser.Id);
+                allUser1Snapshots.Should().NotBeEmpty();
+                allUser1Snapshots.Should().AllSatisfy(s => s.UserId.Should().Be(testUser.Id));
+
+                // User 2 retrieves their snapshot
+                var user2Snapshot = await _repository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+                user2Snapshot.Should().NotBeNull();
+                user2Snapshot.Id.Should().Be(snapshot2.Id);
+
+                var allUser2Snapshots = await _repository.GetAllSnapshotsAsync(secondUser.Id);
+                allUser2Snapshots.Should().NotBeEmpty();
+                allUser2Snapshots.Should().AllSatisfy(s => s.UserId.Should().Be(secondUser.Id));
+
+                // Verify snapshots are different
+                allUser1Snapshots.Should().NotContain(s => s.Id == snapshot2.Id);
+                allUser2Snapshots.Should().NotContain(s => s.Id == snapshot1.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task DeleteSnapshotByIdAsync_WithUserIsolation_UserCanOnlyDeleteOwnSnapshots()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Add snapshots for both users
+                var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+
+                var snapshot2 = CreateSnapshotWithSystemInfo(secondUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                // Act - User 1 tries to delete User 2's snapshot
+                var result = await _repository.DeleteSnapshotByIdAsync(snapshot2.Id, testUser.Id);
+
+                // Assert - Should return NotFound because User 1 can only see their own snapshots
+                result.Should().Be(DatabaseActionResult.NotFound);
+
+                // User 2's snapshot should still exist
+                var snapshot2After = await _repository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+                snapshot2After.Should().NotBeNull();
+
+                // Act - User 2 successfully deletes their own snapshot
+                var result2 = await _repository.DeleteSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+
+                // Assert
+                result2.Should().Be(DatabaseActionResult.Success);
+
+                // Snapshot should no longer exist for User 2
+                await Assert.ThrowsAsync<ArgumentNullException>(async () =>
+                    await _repository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id));
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddSnapshotAsync_WithUserIsolation_SameFileNamesInDifferentUsers()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Create snapshots with same file names for both users
+                var snapshot1 = CreateSnapshotWithFiles(testUser.Id);
+                snapshot1.RootFolder!.Files[0].Name = "myfile.txt";
+                snapshot1.RootFolder.Files[0].Sha256Hash = "hash_user1_file1";
+
+                var snapshot2 = CreateSnapshotWithFiles(secondUser.Id);
+                snapshot2.RootFolder!.Files[0].Name = "myfile.txt"; // Same name
+                snapshot2.RootFolder.Files[0].Sha256Hash = "hash_user2_file1"; // Different hash
+
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                // Act & Assert
+                var user1Snapshot = await _repository.GetSnapshotByIdAsync(snapshot1.Id, testUser.Id);
+                var user2Snapshot = await _repository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+
+                user1Snapshot.RootFolder!.Files.Should().Contain(f => f.Name == "myfile.txt");
+                user2Snapshot.RootFolder!.Files.Should().Contain(f => f.Name == "myfile.txt");
+
+                // But the files should have different hashes and IDs
+                var user1File = user1Snapshot.RootFolder.Files.First(f => f.Name == "myfile.txt");
+                var user2File = user2Snapshot.RootFolder.Files.First(f => f.Name == "myfile.txt");
+
+                user1File.Sha256Hash.Should().Be("hash_user1_file1");
+                user2File.Sha256Hash.Should().Be("hash_user2_file1");
+                user1File.Id.Should().NotBe(user2File.Id);
+                user1File.UserId.Should().Be(testUser.Id);
+                user2File.UserId.Should().Be(secondUser.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task AddSnapshotAsync_WithUserIsolation_FolderIsolation()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Create snapshots with same folder names but different hashes
+                var snapshot1 = CreateSnapshotWithNestedFolders(testUser.Id);
+                var folder1InSnapshot1 = snapshot1.RootFolder!.ChildFolders.First();
+                folder1InSnapshot1.Sha256Hash = "hash_user1_documents";
+
+                var snapshot2 = CreateSnapshotWithNestedFolders(secondUser.Id);
+                var folder1InSnapshot2 = snapshot2.RootFolder!.ChildFolders.First();
+                folder1InSnapshot2.Sha256Hash = "hash_user2_documents";
+
+                await _repository!.AddSnapshotAsync(snapshot1, testUser.Id);
+                await _repository.AddSnapshotAsync(snapshot2, secondUser.Id);
+
+                // Act & Assert
+                var user1Snapshot = await _repository.GetSnapshotByIdAsync(snapshot1.Id, testUser.Id);
+                var user2Snapshot = await _repository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+
+                var user1Folders = user1Snapshot.RootFolder!.ChildFolders;
+                var user2Folders = user2Snapshot.RootFolder!.ChildFolders;
+
+                user1Folders.Should().NotBeEmpty();
+                user2Folders.Should().NotBeEmpty();
+
+                // Folders from different users should have different IDs
+                var user1FolderIds = user1Folders.Select(f => f.Id).ToHashSet();
+                var user2FolderIds = user2Folders.Select(f => f.Id).ToHashSet();
+
+                user1FolderIds.Intersect(user2FolderIds).Should().BeEmpty("because different users should have separate folder instances");
+
+                // Verify user isolation
+                user1Folders.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
+                user2Folders.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        [Fact]
+        public async Task GetLatestSnapshotWithAllEntitiesAsync_WithUserIsolation_ReturnOnlyUserSnapshot()
+        {
+            // Arrange
+            await InitializeDatabaseAsync();
+            try
+            {
+                var secondUser = new UserEntity { Id = Ulid.NewUlid(), Name = "TestUser2" };
+
+                // Insert second user
+                await using var sqLiteConnection = new SqliteConnection(_connectionString);
+                await sqLiteConnection.OpenAsync();
+                await sqLiteConnection.ExecuteAsync(
+                    "INSERT INTO Users (Id, Name, PasswordHash) VALUES (@Id, @Name, @PasswordHash)",
+                    new { secondUser.Id, secondUser.Name, PasswordHash = "hash2" });
+
+                // Add older snapshot for user 1
+                var snapshot1Old = CreateSnapshotWithSystemInfo(testUser.Id);
+                snapshot1Old.Timestamp = DateTimeOffset.Now.AddDays(-1);
+                await _repository!.AddSnapshotAsync(snapshot1Old, testUser.Id);
+
+                // Add newer snapshot for user 1
+                var snapshot1New = CreateSnapshotWithSystemInfo(testUser.Id);
+                snapshot1New.Timestamp = DateTimeOffset.Now;
+                await _repository.AddSnapshotAsync(snapshot1New, testUser.Id);
+
+                // Add latest snapshot for user 2 (even newer)
+                var snapshot2Latest = CreateSnapshotWithSystemInfo(secondUser.Id);
+                snapshot2Latest.Timestamp = DateTimeOffset.Now.AddSeconds(1);
+                await _repository.AddSnapshotAsync(snapshot2Latest, secondUser.Id);
+
+                // Act - User 1 gets their latest snapshot
+                var user1Latest = await _repository.GetLatestSnapshotWithAllEntitiesAsync(testUser.Id);
+
+                // Assert - Should get User 1's latest snapshot, not User 2's
+                user1Latest.Should().NotBeNull();
+                user1Latest.Id.Should().Be(snapshot1New.Id);
+                user1Latest.UserId.Should().Be(testUser.Id);
+                user1Latest.Id.Should().NotBe(snapshot2Latest.Id);
+
+                // Act - User 2 gets their latest snapshot
+                var user2Latest = await _repository.GetLatestSnapshotWithAllEntitiesAsync(secondUser.Id);
+
+                // Assert
+                user2Latest.Should().NotBeNull();
+                user2Latest.Id.Should().Be(snapshot2Latest.Id);
+                user2Latest.UserId.Should().Be(secondUser.Id);
+            }
+            finally
+            {
+                CleanupDatabase();
+            }
+        }
+
+        #endregion
+
         #region Helper Methods
 
         // Helper methods
-        private SnapshotEntity CreateSnapshotWithSimpleFolder()
+        private SnapshotEntity CreateSnapshotWithSimpleFolder(Ulid userId)
         {
             var snapshot = new SnapshotEntity { 
                 Description = "Test Snapshot 93853",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var pc = new PcEntity { 
                 Name = "TestPC", 
                 DeviceId = Guid.NewGuid().ToString(),
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var storageDrive = new StorageDriveEntity
@@ -1198,7 +1465,7 @@ namespace Ufo.IntegrationTests
                 Description = "Test Storage Drive",
                 MediaType = "SSD",
                 InterfaceType = "SATA",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var volume = new VolumeEntity
@@ -1208,14 +1475,14 @@ namespace Ufo.IntegrationTests
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 500000,
                 Description = "Test Volume",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 250000,
                 DriveStatus = "OK",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var rootFolder = new FsFolderEntity
@@ -1223,7 +1490,7 @@ namespace Ufo.IntegrationTests
                 Name = "Root",
                 Size = 0,
                 Sha256Hash = "abc123",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1244,9 +1511,9 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private SnapshotEntity CreateSnapshotWithNestedFolders()
+        private SnapshotEntity CreateSnapshotWithNestedFolders(Ulid userId)
         {
-            var snapshot = CreateSnapshotWithSimpleFolder();
+            var snapshot = CreateSnapshotWithSimpleFolder(userId);
             var rootFolder = snapshot.RootFolder;
 
             var childFolder1 = new FsFolderEntity
@@ -1254,7 +1521,7 @@ namespace Ufo.IntegrationTests
                 Name = "ChildFolder1",
                 Size = 100,
                 Sha256Hash = "child1hash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1263,7 +1530,7 @@ namespace Ufo.IntegrationTests
                 Name = "GrandchildFolder",
                 Size = 50,
                 Sha256Hash = "grandchildhash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1276,9 +1543,9 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private SnapshotEntity CreateSnapshotWithFiles()
+        private SnapshotEntity CreateSnapshotWithFiles(Ulid userId)
         {
-            var snapshot = CreateSnapshotWithSimpleFolder();
+            var snapshot = CreateSnapshotWithSimpleFolder(userId);
             var rootFolder = snapshot.RootFolder;
 
             var file1 = new FsFileEntity
@@ -1287,7 +1554,7 @@ namespace Ufo.IntegrationTests
                 FileExtension = ".txt",
                 Size = 100,
                 Sha256Hash = "filehash1",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1297,7 +1564,7 @@ namespace Ufo.IntegrationTests
                 FileExtension = ".pdf",
                 Size = 200,
                 Sha256Hash = "filehash2",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1307,7 +1574,7 @@ namespace Ufo.IntegrationTests
                 FileExtension = ".jpg",
                 Size = 300,
                 Sha256Hash = "filehash3",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1322,9 +1589,9 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private SnapshotEntity CreateComplexSnapshot()
+        private SnapshotEntity CreateComplexSnapshot(Ulid userId)
         {
-            var snapshot = CreateSnapshotWithFiles();
+            var snapshot = CreateSnapshotWithFiles(userId);
             var rootFolder = snapshot.RootFolder;
 
             var folder1 = new FsFolderEntity
@@ -1332,7 +1599,7 @@ namespace Ufo.IntegrationTests
                 Name = "Documents",
                 Size = 500,
                 Sha256Hash = "dochash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1341,7 +1608,7 @@ namespace Ufo.IntegrationTests
                 Name = "SubDocuments",
                 Size = 300,
                 Sha256Hash = "subdochash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1357,7 +1624,7 @@ namespace Ufo.IntegrationTests
                 FileExtension = ".docx",
                 Size = 150,
                 Sha256Hash = "docfilehash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1370,7 +1637,7 @@ namespace Ufo.IntegrationTests
                 FileExtension = ".doc",
                 Size = 120,
                 Sha256Hash = "subdocfilehash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1380,18 +1647,18 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private SnapshotEntity CreateSnapshotWithSystemInfo()
+        private SnapshotEntity CreateSnapshotWithSystemInfo(Ulid userId)
         {
             var snapshot = new SnapshotEntity { 
                 Description = "Test Snapshot 35464",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var pc = new PcEntity
             {
                 Name = "TestPc30290",
                 DeviceId = Guid.NewGuid().ToString(),
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var storageDrive = new StorageDriveEntity
@@ -1403,7 +1670,7 @@ namespace Ufo.IntegrationTests
                 Description = "Disk drive",
                 MediaType = "Fixed hard disk media",
                 InterfaceType = "SATA",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var volume = new VolumeEntity
@@ -1413,14 +1680,14 @@ namespace Ufo.IntegrationTests
                 VolumeSerialNumber = Guid.NewGuid().ToString(),
                 VolumeSize = 549755813888,
                 Description = "Local Fixed Disk",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var volumeInfo = new VolumeInfoEntity
             {
                 FreeSpace = 274877906944,
                 DriveStatus = "OK",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
             var rootFolder = new FsFolderEntity
@@ -1428,7 +1695,7 @@ namespace Ufo.IntegrationTests
                 Name = "C:\\",
                 Size = 0,
                 Sha256Hash = "c_drive_hash",
-                UserId = testUser.Id,
+                UserId = userId,
                 User = null!
             };
 
@@ -1449,9 +1716,9 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private SnapshotEntity CreateLargeSnapshot()
+        private SnapshotEntity CreateLargeSnapshot(Ulid userId)
         {
-            var snapshot = CreateSnapshotWithSystemInfo();
+            var snapshot = CreateSnapshotWithSystemInfo(userId);
             var rootFolder = snapshot.RootFolder;
 
             var random = new Random(42);
@@ -1469,7 +1736,7 @@ namespace Ufo.IntegrationTests
                         Name = $"Folder_{folderCount}_{i}",
                         Size = random.Next(100, 1000),
                         Sha256Hash = $"hash_{folderCount}_{i}",
-                        UserId = testUser.Id,
+                        UserId = userId,
                         User = null!
                     };
 
@@ -1484,7 +1751,7 @@ namespace Ufo.IntegrationTests
                             FileExtension = ".txt",
                             Size = random.Next(10, 500),
                             Sha256Hash = $"filehash_{folderCount}_{i}_{j}",
-                            UserId = testUser.Id,
+                            UserId = userId,
                             User = null!
                         };
 
