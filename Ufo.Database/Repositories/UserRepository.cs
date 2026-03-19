@@ -1,6 +1,6 @@
 ﻿using Dapper;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 
@@ -8,22 +8,22 @@ namespace Ufo.Database.Repositories;
 
 public class UserRepository : IUserRepository
 {
-    private readonly string _connectionString;
     private readonly ILogger<UserRepository> _logger;
+    private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public UserRepository(string connectionString, ILogger<UserRepository>? logger)
+    public UserRepository(IDbConnectionFactory dbConnectionFactory, ILogger<UserRepository>? logger)
     {
-        _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        _dbConnectionFactory = dbConnectionFactory ?? throw new ArgumentNullException(nameof(dbConnectionFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<UserEntity?> GetUserByUsernameAsync(string username)
+    public async Task<UserEntity?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        using var sqLiteConnection = new SqliteConnection(_connectionString);
         const string sql = @"SELECT * FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
 
         try
         {
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { Username = username });
             _logger.LogInformation("Retrieved user: {Username}", userEntity?.Name);
             return userEntity;
@@ -34,14 +34,14 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<bool> UserExistsAsync(string username)
+    public async Task<bool> UserExistsAsync(string username, CancellationToken cancellationToken = default)
     {
-        using var sqLiteConnection = new SqliteConnection(_connectionString);
         const string sql = "SELECT COUNT(1) FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
         _logger.LogInformation("Checking if user exists: {Username}", username);
 
         try
         {
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var usersWithSameName = await sqLiteConnection.ExecuteScalarAsync<int>(sql, new { Username = username });
             return usersWithSameName > 0;
         }
@@ -51,10 +51,9 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<bool> CreateUserAsync(UserEntity user)
+    public async Task<bool> CreateUserAsync(UserEntity user, CancellationToken cancellationToken = default)
     {
-        using var sqLiteConnection = new SqliteConnection(_connectionString);
-        await sqLiteConnection.OpenAsync();
+        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
         using var transaction = sqLiteConnection.BeginTransaction();
         const string userSql = @"
                 INSERT INTO Users (Id, Name, PasswordHash) 
@@ -81,13 +80,13 @@ public class UserRepository : IUserRepository
         }
     }
 
-    public async Task<int> GetUserCountAsync()
+    public async Task<int> GetUserCountAsync(CancellationToken cancellationToken = default)
     {
-        using var sqLiteConnection = new SqliteConnection(_connectionString);
         const string sql = "SELECT COUNT(1) FROM Users"; // TODO LA - Move to SqlScript class
 
         try
         {
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var userCount = await sqLiteConnection.ExecuteScalarAsync<int>(sql);
             _logger.LogInformation("Users in Databse: {userCount}", userCount);
 
@@ -99,12 +98,12 @@ public class UserRepository : IUserRepository
         }        
     }
 
-    public async Task<UserEntity> GetUserByIdAsync(Ulid userId)
+    public async Task<UserEntity> GetUserByIdAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
-        using var sqLiteConnection = new SqliteConnection(_connectionString);
         const string sql = @"SELECT * FROM Users WHERE Id = @UserId"; // TODO LA - Move to SqlScript class
         try
         {
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { UserId = userId.ToString() });
             if (userEntity == null)
             {

@@ -1,7 +1,7 @@
 using Cysharp.Serialization.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Data.Sqlite;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Diagnostics;
@@ -9,13 +9,13 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.DataProviders;
 using Ufo.Abstractions.Options;
-using Ufo.Database.Extensions;
+using Ufo.Database.Contexts;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
-using Ufo.Server.SchemaFilters;
 using Ufo.Server.Services;
 
 Console.WriteLine("App started. Version: 0.0.3");
@@ -38,27 +38,29 @@ if (jwtOptions == null)
     throw new ArgumentNullException(nameof(JwtOptions), "JwtOptions is null.");
 }
 
-builder.Services.Configure<DatabaseOptions>(options =>
-{
-    options.ConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-});
-
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrEmpty(connectionString))
 {
     throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 }
+
+builder.Services.Configure<DatabaseOptions>(options =>
+{
+    options.ConnectionString = connectionString;
+});
 builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 
+builder.Services.AddScoped<IDbConnectionFactory, SqliteConnectionFactory>();
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
-builder.Services.AddTransient<IFileSystemRepository, FileSystemRepository>();
-builder.Services.AddTransient<ILabelsRepository, LabelsRepository>();
-builder.Services.AddTransient<ISearchRepository, SearchRepository>();
-builder.Services.AddTransient<IUserRepository>(provider =>
-    new UserRepository(connectionString, provider.GetRequiredService<ILogger<UserRepository>>()));
+builder.Services.AddScoped<IFileSystemRepository, FileSystemRepository>();
+builder.Services.AddScoped<ILabelsRepository, LabelsRepository>();
+builder.Services.AddScoped<ISearchRepository, SearchRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-await DependencyExtension.AddDataLayerAsync(builder.Services, connectionString);
+// TODO LA - Get sqliteConnection and Init Database (refactor)
+var sqliteConnection = new SqliteConnection(connectionString);
+await DapperDataContext.InitiateDatabaseAsync(sqliteConnection);
 
 builder.Services.AddTransient<IJwtTokenService, JwtTokenService>();
 builder.Services.AddTransient<IJwtClaimsService, JwtClaimsService>();

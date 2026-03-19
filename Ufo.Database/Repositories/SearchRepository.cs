@@ -1,10 +1,9 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
+using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
-using Ufo.Abstractions.Options;
 using Ufo.Abstractions.Requests;
 using Ufo.Abstractions.Responses;
 
@@ -13,11 +12,11 @@ namespace Ufo.Database.Repositories;
 public class SearchRepository : ISearchRepository
 {
     private readonly ILogger<SearchRepository> _logger;
-    private readonly string _connectionString;
+    private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public SearchRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<SearchRepository>? logger)
+    public SearchRepository(IDbConnectionFactory dbConnectionFactory, ILogger<SearchRepository>? logger)
     {
-        _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
+        _dbConnectionFactory = dbConnectionFactory ?? throw new ArgumentNullException(nameof(dbConnectionFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -31,21 +30,21 @@ public class SearchRepository : ISearchRepository
             return response;
         }
 
-        var rawQuery = searchRequest.Query.Trim();        
+        var rawQuery = searchRequest.Query.Trim();
+
+        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
 
         try
         {
-            await using var connection = new SqliteConnection(_connectionString);
-
             var tasks = new List<Task>();
             if (searchRequest.IncludeFiles)
             {
-                tasks.Add(PerformFileSearch(connection, rawQuery, userId, response));
+                tasks.Add(PerformFileSearch(sqLiteConnection, rawQuery, userId, response));
             }
 
             if (searchRequest.IncludeFolders)
             {
-                tasks.Add(PerformFolderSearch(connection, rawQuery, userId, response));
+                tasks.Add(PerformFolderSearch(sqLiteConnection, rawQuery, userId, response));
             }
 
             await Task.WhenAll(tasks);

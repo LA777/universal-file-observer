@@ -1,32 +1,31 @@
 ﻿using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System.Data;
 using System.Data.Common;
 using Ufo.Abstractions;
+using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
-using Ufo.Abstractions.Options;
 
 namespace Ufo.Database.Repositories;
 
 public class FileSystemRepository : IFileSystemRepository
 {
     private readonly ILogger<FileSystemRepository> _logger;
-    private readonly string _connectionString;
+    private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public FileSystemRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<FileSystemRepository>? logger)
+    public FileSystemRepository(IDbConnectionFactory dbConnectionFactory, ILogger<FileSystemRepository>? logger)
     {
-        _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
+        _dbConnectionFactory = dbConnectionFactory ?? throw new ArgumentNullException(nameof(dbConnectionFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task DropDataInTables()
+    public async Task DropDataInTables(CancellationToken cancellationToken = default)
     {
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             await sqLiteConnection.QueryAsync<SnapshotEntity>(SqlScripts.ClearDataInTablesSql);
         }
         catch (Exception exception)
@@ -38,11 +37,10 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<IEnumerable<FsFileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("GetFilesByNameAndExtensionAsync - UserId: {UserId}", userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var fileEntities = await sqLiteConnection.QueryAsync<FsFileEntity>(SqlScripts.SelectFilesByNameAndExtensionSql, new { Name = name, FileExtension = extension });
 
             return fileEntities;
@@ -56,11 +54,10 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<IEnumerable<FsFolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("GetFoldersByNameAsync - UserId: {UserId}", userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var folderEntities = await sqLiteConnection.QueryAsync<FsFolderEntity>(SqlScripts.SelectFoldersByNameSql, new { Name = name });
 
             return folderEntities;
@@ -74,13 +71,12 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("GetSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
             SnapshotEntity snapshotResult = null;
 
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             await sqLiteConnection
             .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcsToStorageDrivesEntity, PcEntity, SnapshotEntity>(
                 SqlScripts.SelectSnapshotByIdSql,
@@ -233,8 +229,9 @@ public class FileSystemRepository : IFileSystemRepository
         _logger.LogInformation("GetLatestSnapshotWithAllEntitiesAsync - UserId: {UserId}", userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
             SnapshotEntity? snapshotResult = null;
+
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
 
             await sqLiteConnection
             .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcsToStorageDrivesEntity, PcEntity, SnapshotEntity>(
@@ -394,10 +391,9 @@ public class FileSystemRepository : IFileSystemRepository
         _logger.LogInformation("GetAllSnapshotsAsync - UserId: {UserId}", userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
             var snapshots = new List<SnapshotEntity>();
 
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             await sqLiteConnection
             .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcEntity, FsFolderEntity, SnapshotEntity>(
                 SqlScripts.SelectSnapshotsWithSystemInfoSql,
@@ -439,10 +435,8 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<DatabaseActionResult> DeleteSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("DeleteSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
-        await using var sqLiteConnection = new SqliteConnection(_connectionString);
-        await sqLiteConnection.OpenAsync(cancellationToken);
+        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
         using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
         try
@@ -555,10 +549,8 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("AddSnapshotAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotEntity.Id, userId);
-        await using var sqLiteConnection = new SqliteConnection(_connectionString);
-        await sqLiteConnection.OpenAsync(cancellationToken);
+        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
         try

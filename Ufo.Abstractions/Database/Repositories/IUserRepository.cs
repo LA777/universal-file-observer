@@ -4,9 +4,9 @@ namespace Ufo.Abstractions.Database.Repositories;
 
 public interface IUserRepository
 {
-    Task<UserEntity?> GetUserByUsernameAsync(string username);
-    Task<bool> UserExistsAsync(string username);
-    Task<bool> CreateUserAsync(UserEntity user);
-    Task<int> GetUserCountAsync();
-    Task<UserEntity> GetUserByIdAsync(Ulid userId);
+    Task<UserEntity?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default);
+    Task<bool> UserExistsAsync(string username, CancellationToken cancellationToken = default);
+    Task<bool> CreateUserAsync(UserEntity user, CancellationToken cancellationToken = default);
+    Task<int> GetUserCountAsync(CancellationToken cancellationToken = default);
+    Task<UserEntity> GetUserByIdAsync(Ulid userId, CancellationToken cancellationToken = default);
 }

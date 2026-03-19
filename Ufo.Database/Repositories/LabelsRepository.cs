@@ -1,11 +1,9 @@
 ﻿using Dapper;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Ufo.Abstractions;
+using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
-using Ufo.Abstractions.Options;
 using Ufo.Abstractions.Requests;
 
 namespace Ufo.Database.Repositories;
@@ -13,11 +11,11 @@ namespace Ufo.Database.Repositories;
 public class LabelsRepository : ILabelsRepository
 {
     private readonly ILogger<LabelsRepository> _logger;
-    private readonly string _connectionString;
+    private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public LabelsRepository(IOptionsMonitor<DatabaseOptions> databaseOptionsMonitor, ILogger<LabelsRepository>? logger)
+    public LabelsRepository(IDbConnectionFactory dbConnectionFactory, ILogger<LabelsRepository>? logger)
     {
-        _connectionString = databaseOptionsMonitor.CurrentValue.ConnectionString ?? throw new ArgumentNullException(nameof(databaseOptionsMonitor));
+        _dbConnectionFactory = dbConnectionFactory ?? throw new ArgumentNullException(nameof(dbConnectionFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -26,8 +24,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("AddLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labelInDatabase = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByNameSql,
                 new { label.Name, UserId = userId });
@@ -97,9 +94,8 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("AddLabelToSnapshotAsync - LabelId: {LabelId}, SnapshotId: {SnapshotId}, UserId: {UserId}", labelId, snapshotId, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
             // Check that such Label exists
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labelEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByIdSql,
                 new { LabelId = labelId, UserId = userId });
@@ -157,8 +153,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("DeleteLabelByIdAsync - LabelId: {LabelId}, UserId: {UserId}", labelId, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-            await sqLiteConnection.OpenAsync(cancellationToken);
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
             try
@@ -229,8 +224,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("GetAllLabelsAsync - UserId: {UserId}", userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labels = await sqLiteConnection.QueryAsync<LabelEntity>(
                 SqlScripts.SelectAllLabelsSql,
                 new { UserId = userId });
@@ -250,8 +244,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("GetLabelsBySnapshotIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labels = await sqLiteConnection.QueryAsync<LabelEntity>(
                 SqlScripts.SelectLabelsBySnapshotIdSql,
                 new { SnapshotId = snapshotId, UserId = userId });
@@ -271,8 +264,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("RemoveLabelFromSnapshotAsync - LabelId: {LabelId}, SnapshotId: {SnapshotId}, UserId: {UserId}", labelId, snapshotId, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labelEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByIdSql, new { LabelId = labelId, UserId = userId });
 
@@ -332,8 +324,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("UpdateLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
-
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var labelToUpdate = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByIdSql,
                 new { LabelId = label.Id, UserId = userId });
@@ -389,7 +380,7 @@ public class LabelsRepository : ILabelsRepository
         _logger.LogInformation("GetLabelByNameAsync - LabelName: {LabelName}, UserId: {UserId}", labelName, userId);
         try
         {
-            await using var sqLiteConnection = new SqliteConnection(_connectionString);
+            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             var label = await sqLiteConnection.QueryFirstOrDefaultAsync<LabelEntity>(
                 SqlScripts.SelectLabelByNameSql,
                 new { Name = labelName, UserId = userId });
