@@ -19,7 +19,7 @@ https://medium.com/@vag/angular-material-tree-26adccadc63b
 https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
-TODO:
+TODO:- 
 - Add Authorization and Authentication on Back-end
 - [UI] Add Create User Page
 - [UI] Add Login Page
@@ -62,6 +62,8 @@ DONE:
 + API - CRUD for Labels
 + API - Assign/Remove Labels to/from Snapshot
 + API - create Snapshot with Labels
++ Integration tests use in-memory SQLite DB
++ Functional tests for API including in-memory SQLite DB
 
 
 UnauthorizedAccessException
