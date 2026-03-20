@@ -79,7 +79,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-
 // Add JWT Authentication
 builder.Services.AddAuthentication(options =>
 {
@@ -88,8 +87,6 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    //options.Authority = "https://demo.duendesoftware.com";
-    //options.Audience = "api";
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
@@ -105,21 +102,6 @@ builder.Services.AddAuthentication(options =>
     };
 });
 
-
-/*
-builder.Services.AddAuthentication()
-    .AddJwtBearer(options =>
-    {
-        options.Authority = "https://demo.duendesoftware.com";
-        options.Audience = "api";
-        options.TokenValidationParameters = new()
-        {
-            NameClaimType = "name",
-            RoleClaimType = "role"
-        };
-    });
-*/
-
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers(options =>
@@ -133,51 +115,6 @@ builder.Services.AddControllers(options =>
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
         options.JsonSerializerOptions.Converters.Add(new UlidJsonConverter());
     });
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-//builder.Services.AddEndpointsApiExplorer();
-//builder.Services.AddSwaggerGen(c =>
-//{
-//    c.SwaggerDoc("v1", new OpenApiInfo
-//    {
-//        Title = "UFO API",
-//        Version = "v1" // This is the crucial part
-//    });
-//    c.SchemaFilter<UlidSchemaFilter>();
-
-//    // Add JWT Security Definition
-//    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-//    {
-//        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
-//        Name = "Authorization",
-//        In = ParameterLocation.Header,
-//        Type = SecuritySchemeType.ApiKey, // SecuritySchemeType.Http,
-//        Scheme = "Bearer",
-//        BearerFormat = "JWT",
-//    });
-
-//    c.AddSecurityRequirement(new OpenApiSecurityRequirement
-//    {
-//        //{
-//        //    new OpenApiSecuritySchemeReference("oauth2"),
-//        //    ["api", "profile", "email", "openid"]
-//        //}
-
-//        //{
-//        //    new OpenApiSecurityScheme
-//        //    {
-//        //        Reference = new OpenApiReference
-//        //        {
-//        //            Type = ReferenceType.SecurityScheme,
-//        //            Id = "Bearer"
-//        //        },
-//        //        In = ParameterLocation.Header,
-//        //    },
-//        //    new string[] { }
-//        //}
-//    });
-//});
-
 
 builder.Services.AddOpenApi(options =>
 {
@@ -195,35 +132,7 @@ builder.Services.AddOpenApi(options =>
             In = ParameterLocation.Header,
             BearerFormat = "JWT",
             Description = "Enter 'Bearer {token}'"
-            //Flows = new OpenApiOAuthFlows
-            //{
-            //    AuthorizationCode = new OpenApiOAuthFlow
-            //    {
-            //        AuthorizationUrl = new Uri("https://demo.duendesoftware.com/connect/authorize"),
-            //        TokenUrl = new Uri("https://demo.duendesoftware.com/connect/token"),
-            //        Scopes = new Dictionary<string, string>
-            //        {
-            //            { "api", "Access the Weather API" },
-            //            { "openid", "Access the OpenID Connect user profile" },
-            //            { "email", "Access the user's email address" },
-            //            { "profile", "Access the user's profile" }
-            //        }
-            //    }
-            //}
-
-
         });
-
-        // Apply security requirement globally
-        //document.Security = [
-        //    new OpenApiSecurityRequirement
-        //    {
-        //        {
-        //            new OpenApiSecuritySchemeReference("oauth2"),
-        //            ["api", "profile", "email", "openid"]
-        //        }
-        //    }
-        //];
 
         // Apply security requirement globally
         document.Security = [
@@ -244,7 +153,6 @@ builder.Services.AddOpenApi(options =>
     });
 });
 
-
 var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
@@ -255,24 +163,12 @@ app.MapOpenApi();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    //app.UseSwagger(options =>
-    //{
-    //    //options.SerializeAsV2 = true;
-    //});
-    //app.UseSwaggerUI(c => { c.SwaggerEndpoint("/swagger/v1/swagger.json", "v1"); });
-
-
-    //app.UseSwagger();
     // add Swagger UI and point to the OpenAPI document
     // also enable PKCE for OAuth2
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/openapi/v1.json", "v1");
-        //options.OAuthUsePkce();
     });
-
-    //app.UseSwagger();
-    //app.UseSwaggerUI();
 }
 
 app.UseRouting();

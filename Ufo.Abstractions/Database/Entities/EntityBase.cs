@@ -13,15 +13,6 @@ public abstract class EntityBase
     public Ulid Id { get; set; } = Ulid.NewUlid();
 }
 
-public abstract class EntityWithNameAndIdBase : EntityBase
-{  
-    // TODO LA - Refactor
-    [JsonPropertyOrder(1)]
-    [NotNull]
-    [MaxLength(256)]
-    public string Name { get; set; } = string.Empty;
-}
-
 public abstract class EntityWithUserAndIdBase : EntityBase
 {
     [JsonConverter(typeof(UlidJsonConverter))]

@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using System.Data;
 using System.Data.Common;
@@ -225,7 +224,6 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("GetLatestSnapshotWithAllEntitiesAsync - UserId: {UserId}", userId);
         try
         {
@@ -387,7 +385,6 @@ public class FileSystemRepository : IFileSystemRepository
 
     public async Task<IList<SnapshotEntity>> GetAllSnapshotsAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
-        // TODO LA - Use UserId
         _logger.LogInformation("GetAllSnapshotsAsync - UserId: {UserId}", userId);
         try
         {
@@ -518,7 +515,6 @@ public class FileSystemRepository : IFileSystemRepository
             _logger.LogInformation($"Deleted StorageDrives with no Volumes and Snapshots");
 
             // Delete association with labels. Labels should not be deleted.
-            // TODO LA - Add Integration tests for this case
             await sqLiteConnection.ExecuteAsync(
                 SqlScripts.DeleteLabelsToSnapshotsBySnapshotIdSql,
                 new { SnapshotId = snapshotId },
@@ -721,7 +717,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             if (fileToFolderInDb == null) // Item does not exist in DB
             {
-                //_logger.LogInformation($"BindFileWithFolderAndSnapshotAsync: {folderEntity.Id}, {folderEntity.Name}, {fileEntity.Id}, {fileEntity.Name}, {snapshotEntity.Id}");
+                _logger.LogInformation($"BindFileWithFolderAndSnapshotAsync: {folderEntity.Id}, {folderEntity.Name}, {fileEntity.Id}, {fileEntity.Name}, {snapshotEntity.Id}");
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFilesToFoldersSql, new { FolderId = folderEntity.Id, FileId = fileEntity.Id, SnapshotId = snapshotEntity.Id }, transaction);
             }
         }
@@ -742,7 +738,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             if (pcToStorageDriveInDb == null) // Item does not exist in DB
             {
-                //_logger.LogInformation($"BindPcWithStorageDriveAndSnapshotAsync: {pcEntity.Id}, {storageDriveEntity.Id}, {snapshotEntity.Id}");
+                _logger.LogInformation($"BindPcWithStorageDriveAndSnapshotAsync: {pcEntity.Id}, {storageDriveEntity.Id}, {snapshotEntity.Id}");
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertPcsToStorageDrivesSql, new { PcId = pcEntity.Id, StorageDriveId = storageDriveEntity.Id, SnapshotId = snapshotEntity.Id }, transaction);
             }
         }
@@ -755,7 +751,6 @@ public class FileSystemRepository : IFileSystemRepository
 
     private async Task AddLabelsAndAssighnToSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
-        // TODO LA - Add Integration tests for this case
         try
         {
             foreach (var labelEntity in snapshotEntity.Labels)

@@ -315,6 +315,13 @@ public class SqlScripts
     public const string DeleteLabelFromSnapshotSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId AND SnapshotId = @SnapshotId;";
     public const string DeleteLabelsToSnapshotsByLabelIdSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId;";
 
+    // User SQL Scripts
+    public const string SelectUserByIdSql = "SELECT * FROM Users WHERE Id = @UserId;";
+    public const string SelectUserByNameSql = "SELECT * FROM Users WHERE Name = @Username;";
+    public const string SelectSameUserByNameSql = "SELECT COUNT(1) FROM Users WHERE Name = @Username;";
+    public const string InsertUserSql = "INSERT INTO Users (Id, Name, PasswordHash) " +
+                                            "VALUES (@Id, @Name, @PasswordHash);";
+    public const string SelectUserCountSql = "SELECT COUNT(1) FROM Users;";
 
     // Search SQL Scripts
     //public const string SearchFoldersByNameSql = "SELECT * FROM Folders " +

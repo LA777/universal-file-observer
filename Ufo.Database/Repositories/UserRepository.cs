@@ -19,12 +19,12 @@ public class UserRepository : IUserRepository
 
     public async Task<UserEntity?> GetUserByUsernameAsync(string username, CancellationToken cancellationToken = default)
     {
-        const string sql = @"SELECT * FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
+        _logger.LogInformation("GetUserByUsernameAsync: {Username}", username);
 
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { Username = username });
+            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(SqlScripts.SelectUserByNameSql, new { Username = username });
             _logger.LogInformation("Retrieved user: {Username}", userEntity?.Name);
             return userEntity;
         }
@@ -36,13 +36,12 @@ public class UserRepository : IUserRepository
 
     public async Task<bool> UserExistsAsync(string username, CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT COUNT(1) FROM Users WHERE Name = @Username"; // TODO LA - Move to SqlScript class
         _logger.LogInformation("Checking if user exists: {Username}", username);
 
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var usersWithSameName = await sqLiteConnection.ExecuteScalarAsync<int>(sql, new { Username = username });
+            var usersWithSameName = await sqLiteConnection.ExecuteScalarAsync<int>(SqlScripts.SelectSameUserByNameSql, new { Username = username });
             return usersWithSameName > 0;
         }
         catch (Exception)
@@ -53,15 +52,14 @@ public class UserRepository : IUserRepository
 
     public async Task<bool> CreateUserAsync(UserEntity user, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("CreateUserAsync: {Name}", user.Name);
+
         var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-        using var transaction = sqLiteConnection.BeginTransaction();
-        const string userSql = @"
-                INSERT INTO Users (Id, Name, PasswordHash) 
-                VALUES (@Id, @Name, @PasswordHash)"; // TODO LA - Move to SqlScript class
+        using var transaction = sqLiteConnection.BeginTransaction();       
 
         try
         {
-            await sqLiteConnection.ExecuteAsync(userSql, new
+            await sqLiteConnection.ExecuteAsync(SqlScripts.InsertUserSql, new
             {
                 Id = user.Id.ToString(),
                 user.Name,
@@ -82,12 +80,12 @@ public class UserRepository : IUserRepository
 
     public async Task<int> GetUserCountAsync(CancellationToken cancellationToken = default)
     {
-        const string sql = "SELECT COUNT(1) FROM Users"; // TODO LA - Move to SqlScript class
+        _logger.LogInformation("GetUserCountAsync");
 
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var userCount = await sqLiteConnection.ExecuteScalarAsync<int>(sql);
+            var userCount = await sqLiteConnection.ExecuteScalarAsync<int>(SqlScripts.SelectUserCountSql);
             _logger.LogInformation("Users in Databse: {userCount}", userCount);
 
             return userCount;
@@ -100,11 +98,12 @@ public class UserRepository : IUserRepository
 
     public async Task<UserEntity> GetUserByIdAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
-        const string sql = @"SELECT * FROM Users WHERE Id = @UserId"; // TODO LA - Move to SqlScript class
+        _logger.LogInformation("GetUserByIdAsync: {UserId}", userId);
+
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(sql, new { UserId = userId.ToString() });
+            var userEntity = await sqLiteConnection.QueryFirstOrDefaultAsync<UserEntity>(SqlScripts.SelectUserByIdSql, new { UserId = userId.ToString() });
             if (userEntity == null)
             {
                 throw new Exception($"User with ID ({userId}) was not found.");
