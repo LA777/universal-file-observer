@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -16,6 +17,7 @@ using Ufo.Abstractions.Options;
 using Ufo.Database.Contexts;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
+using Ufo.Server.Extensions;
 using Ufo.Server.Services;
 
 Console.WriteLine("App started. Version: 0.0.3");
@@ -51,6 +53,8 @@ builder.Services.Configure<DatabaseOptions>(options =>
 builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 
+builder.Services.AddScoped<ILabelsService, LabelsService>();
+
 builder.Services.AddScoped<IDbConnectionFactory, SqliteConnectionFactory>();
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
 builder.Services.AddScoped<IFileSystemRepository, FileSystemRepository>();
@@ -59,8 +63,11 @@ builder.Services.AddScoped<ISearchRepository, SearchRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 // TODO LA - Get sqliteConnection and Init Database (refactor)
-var sqliteConnection = new SqliteConnection(connectionString);
-await DapperDataContext.InitiateDatabaseAsync(sqliteConnection);
+if (!builder.Environment.IsFunctionalTesting())
+{
+    var sqliteConnection = new SqliteConnection(connectionString);
+    await DapperDataContext.InitiateDatabaseAsync(sqliteConnection);
+}
 
 builder.Services.AddTransient<IJwtTokenService, JwtTokenService>();
 builder.Services.AddTransient<IJwtClaimsService, JwtClaimsService>();
@@ -80,6 +87,7 @@ builder.Services.AddCors(options =>
 });
 
 // Add JWT Authentication
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -90,15 +98,13 @@ builder.Services.AddAuthentication(options =>
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtOptions.Key)),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
         ValidateIssuer = true,
         ValidIssuer = jwtOptions.Issuer,
         ValidateAudience = true,
         ValidAudience = jwtOptions.Audience,
         ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero,
-        NameClaimType = "name",
-        RoleClaimType = "role"
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -184,9 +190,11 @@ if (app.Environment.IsProduction())
     app.UseHsts();
 }
 
-var appEndpointUrl = app.Configuration["Kestrel:Endpoints:App:Url"] ?? "https://localhost:55000";
-
-OpenBrowser(appEndpointUrl);
+if (!app.Environment.IsFunctionalTesting())
+{
+    var appEndpointUrl = app.Configuration["Kestrel:Endpoints:App:Url"] ?? "https://localhost:55000";
+    OpenBrowser(appEndpointUrl);
+}
 
 await app.RunAsync();
 

@@ -2,7 +2,7 @@
 
 namespace Ufo.Abstractions.Requests;
 
-public class SearchRequest
+public record SearchRequest
 {
     [MinLength(3)] // TODO LA - Add tests to ensure minimum length
     public string Query { get; set; } = string.Empty;

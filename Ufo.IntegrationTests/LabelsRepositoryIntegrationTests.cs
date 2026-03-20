@@ -383,6 +383,23 @@ namespace Ufo.IntegrationTests
             allLabels.Count.Should().BeLessThanOrEqualTo(2);
         }
 
+        [Fact]
+        public async Task AddLabelToSnapshotAsync_WithNonExistentSnapshot_ReturnsNotFound()
+        {
+            // Arrange - label exists but snapshot does not
+            var label = new LabelRequest { Name = "OrphanLabel", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            var nonExistentSnapshotId = Ulid.NewUlid();
+
+            // Act
+            var result = await _labelsRepository.AddLabelToSnapshotAsync(label.Id, nonExistentSnapshotId, testUser.Id);
+
+            // Assert
+            result.Result.Should().Be(Result.NotFound);
+            result.Message.Should().Contain(nonExistentSnapshotId.ToString());
+        }
+
         #endregion       
 
         #region GetAllLabelsAsync Tests
@@ -818,6 +835,37 @@ namespace Ufo.IntegrationTests
             labelsForSnapshot.Should().BeEmpty();
         }
 
+        [Fact]
+        public async Task DeleteLabelByIdAsync_AlsoCleansUpLabelsToSnapshotsRows()
+        {
+            // Arrange - label associated with a snapshot
+            var snapshot = CreateSnapshotWithSimpleFolder();
+            await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+
+            var label = new LabelRequest { Name = "LabelWithAssoc", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+            await _labelsRepository.AddLabelToSnapshotAsync(label.Id, snapshot.Id, testUser.Id);
+
+            // Confirm association exists before deletion
+            var labelsBefore = await _labelsRepository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
+            labelsBefore.Should().HaveCount(1);
+
+            // Act
+            var deleteResult = await _labelsRepository.DeleteLabelByIdAsync(label.Id, testUser.Id);
+            deleteResult.Result.Should().Be(Result.Success);
+
+            // Assert - join table rows are gone
+            var count = await _sqLiteConnection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM LabelsToSnapshots WHERE LabelId = @LabelId",
+                new { LabelId = label.Id.ToString() });
+
+            count.Should().Be(0);
+
+            // And the snapshot no longer returns any labels
+            var labelsAfter = await _labelsRepository.GetLabelsBySnapshotIdAsync(snapshot.Id, testUser.Id);
+            labelsAfter.Should().BeEmpty();
+        }
+
         #endregion
 
         #region AddLabelToSnapshotAsync Tests
@@ -1145,6 +1193,83 @@ namespace Ufo.IntegrationTests
             {
                 Assert.Null(retrievedLabel);
             }
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_AfterLabelDeleted_ReturnsNull()
+        {
+            var label = new LabelRequest { Name = "ToDelete", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            await _labelsRepository.DeleteLabelByIdAsync(label.Id, testUser.Id);
+
+            var retrievedLabel = await _labelsRepository.GetLabelByNameAsync("ToDelete", testUser.Id);
+
+            retrievedLabel.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_AfterLabelRenamed_OldNameReturnsNull()
+        {
+            var label = new LabelRequest { Name = "OldName", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            label.Name = "NewName";
+            await _labelsRepository.UpdateLabelAsync(label, testUser.Id);
+
+            var retrievedLabel = await _labelsRepository.GetLabelByNameAsync("OldName", testUser.Id);
+
+            retrievedLabel.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_AfterLabelRenamed_NewNameReturnsLabel()
+        {
+            var label = new LabelRequest { Name = "BeforeRename", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            label.Name = "AfterRename";
+            await _labelsRepository.UpdateLabelAsync(label, testUser.Id);
+
+            var retrievedLabel = await _labelsRepository.GetLabelByNameAsync("AfterRename", testUser.Id);
+
+            retrievedLabel.Should().NotBeNull();
+            retrievedLabel!.Id.Should().Be(label.Id);
+            retrievedLabel.Name.Should().Be("AfterRename");
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_WithSpecialCharacters_ReturnsLabel()
+        {
+            const string specialName = "Label/With\\Special:Characters?And&More";
+            var label = new LabelRequest { Name = specialName, ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            var retrievedLabel = await _labelsRepository.GetLabelByNameAsync(specialName, testUser.Id);
+
+            retrievedLabel.Should().NotBeNull();
+            retrievedLabel!.Name.Should().Be(specialName);
+            retrievedLabel.Id.Should().Be(label.Id);
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_EmptyDatabase_ReturnsNull()
+        {
+            var retrievedLabel = await _labelsRepository!.GetLabelByNameAsync("AnyName", testUser.Id);
+
+            retrievedLabel.Should().BeNull();
+        }
+
+        [Fact]
+        public async Task GetLabelByNameAsync_ReturnsCorrectUserId()
+        {
+            var label = new LabelRequest { Name = "UserCheck", ColorHex = "#FF0000" };
+            await _labelsRepository!.AddLabelAsync(label, testUser.Id);
+
+            var retrievedLabel = await _labelsRepository.GetLabelByNameAsync("UserCheck", testUser.Id);
+
+            retrievedLabel.Should().NotBeNull();
+            retrievedLabel!.UserId.Should().Be(testUser.Id);
         }
 
         #endregion

@@ -2,7 +2,7 @@
 
 namespace Ufo.Abstractions.Requests;
 
-public class PathRequest
+public record PathRequest
 {
     [Required]
     public required string Path { get; set; }

@@ -1,11 +1,9 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
 using Ufo.Server.Attributes;
-
-namespace Ufo.Server.Controllers;
+using Ufo.Server.Services;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -14,11 +12,11 @@ namespace Ufo.Server.Controllers;
 public class LabelController : ControllerBase
 {
     private readonly ILogger<LabelController> _logger;
-    private readonly ILabelsRepository _labelsRepository;
+    private readonly ILabelsService _labelsService;
 
-    public LabelController(ILabelsRepository labelsRepository, ILogger<LabelController> logger)
+    public LabelController(ILabelsService labelsService, ILogger<LabelController> logger)
     {
-        _labelsRepository = labelsRepository ?? throw new ArgumentNullException(nameof(labelsRepository));
+        _labelsService = labelsService ?? throw new ArgumentNullException(nameof(labelsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -28,8 +26,8 @@ public class LabelController : ControllerBase
         _logger.LogInformation("AddLabelAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResults = await _labelsRepository.AddLabelAsync(label, userId, cancellationToken);
-        if (serverResults.Any(x=>x.Priority == ActionPriority.Highest && x.Result == Result.Error))
+        var serverResults = await _labelsService.AddLabelAsync(label, userId, cancellationToken);
+        if (serverResults.Any(x => x.Priority == ActionPriority.Highest && x.Result == Result.Error))
         {
             return BadRequest(serverResults);
         }
@@ -43,7 +41,7 @@ public class LabelController : ControllerBase
         _logger.LogInformation("GetAllLabelsAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var result = await _labelsRepository.GetAllLabelsAsync(userId, cancellationToken);
+        var result = await _labelsService.GetAllLabelsAsync(userId, cancellationToken);
         if (result is { Count: > 0 })
         {
             return Ok(result);
@@ -58,7 +56,7 @@ public class LabelController : ControllerBase
         _logger.LogInformation("GetLabelsBySnapshotIdAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var result = await _labelsRepository.GetLabelsBySnapshotIdAsync(snapshotId, userId, cancellationToken);
+        var result = await _labelsService.GetLabelsBySnapshotIdAsync(snapshotId, userId, cancellationToken);
         if (result is { Count: > 0 })
         {
             return Ok(result);
@@ -73,7 +71,7 @@ public class LabelController : ControllerBase
         _logger.LogInformation("UpdateLabelAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResult = await _labelsRepository.UpdateLabelAsync(label, userId, cancellationToken);
+        var serverResult = await _labelsService.UpdateLabelAsync(label, userId, cancellationToken);
         if (serverResult.Result == Result.Success)
         {
             return Ok(serverResult);
@@ -88,7 +86,7 @@ public class LabelController : ControllerBase
         _logger.LogInformation("AddLabelToSnapshotAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResult = await _labelsRepository.AddLabelToSnapshotAsync(labelId, snapshotId, userId, cancellationToken);
+        var serverResult = await _labelsService.AddLabelToSnapshotAsync(labelId, snapshotId, userId, cancellationToken);
         if (serverResult.Result == Result.Success)
         {
             return Ok(serverResult);
@@ -103,7 +101,7 @@ public class LabelController : ControllerBase
         _logger.LogInformation("RemoveLabelFromSnapshotAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResult = await _labelsRepository.RemoveLabelFromSnapshotAsync(labelId, snapshotId, userId, cancellationToken);
+        var serverResult = await _labelsService.RemoveLabelFromSnapshotAsync(labelId, snapshotId, userId, cancellationToken);
         if (serverResult.Result == Result.Success)
         {
             return Ok(serverResult);
@@ -118,19 +116,34 @@ public class LabelController : ControllerBase
         _logger.LogInformation("DeleteLabelByIdAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResult = await _labelsRepository.DeleteLabelByIdAsync(labelId, userId, cancellationToken);
+        var serverResult = await _labelsService.DeleteLabelByIdAsync(labelId, userId, cancellationToken);
 
         if (serverResult.Result == Result.NotFound)
         {
-            _logger.LogInformation("Label {0} was not found.", labelId);
+            _logger.LogInformation("Label {LabelId} was not found.", labelId);
             return NotFound($"Label with Id: {labelId} was not found.");
         }
         else if (serverResult.Result == Result.Success)
         {
-            _logger.LogInformation("Label {0} deleted from DB.", labelId);
-            return Ok($"Label with Id: {labelId} was sucessfully deleted.");
+            _logger.LogInformation("Label {LabelId} deleted from DB.", labelId);
+            return Ok($"Label with Id: {labelId} was successfully deleted.");
         }
 
         return BadRequest("Failed to delete Label.");
+    }
+
+    [HttpPost("by-name")]
+    public async Task<IActionResult> GetLabelByNameAsync([FromBody] LabelNameRequest request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("GetLabelByNameAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
+
+        var result = await _labelsService.GetLabelByNameAsync(request.Name, userId, cancellationToken);
+        if (result is not null)
+        {
+            return Ok(result);
+        }
+
+        return NotFound();
     }
 }

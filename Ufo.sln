@@ -24,6 +24,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{147CC9D4
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ufo.IntegrationTests", "Ufo.IntegrationTests\Ufo.IntegrationTests.csproj", "{F14E4876-EDCF-4BE6-B417-1069711D6425}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ufo.FunctionalTests", "Ufo.FunctionalTests\Ufo.FunctionalTests.csproj", "{3AD93E68-B86F-4631-8595-96B9558D6F08}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +58,10 @@ Global
 		{F14E4876-EDCF-4BE6-B417-1069711D6425}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F14E4876-EDCF-4BE6-B417-1069711D6425}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F14E4876-EDCF-4BE6-B417-1069711D6425}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AD93E68-B86F-4631-8595-96B9558D6F08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AD93E68-B86F-4631-8595-96B9558D6F08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AD93E68-B86F-4631-8595-96B9558D6F08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AD93E68-B86F-4631-8595-96B9558D6F08}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -63,6 +69,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{7FDC8FC0-BBA4-4167-B525-C7F68C5CB144} = {147CC9D4-B07B-413E-9502-0BB412AA0EFE}
 		{F14E4876-EDCF-4BE6-B417-1069711D6425} = {147CC9D4-B07B-413E-9502-0BB412AA0EFE}
+		{3AD93E68-B86F-4631-8595-96B9558D6F08} = {147CC9D4-B07B-413E-9502-0BB412AA0EFE}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {573B03E3-1947-4FA0-8CAB-860C2AC2048F}

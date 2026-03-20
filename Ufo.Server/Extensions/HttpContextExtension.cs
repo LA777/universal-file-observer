@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Http;
-
 namespace Ufo.Extensions;
 
 /// <summary>

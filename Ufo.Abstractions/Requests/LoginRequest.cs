@@ -2,7 +2,7 @@
 
 namespace Ufo.Abstractions.Requests;
 
-public class LoginRequest
+public record LoginRequest
 {
     [Required]
     public string Username { get; set; } = string.Empty;

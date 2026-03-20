@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Requests
 {
-    public class LabelRequest
+    public record LabelRequest
     {
         [JsonConverter(typeof(UlidJsonConverter))]
         [JsonPropertyOrder(0)]
@@ -19,8 +19,7 @@ namespace Ufo.Abstractions.Requests
         [MaxLength(32)]
         public string ColorHex { get; set; } = string.Empty;
 
-        [JsonConverter(typeof(UlidJsonConverter))]
         [JsonPropertyOrder(22)]
-        public IList<Ulid> SnapshotIds { get; set; } = [];
+        public List<Ulid> SnapshotIds { get; set; } = [];
     }
 }
