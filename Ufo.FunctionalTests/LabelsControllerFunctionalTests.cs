@@ -24,9 +24,10 @@ using Ufo.Abstractions.Requests;
 using Ufo.Abstractions.Responses;
 using Ufo.Database;
 using Ufo.Database.Contexts;
+using Ufo.FunctionalTests.Extensions;
 using Ufo.Server.Extensions;
 
-namespace Ufo.FunctionalTests;
+namespace Ufo.FunctionalTests.LabelController;
 
 #region Test WebApplication factory
 
@@ -245,12 +246,6 @@ internal sealed class OptionsMonitorStub<T> : IOptionsMonitor<T> where T : class
     public IDisposable? OnChange(Action<T, string?> listener) => null;
 }
 
-internal static class OptionsMonitorStubExtensions
-{
-    /// <summary>Creates an <see cref="IOptionsMonitor{T}"/> wrapping <paramref name="value"/>.</summary>
-    public static IOptionsMonitor<T> ToOptionsMonitor<T>(this T value) where T : class =>
-        new OptionsMonitorStub<T>(value);
-}
 
 #endregion
 
