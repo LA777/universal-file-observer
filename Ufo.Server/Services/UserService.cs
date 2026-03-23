@@ -13,7 +13,7 @@ public interface IUserService
 }
 
 public class UserService : IUserService
-{
+{ // TODO LA - Cover with Unit tests
     private readonly IUserRepository _userRepository;
     private readonly ILogger<UserService> _logger;
 

@@ -11,6 +11,8 @@ namespace Ufo.Database.Repositories;
 
 public class FileSystemRepository : IFileSystemRepository
 {
+    // TODO LA - rename to SnapshotRepository
+
     private readonly ILogger<FileSystemRepository> _logger;
     private readonly IDbConnectionFactory _dbConnectionFactory;
 
@@ -20,6 +22,7 @@ public class FileSystemRepository : IFileSystemRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    // TODO LA - Move this method to a separate Repository and create an interface for it. This is only for testing purposes to clear the DB after each test run.
     public async Task DropDataInTables(CancellationToken cancellationToken = default)
     {
         try
@@ -640,7 +643,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             if (folderInDb == null) // Folder does not exist in DB
             {
-                //_logger.LogInformation($"InsertFolderSql: {folderEntity.Id}");
+                _logger.LogInformation($"InsertFolderSql: {folderEntity.Id}");
                 // add new Folder to DB
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFolderSql, folderEntity, transaction);
             }
@@ -667,7 +670,7 @@ public class FileSystemRepository : IFileSystemRepository
 
                 if (fileInDb == null) // File does not exist in DB
                 {
-                    //_logger.LogInformation($"InsertFileSql: {fileEntity.Id}");
+                    _logger.LogInformation($"InsertFileSql: {fileEntity.Id}");
                     // add new File to DB
                     await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFileSql, fileEntity, transaction);
                 }
@@ -696,7 +699,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             if (folderToFolderInDb == null) // Item does not exist in DB
             {
-                //_logger.LogInformation($"BindFolderWithFolderAndSnapshotAsync: {parentFolderEntity?.Id}, {childFolderEntity.Id}, {snapshotEntity.Id}");
+                _logger.LogInformation($"BindFolderWithFolderAndSnapshotAsync: {parentFolderEntity?.Id}, {childFolderEntity.Id}, {snapshotEntity.Id}");
                 await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFoldersToFoldersSql, new { ParentFolderId = parentFolderEntity?.Id, ChildFolderId = childFolderEntity.Id, SnapshotId = snapshotEntity.Id }, transaction);
             }
         }

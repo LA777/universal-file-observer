@@ -93,7 +93,7 @@ public class SnapshotController : ControllerBase
         }
 
         var user = await _userRepository.GetUserByIdAsync(userId);
-        var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path, user);        
+        var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path, user);
         var folderTree = CreateFolderTree(folderPath.Path, snapshot, null, user);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
@@ -132,9 +132,12 @@ public class SnapshotController : ControllerBase
         var folder = new FsFolderEntity
         {
             Name = directoryInfo.Name,
-            Sha256Hash = string.Empty, 
-            User = user, 
-            UserId = user.Id
+            Sha256Hash = string.Empty,
+            User = user,
+            UserId = user.Id,
+            CreatedAt = directoryInfo.CreationTimeUtc.ToString("o"), // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
+            UpdatedAt = directoryInfo.CreationTimeUtc.ToString("o"),  // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
+            IsHidden = (directoryInfo.Attributes & FileAttributes.Hidden) != 0 // TODO LA - Cover with Unit tests.
         };
         folder.Snapshots.Add(snapshot);
         if (parentFolder is not null)
@@ -158,7 +161,10 @@ public class SnapshotController : ControllerBase
                 Sha256Hash = fileInfo.GetFileHashSha256(),
                 FileExtension = fileInfo.Extension,
                 User = user,
-                UserId = user.Id
+                UserId = user.Id,
+                CreatedAt = fileInfo.CreationTimeUtc.ToString("o"), // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
+                UpdatedAt = fileInfo.LastWriteTimeUtc.ToString("o"),  // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
+                IsHidden = (fileInfo.Attributes & FileAttributes.Hidden) != 0 // TODO LA - Cover with Unit tests.
             };
             file.Snapshots.Add(snapshot);
             file.ParentFolders.Add(folder);

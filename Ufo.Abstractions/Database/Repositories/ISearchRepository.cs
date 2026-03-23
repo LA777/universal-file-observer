@@ -1,9 +1,9 @@
-﻿using Ufo.Abstractions.Requests;
-using Ufo.Abstractions.Responses;
+﻿using Ufo.Abstractions.Database.Entities;
+using Ufo.Abstractions.Requests;
 
 namespace Ufo.Abstractions.Database.Repositories;
 
 public interface ISearchRepository
 {
-    public Task<SearchResponse> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default);
+    public Task<(List<FsFolderEntity>, List<FsFileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default);
 }

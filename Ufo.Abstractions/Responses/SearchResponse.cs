@@ -1,9 +1,9 @@
-﻿using Ufo.Abstractions.Database.Entities;
+﻿using Ufo.Abstractions.DataTransferObjects;
 
 namespace Ufo.Abstractions.Responses;
 
 public class SearchResponse
 {
-    public List<FsFileEntity> Files { get; set; } = [];
-    public List<FsFolderEntity> Folders { get; set; } = [];
+    public List<FileDto> Files { get; set; } = [];
+    public List<FolderDto> Folders { get; set; } = [];
 }

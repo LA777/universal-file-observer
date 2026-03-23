@@ -1,21 +1,21 @@
 ﻿using Ufo.Abstractions;
 using Ufo.Abstractions.Database.Repositories;
+using Ufo.Abstractions.DataTransferObjects;
 using Ufo.Abstractions.Requests;
-using Ufo.Abstractions.Responses;
-using Ufo.Server.Extensions;
+using Ufo.Server.Mappers;
 
 namespace Ufo.Server.Services;
 
 public interface ILabelsService
 {
-    Task<IList<LabelResponse>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken);
-    Task<IList<LabelResponse>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken);
-    Task<IList<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken);
+    Task<List<LabelDto>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken);
+    Task<List<LabelDto>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken);
+    Task<List<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken);
     Task<ServerResult> UpdateLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken);
     Task<ServerResult> AddLabelToSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken);
     Task<ServerResult> RemoveLabelFromSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken);
     Task<ServerResult> DeleteLabelByIdAsync(Ulid labelId, Ulid userId, CancellationToken cancellationToken);
-    Task<LabelResponse?> GetLabelByNameAsync(string labelName, Ulid userId, CancellationToken cancellationToken);
+    Task<LabelDto?> GetLabelByNameAsync(string labelName, Ulid userId, CancellationToken cancellationToken);
 }
 
 public class LabelsService : ILabelsService
@@ -30,21 +30,21 @@ public class LabelsService : ILabelsService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IList<LabelResponse>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken)
+    public async Task<List<LabelDto>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetAllLabelsAsync - UserId: {UserId}", userId);
         var entities = await _labelsRepository.GetAllLabelsAsync(userId, cancellationToken);
-        return entities.ToResponseList();
+        return entities.ToDtoList();
     }
 
-    public async Task<IList<LabelResponse>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken)
+    public async Task<List<LabelDto>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetLabelsBySnapshotIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         var entities = await _labelsRepository.GetLabelsBySnapshotIdAsync(snapshotId, userId, cancellationToken);
-        return entities.ToResponseList();
+        return entities.ToDtoList();
     }
 
-    public async Task<IList<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken)
+    public async Task<List<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("AddLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         return await _labelsRepository.AddLabelAsync(label, userId, cancellationToken);
@@ -74,10 +74,10 @@ public class LabelsService : ILabelsService
         return await _labelsRepository.DeleteLabelByIdAsync(labelId, userId, cancellationToken);
     }
 
-    public async Task<LabelResponse?> GetLabelByNameAsync(string labelName, Ulid userId, CancellationToken cancellationToken)
+    public async Task<LabelDto?> GetLabelByNameAsync(string labelName, Ulid userId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetLabelByNameAsync - LabelName: {LabelName}, UserId: {UserId}", labelName, userId);
         var entity = await _labelsRepository.GetLabelByNameAsync(labelName, userId, cancellationToken);
-        return entity?.ToResponse();
+        return entity?.ToDto();
     }
 }

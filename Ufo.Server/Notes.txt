@@ -20,6 +20,8 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:- 
+- Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
+- Verify FunctionalTest contain User data separation tests
 - Add Authorization and Authentication on Back-end
 - [UI] Add Create User Page
 - [UI] Add Login Page

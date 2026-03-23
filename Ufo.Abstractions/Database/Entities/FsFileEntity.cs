@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("Files")]
-public class FsFileEntity: FsItemEntity
+public class FsFileEntity : FsItemEntity // TODO LA - Rename to FileEntity
 {
     [JsonPropertyOrder(50)]
     [MaxLength(128)]

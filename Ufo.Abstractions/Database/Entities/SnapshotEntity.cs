@@ -24,5 +24,5 @@ public class SnapshotEntity : EntityWithUserAndIdBase
 
     [JsonPropertyOrder(99)]
     [ManyToMany(typeof(FoldersToFoldersEntity))]
-    public IList<LabelEntity> Labels { get; set; } = [];
+    public List<LabelEntity> Labels { get; set; } = [];
 }

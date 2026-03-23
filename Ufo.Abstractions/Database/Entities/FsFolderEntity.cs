@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("Folders")]
-public class FsFolderEntity : FsItemEntity
+public class FsFolderEntity : FsItemEntity // TODO LA - Rename to FileEntity
 {
     [JsonIgnore]
     [ManyToMany(typeof(FoldersToFoldersEntity))]

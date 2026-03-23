@@ -19,7 +19,7 @@ public class LabelsRepository : ILabelsRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IList<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<List<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("AddLabelAsync - LabelId: {LabelId}, UserId: {UserId}", label.Id, userId);
         try
@@ -219,7 +219,7 @@ public class LabelsRepository : ILabelsRepository
         }
     }
 
-    public async Task<IList<LabelEntity>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<List<LabelEntity>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetAllLabelsAsync - UserId: {UserId}", userId);
         try
@@ -239,7 +239,7 @@ public class LabelsRepository : ILabelsRepository
         }
     }
 
-    public async Task<IList<LabelEntity>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<List<LabelEntity>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetLabelsBySnapshotIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try

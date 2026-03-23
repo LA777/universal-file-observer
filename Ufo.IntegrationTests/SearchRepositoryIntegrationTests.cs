@@ -69,12 +69,12 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().NotBeEmpty();
-            result.Files.Should().Contain(f => f.Name.Contains("file1"));
-            result.Folders.Should().BeEmpty();
+            files.Should().NotBeEmpty();
+            files.Should().Contain(f => f.Name.Contains("file1"));
+            folders.Should().BeEmpty();
         }
 
         [Theory]
@@ -96,12 +96,13 @@ namespace Ufo.IntegrationTests
             };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Should().NotBeNull();
-            result.Files.Should().BeEmpty("because an empty query should not match any files");
-            result.Folders.Should().BeEmpty("because an empty query should not match any folders");
+            files.Should().NotBeNull();
+            folders.Should().NotBeNull();
+            files.Should().BeEmpty("because an empty query should not match any files");
+            folders.Should().BeEmpty("because an empty query should not match any folders");
         }
 
         [Fact]
@@ -114,11 +115,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "nonexistent", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().BeEmpty();
-            result.Folders.Should().BeEmpty();
+            files.Should().BeEmpty();
+            folders.Should().BeEmpty();
         }
 
         [Fact]
@@ -131,11 +132,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "fil", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().NotBeEmpty();
-            result.Files.Should().AllSatisfy(f => f.Name.Contains("fil"));
+            files.Should().NotBeEmpty();
+            files.Should().AllSatisfy(f => f.Name.Contains("fil"));
         }
 
         [Fact]
@@ -148,11 +149,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "file", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().NotBeEmpty();
-            result.Files.Count.Should().BeGreaterThanOrEqualTo(3);
+            files.Should().NotBeEmpty();
+            files.Count.Should().BeGreaterThanOrEqualTo(3);
         }
 
         #endregion
@@ -169,12 +170,12 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "Documents", IncludeFiles = false, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Folders.Should().NotBeEmpty();
-            result.Folders.Should().Contain(f => f.Name.Contains("Documents"));
-            result.Files.Should().BeEmpty();
+            folders.Should().NotBeEmpty();
+            folders.Should().Contain(f => f.Name.Contains("Documents"));
+            files.Should().BeEmpty();
         }
 
         [Fact]
@@ -187,15 +188,15 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "document", IncludeFiles = false, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Folders.Should().NotBeEmpty();
-            result.Folders.Should().HaveCount(2);
-            var names = result.Folders.Select(f => f.Name).ToList();
+            folders.Should().NotBeEmpty();
+            folders.Should().HaveCount(2);
+            var names = folders.Select(f => f.Name).ToList();
             names.Should().Contain("Documents");
             names.Should().Contain("SubDocuments");
-            result.Folders.Should().AllSatisfy(f =>
+            folders.Should().AllSatisfy(f =>
             {
                 f.Name.Should().Contain("Document");
             });
@@ -211,11 +212,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "folder", IncludeFiles = false, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Folders.Should().HaveCount(50);
-            result.Folders.Should().AllSatisfy(f =>
+            folders.Should().HaveCount(50);
+            folders.Should().AllSatisfy(f =>
             {
                 f.Name.Should().Contain("Folder");
             });
@@ -235,12 +236,13 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "Doc", IncludeFiles = true, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Should().NotBeNull();
+            folders.Should().NotBeNull();
+            files.Should().NotBeNull();
             // Should return results for both files and folders
-            (result.Files.Count + result.Folders.Count).Should().BeGreaterThan(0);
+            (files.Count + folders.Count).Should().BeGreaterThan(0);
         }
 
         [Fact]
@@ -253,11 +255,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "xyz123", IncludeFiles = true, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().BeEmpty();
-            result.Folders.Should().BeEmpty();
+            files.Should().BeEmpty();
+            folders.Should().BeEmpty();
         }
 
         [Fact]
@@ -270,12 +272,13 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "document", IncludeFiles = true, IncludeFolders = true };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Should().NotBeNull();
+            folders.Should().NotBeNull();
+            files.Should().NotBeNull();
             // Should find files and/or folders matching "document"
-            (result.Files.Count + result.Folders.Count).Should().BeGreaterThan(0);
+            (files.Count + folders.Count).Should().BeGreaterThan(0);
         }
 
         #endregion
@@ -292,10 +295,10 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "FILE", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert - SQLite FTS is typically case-insensitive
-            result.Files.Should().NotBeEmpty();
+            files.Should().NotBeEmpty();
         }
 
         [Fact]
@@ -311,12 +314,12 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "file", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().NotBeEmpty();
+            files.Should().NotBeEmpty();
             // Each file should have snapshots associated
-            result.Files.Should().AllSatisfy(f => f.Snapshots.Should().NotBeEmpty());
+            files.Should().AllSatisfy(f => f.Snapshots.Should().NotBeEmpty());
         }
 
         [Fact]
@@ -330,8 +333,9 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = ".", IncludeFiles = true, IncludeFolders = false };
 
             // Act & Assert - Should not throw
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
-            result.Should().NotBeNull();
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            folders.Should().NotBeNull();
+            files.Should().NotBeNull();
         }
 
         [Fact]
@@ -349,10 +353,10 @@ namespace Ufo.IntegrationTests
             };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
-            result.Files.Should().BeEmpty();
+            files.Should().BeEmpty();
         }
 
         [Fact]
@@ -369,11 +373,11 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert
             // Should return the same file with multiple snapshots, not duplicated
-            var file1Results = result.Files.Where(f => f.Name.Contains("file1")).ToList();
+            var file1Results = files.Where(f => f.Name.Contains("file1")).ToList();
             file1Results.Should().HaveCount(1);
             file1Results.First().Snapshots.Should().HaveCount(2);
         }
@@ -394,13 +398,14 @@ namespace Ufo.IntegrationTests
             var stopwatch = Stopwatch.StartNew();
 
             // Act
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             stopwatch.Stop();
 
             // Assert
             Assert.True(stopwatch.ElapsedMilliseconds < 5000, $"Search took {stopwatch.ElapsedMilliseconds}ms");
-            result.Should().NotBeNull();
+            folders.Should().NotBeNull();
+            files.Should().NotBeNull();
         }
 
         #endregion
@@ -429,21 +434,21 @@ namespace Ufo.IntegrationTests
             var searchRequest = new SearchRequest { Query = "file1", IncludeFiles = true, IncludeFolders = false };
 
             // Act - Search as first user
-            var result1 = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders1, files1) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
             // Act - Search as second user
-            var result2 = await _searchRepository.SearchAsync(searchRequest, secondUser.Id);
+            var (folders2, files2) = await _searchRepository.SearchAsync(searchRequest, secondUser.Id);
 
             // Assert
-            result1.Files.Count.Should().Be(1);
-            result2.Files.Count.Should().Be(1);
+            files1.Count.Should().Be(1);
+            files2.Count.Should().Be(1);
 
             // Verify that each user only sees their own files
-            result1.Files.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
-            result2.Files.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
+            files1.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
+            files2.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
 
             // Verify results are different (different file IDs from different users)
-            var result1Ids = result1.Files.Select(f => f.Id).ToHashSet();
-            var result2Ids = result2.Files.Select(f => f.Id).ToHashSet();
+            var result1Ids = files1.Select(f => f.Id).ToHashSet();
+            var result2Ids = files2.Select(f => f.Id).ToHashSet();
             result1Ids.Intersect(result2Ids).Should().BeEmpty("because different users should have different file instances");
         }
 
@@ -527,10 +532,10 @@ namespace Ufo.IntegrationTests
                 IncludeFiles = true,
                 IncludeFolders = false
             };
-            var result = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders, files) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
 
             // Assert - User 1 should get no results
-            result.Files.Should().BeEmpty("because User 1 should not be able to see User 2's files");
+            files.Should().BeEmpty("because User 1 should not be able to see User 2's files");
         }
 
         [Fact]
@@ -560,20 +565,20 @@ namespace Ufo.IntegrationTests
             };
 
             // Act
-            var result1 = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
-            var result2 = await _searchRepository.SearchAsync(searchRequest, secondUser.Id);
+            var (folders1, files1) = await _searchRepository!.SearchAsync(searchRequest, testUser.Id);
+            var (folders2, files2) = await _searchRepository!.SearchAsync(searchRequest, secondUser.Id);
 
             // Assert
-            result1.Folders.Should().NotBeEmpty();
-            result2.Folders.Should().NotBeEmpty();
+            folders1.Should().NotBeEmpty();
+            folders2.Should().NotBeEmpty();
 
             // Each user should only see their own folders
-            result1.Folders.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
-            result2.Folders.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
+            folders1.Should().AllSatisfy(f => f.UserId.Should().Be(testUser.Id));
+            folders2.Should().AllSatisfy(f => f.UserId.Should().Be(secondUser.Id));
 
             // Folder IDs should be different
-            var result1Ids = result1.Folders.Select(f => f.Id).ToHashSet();
-            var result2Ids = result2.Folders.Select(f => f.Id).ToHashSet();
+            var result1Ids = folders1.Select(f => f.Id).ToHashSet();
+            var result2Ids = folders2.Select(f => f.Id).ToHashSet();
             result1Ids.Intersect(result2Ids).Should().BeEmpty("because different users should have different folder instances");
         }
 
@@ -910,7 +915,10 @@ namespace Ufo.IntegrationTests
                         Size = random.Next(100, 1000),
                         Sha256Hash = $"hash_{folderCount}_{i}",
                         UserId = testUser.Id,
-                        User = testUser
+                        User = testUser,
+                        CreatedAt = DateTime.UtcNow.AddMinutes(-random.Next(0, 1000)).ToString("o"),
+                        UpdatedAt = DateTime.UtcNow.AddMinutes(-random.Next(0, 1000)).ToString("o"),
+                        IsHidden = false
                     };
 
                     currentFolder.ChildFolders.Add(newFolder);
@@ -925,7 +933,10 @@ namespace Ufo.IntegrationTests
                             Size = random.Next(10, 500),
                             Sha256Hash = $"filehash_{folderCount}_{i}_{j}",
                             UserId = testUser.Id,
-                            User = testUser
+                            User = testUser,
+                            CreatedAt = DateTime.UtcNow.AddMinutes(-random.Next(0, 1000)).ToString("o"),
+                            UpdatedAt = DateTime.UtcNow.AddMinutes(-random.Next(0, 1000)).ToString("o"),
+                            IsHidden = false
                         };
 
                         newFolder.Files.Add(file);

@@ -5,9 +5,9 @@ namespace Ufo.Abstractions.Database.Repositories;
 
 public interface ILabelsRepository
 {
-    public Task<IList<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default);
-    public Task<IList<LabelEntity>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken = default);
-    public Task<IList<LabelEntity>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
+    public Task<List<ServerResult>> AddLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default);
+    public Task<List<LabelEntity>> GetAllLabelsAsync(Ulid userId, CancellationToken cancellationToken = default);
+    public Task<List<LabelEntity>> GetLabelsBySnapshotIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
     public Task<ServerResult> UpdateLabelAsync(LabelRequest label, Ulid userId, CancellationToken cancellationToken = default);
     public Task<ServerResult> AddLabelToSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
     public Task<ServerResult> RemoveLabelFromSnapshotAsync(Ulid labelId, Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);

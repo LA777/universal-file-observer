@@ -6,6 +6,7 @@ namespace Ufo.Abstractions.Requests
 {
     public record LabelRequest
     {
+        // TODO LA - Consider merging with LabelResponse and using it for both request and response, as they are very similar. If we do that, we should rename it to LabelDto or something like that.
         [JsonConverter(typeof(UlidJsonConverter))]
         [JsonPropertyOrder(0)]
         public Ulid Id { get; set; } = Ulid.NewUlid();

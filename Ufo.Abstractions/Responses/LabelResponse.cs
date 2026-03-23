@@ -1,9 +1,12 @@
-﻿using System.Text.Json.Serialization;
+﻿using Cysharp.Serialization.Json;
+using System.Text.Json.Serialization;
 
 namespace Ufo.Abstractions.Responses
 {
     public record LabelResponse
     {
+        // TODO LA - Rename to LabelDto
+        [JsonConverter(typeof(UlidJsonConverter))]
         [JsonPropertyOrder(0)]
         public Ulid Id { get; set; }
 

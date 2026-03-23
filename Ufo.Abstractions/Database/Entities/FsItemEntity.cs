@@ -13,14 +13,23 @@ public abstract class FsItemEntity: EntityWithUserAndNameAndIdBase
     [MaxLength(128)]
     public string Sha256Hash { get; set; } = string.Empty;
 
-    [Ignore]
-    public string? FullPath { get; set; }
+    public bool IsHidden { get; set; } = false;
 
-    [JsonPropertyOrder(4)]
-    [Ignore]
-    public bool HasParent { get; set; }
+    [MaxLength(64)] // TODO LA - Update tests to cover this field. Verify MaxLength.
+    public string CreatedAt { get; set; } = string.Empty;
 
-    [JsonPropertyOrder(5)]
-    [Ignore]
-    public bool IsHidden { get; set; }
+    [MaxLength(64)] // TODO LA - Update tests to cover this field. Verify MaxLength.
+    public string UpdatedAt { get; set; } = string.Empty;
+
+    // TODO LA - remove this code
+    //[Ignore]
+    //public string? FullPath { get; set; }
+
+    //[JsonPropertyOrder(4)]
+    //[Ignore]
+    //public bool HasParent { get; set; }
+
+    // [JsonPropertyOrder(5)]
+    //[Ignore]
+    //public bool IsHidden { get; set; }
 }

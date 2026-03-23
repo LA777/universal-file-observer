@@ -85,6 +85,9 @@ public class SqlScripts
             Name                      TEXT NOT NULL,
             Size                      REAL NOT NULL,
             Sha256Hash                TEXT NOT NULL,
+            CreatedAt                 TEXT NOT NULL,
+            UpdatedAt                 TEXT NOT NULL,
+            IsHidden                  INTEGER DEFAULT 0 CHECK (IsHidden IN (0,1)),
             UserId                    TEXT NOT NULL,
 
             CONSTRAINT FK_Folders_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
@@ -107,6 +110,9 @@ public class SqlScripts
             Size                      REAL NOT NULL,
             FileExtension             TEXT NOT NULL,
             Sha256Hash                TEXT NOT NULL,
+            CreatedAt                 TEXT NOT NULL,
+            UpdatedAt                 TEXT NOT NULL,
+            IsHidden                  INTEGER DEFAULT 0 CHECK (IsHidden IN (0,1)),
             UserId                    TEXT NOT NULL,
 
             CONSTRAINT FK_Files_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
@@ -215,16 +221,16 @@ public class SqlScripts
     public const string SelectFoldersByNameSql = "SELECT * FROM Folders " +
                                                     "WHERE Name = @Name AND UserId = @UserId;";
     public const string InsertFolderSql = "INSERT INTO Folders " +
-                                            "(Id, Name, Size, Sha256Hash, UserId) " +
+                                            "(Id, Name, Size, Sha256Hash, UserId, CreatedAt, UpdatedAt, IsHidden) " +
                                             "VALUES " +
-                                            "(@Id, @Name, @Size, @Sha256Hash, @UserId)";
+                                            "(@Id, @Name, @Size, @Sha256Hash, @UserId, @CreatedAt, @UpdatedAt, @IsHidden)";
     public const string UpdateFolderHashSql = "UPDATE Folders " +
                                                 "SET Sha256Hash = @Sha256Hash " +
                                                 "WHERE Id = @Id;";
     public const string InsertFileSql = "INSERT INTO Files " +
-                                            "(Id, Name, Size, FileExtension,Sha256Hash, UserId) " +
+                                            "(Id, Name, Size, FileExtension,Sha256Hash, UserId, CreatedAt, UpdatedAt, IsHidden) " +
                                             "VALUES " +
-                                            "(@Id, @Name, @Size, @FileExtension, @Sha256Hash, @UserId)";
+                                            "(@Id, @Name, @Size, @FileExtension, @Sha256Hash, @UserId, @CreatedAt, @UpdatedAt, @IsHidden)";
     public const string SelectFilesByNameAndExtensionSql = "SELECT * FROM Files " +
                                                                 "WHERE Name = @Name " +
                                                                 "AND FileExtension = @FileExtension " +

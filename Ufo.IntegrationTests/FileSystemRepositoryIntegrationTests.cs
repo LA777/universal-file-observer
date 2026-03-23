@@ -280,9 +280,6 @@ namespace Ufo.IntegrationTests
             Assert.Equal(originalFolderCount, retrievedFolderCount);
             Assert.Equal(originalFileCount, retrievedFileCount);
 
-            var jsonOriginal = System.Text.Json.JsonSerializer.Serialize(snapshot);
-            var jsonRetrieved = System.Text.Json.JsonSerializer.Serialize(retrievedSnapshot);
-
             retrievedSnapshot.Should().BeEquivalentTo(snapshot, options =>
               options.ExcludingCircularReferences());
         }

@@ -55,6 +55,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 
 builder.Services.AddScoped<ILabelsService, LabelsService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ISearchService, SearchService>();
 
 builder.Services.AddScoped<IDbConnectionFactory, SqliteConnectionFactory>();
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();

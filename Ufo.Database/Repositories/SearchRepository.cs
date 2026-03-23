@@ -5,7 +5,6 @@ using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.Requests;
-using Ufo.Abstractions.Responses;
 
 namespace Ufo.Database.Repositories;
 
@@ -20,35 +19,34 @@ public class SearchRepository : ISearchRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<SearchResponse> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<(List<FsFolderEntity>, List<FsFileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", searchRequest.Query, userId);
 
-        var response = new SearchResponse();
+        //var response = new SearchResponse();
         if (string.IsNullOrWhiteSpace(searchRequest.Query))
         {
-            return response;
+            return ([], []);
         }
 
         var rawQuery = searchRequest.Query.Trim();
-
         var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
 
         try
         {
-            var tasks = new List<Task>();
+            var files = new List<FsFileEntity>();
+            var folders = new List<FsFolderEntity>();
             if (searchRequest.IncludeFiles)
             {
-                tasks.Add(PerformFileSearch(sqLiteConnection, rawQuery, userId, response));
+                files = await PerformFileSearchAsync(sqLiteConnection, rawQuery, userId);
             }
 
             if (searchRequest.IncludeFolders)
             {
-                tasks.Add(PerformFolderSearch(sqLiteConnection, rawQuery, userId, response));
+                folders = await PerformFolderSearchAsync(sqLiteConnection, rawQuery, userId);
             }
 
-            await Task.WhenAll(tasks);
-            return response;
+            return (folders, files);
         }
         catch (Exception ex)
         {
@@ -57,7 +55,7 @@ public class SearchRepository : ISearchRepository
         }
     }
 
-    private async Task PerformFileSearch(SqliteConnection sqLiteConnection, string query, Ulid userId, SearchResponse searchResponse)
+    private async Task<List<FsFileEntity>> PerformFileSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
     {
         var fileDictionary = new Dictionary<Ulid, FsFileEntity>();
 
@@ -72,17 +70,17 @@ public class SearchRepository : ISearchRepository
                 }
 
                 // Find or add snapshot to the file
-                var snapEntry = fileEntry.Snapshots.FirstOrDefault(s => s.Id == snapshot.Id);
-                if (snapEntry == null && snapshot != null)
+                var snapshotEntry = fileEntry.Snapshots.FirstOrDefault(s => s.Id == snapshot.Id);
+                if (snapshotEntry == null && snapshot != null)
                 {
-                    snapEntry = snapshot;
-                    fileEntry.Snapshots.Add(snapEntry);
+                    snapshotEntry = snapshot;
+                    fileEntry.Snapshots.Add(snapshotEntry);
                 }
 
                 // Add label to the snapshot
-                if (snapEntry != null && label != null && !snapEntry.Labels.Any(l => l.Id == label.Id))
+                if (snapshotEntry != null && label != null && !snapshotEntry.Labels.Any(l => l.Id == label.Id))
                 {
-                    snapEntry.Labels.Add(label);
+                    snapshotEntry.Labels.Add(label);
                 }
 
                 return fileEntry;
@@ -90,10 +88,10 @@ public class SearchRepository : ISearchRepository
             new { Query = query, UserId = userId },
             splitOn: "Id,Id");
 
-        searchResponse.Files = fileDictionary.Values.ToList();
+        return [.. fileDictionary.Values];
     }
 
-    private async Task PerformFolderSearch(SqliteConnection sqLiteConnection, string query, Ulid userId, SearchResponse searchResponse)
+    private async Task<List<FsFolderEntity>> PerformFolderSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
     {
         var folderDictionary = new Dictionary<Ulid, FsFolderEntity>();
 
@@ -107,16 +105,16 @@ public class SearchRepository : ISearchRepository
                     folderDictionary.Add(folderEntry.Id, folderEntry);
                 }
 
-                var snapEntry = folderEntry.Snapshots.FirstOrDefault(s => s.Id == snapshot.Id);
-                if (snapEntry == null && snapshot != null)
+                var snapshotEntry = folderEntry.Snapshots.FirstOrDefault(s => s.Id == snapshot.Id);
+                if (snapshotEntry == null && snapshot != null)
                 {
-                    snapEntry = snapshot;
-                    folderEntry.Snapshots.Add(snapEntry);
+                    snapshotEntry = snapshot;
+                    folderEntry.Snapshots.Add(snapshotEntry);
                 }
 
-                if (snapEntry != null && label != null && !snapEntry.Labels.Any(l => l.Id == label.Id))
+                if (snapshotEntry != null && label != null && !snapshotEntry.Labels.Any(l => l.Id == label.Id))
                 {
-                    snapEntry.Labels.Add(label);
+                    snapshotEntry.Labels.Add(label);
                 }
 
                 return folderEntry;
@@ -124,6 +122,6 @@ public class SearchRepository : ISearchRepository
             new { Query = query, UserId = userId },
             splitOn: "Id,Id");
 
-        searchResponse.Folders = folderDictionary.Values.ToList();
+        return [.. folderDictionary.Values];
     }       
 }
