@@ -7,7 +7,10 @@ namespace Ufo.Server.Mappers
     {
         public static FolderDto ToDto(this FolderEntity entity)
         {
-            if (entity == null) return null!;
+            if (entity == null)
+            {
+                return null!;
+            }
 
             var dto = new FolderDto
             {
@@ -23,6 +26,16 @@ namespace Ufo.Server.Mappers
                 IsHidden = entity.IsHidden
             };
 
+            foreach (var folder in entity.ChildFolders) // TODO LA - Check this is tests
+            {
+                dto.ChildFolders.Add(folder.ToDto());
+            }
+
+            foreach (var file in entity.Files) // TODO LA - Check this is tests
+            {
+                dto.Files.Add(file.ToDto());
+            }
+
             // Convert snapshots to SnapshotSummaryDto list
             if (entity.Snapshots != null)
             {
@@ -35,7 +48,7 @@ namespace Ufo.Server.Mappers
             return dto;
         }
 
-        public static List<FolderDto> ToDtoList(this List<FolderEntity> entity) =>
+        public static List<FolderDto> ToDtoList(this IList<FolderEntity> entity) =>
             entity.Select(ToDto).ToList();
     }
 }

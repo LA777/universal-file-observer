@@ -7,7 +7,7 @@ namespace Ufo.Server.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class WeatherForecastController : ControllerBase
+public class WeatherForecastController : ControllerBase // TODO LA - Remove this controller, it's just a template and not used in the app
 {
     private static readonly string[] Summaries =
     [

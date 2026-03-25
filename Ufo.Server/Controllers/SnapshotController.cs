@@ -7,6 +7,7 @@ using Ufo.Abstractions.DataProviders;
 using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
 using Ufo.Server.Attributes;
+using Ufo.Server.Mappers;
 
 namespace Ufo.Server.Controllers;
 
@@ -48,7 +49,7 @@ public class SnapshotController : ControllerBase
 
         _logger.LogInformation("LatestSnapshot retrieved from DB");
 
-        return Ok(latestSnapshot);
+        return Ok(latestSnapshot.ToDto());
     }
 
     [HttpGet("{snapshotId}")]
@@ -67,7 +68,7 @@ public class SnapshotController : ControllerBase
 
         _logger.LogInformation("Snapshot by Id retrieved from DB");
 
-        return Ok(snapshot);
+        return Ok(snapshot.ToDto());
     }
 
     [HttpGet("all")]
@@ -78,11 +79,11 @@ public class SnapshotController : ControllerBase
         var snapshots = await _repository.GetAllSnapshotsAsync(userId, cancellationToken);
         _logger.LogInformation("Snapshots retrieved from DB");
 
-        return Ok(snapshots);
+        return Ok(snapshots.ToSummaryDtoList());
     }
 
     [HttpPost("create")]
-    public async Task<string> CreateSnapshotAsync([FromBody] PathRequest folderPath, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateSnapshotAsync([FromBody] PathRequest folderPath, CancellationToken cancellationToken)
     {
         _logger.LogInformation("CreateSnapshotAsync");
         var userId = HttpContext.GetUserIdAsUlid();
@@ -100,8 +101,7 @@ public class SnapshotController : ControllerBase
         await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);
         _logger.LogInformation("Snapshot saved to DB");
 
-        // TODO LA - Return OK(snapshot)
-        return "Snapshot created successfully.";
+        return Ok(snapshot.ToSummaryDto()); // TODO LA - Check front end.
     }
 
     [HttpDelete("delete/{id}")]

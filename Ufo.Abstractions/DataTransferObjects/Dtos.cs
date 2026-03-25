@@ -63,9 +63,18 @@ public class LabelDto : DtoWithUserIdAndNameAndIdBase
     public List<Ulid> SnapshotIds { get; set; } = [];
 }
 
-public class Pc : DtoWithUserIdAndNameAndIdBase
+public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
     public string? DeviceId { get; set; }
+
+    // TODO LA - Consider adding these fields
+    //[JsonPropertyOrder(80)]
+    //[JsonIgnore]
+    //public List<StorageDriveEntity> StorageDrives { get; set; } = [];
+
+    //[JsonPropertyOrder(90)]
+    //[JsonIgnore]
+    //public List<SnapshotEntity> Snapshots { get; set; } = [];
 }
 
 public class StorageDriveDto : DtoWithUserIdAndNameAndIdBase
@@ -89,7 +98,7 @@ public class StorageDriveDto : DtoWithUserIdAndNameAndIdBase
     public string InterfaceType { get; set; } = string.Empty;
 
     [JsonPropertyOrder(40)]
-    public List<Pc> Pcs { get; set; } = [];
+    public List<PcDto> Pcs { get; set; } = [];
 }
 
 public class VolumeDto : DtoWithUserIdAndIdBase
@@ -123,6 +132,8 @@ public class VolumeInfoDto : DtoWithUserIdAndIdBase
 
     [JsonPropertyOrder(100)]
     public VolumeDto? Volume { get; set; }
+
+    // TODO LA - Consider adding more volume info fields here, such as FileSystemType, TotalSize, UsedSpace etc.
 }
 
 public class FileDto : FsItemDto
@@ -156,7 +167,7 @@ public class SnapshotSummaryDto : DtoWithUserIdAndIdBase
     public DateTimeOffset Timestamp { get; set; }
 
     [JsonPropertyOrder(6)]
-    public string? Description { get; set; }
+    public string? Description { get; set; }   
 
     [JsonPropertyOrder(99)]
     public List<LabelDto> Labels { get; set; } = [];
