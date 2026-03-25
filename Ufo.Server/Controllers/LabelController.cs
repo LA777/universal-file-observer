@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Ufo.Abstractions;
 using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
 using Ufo.Server.Attributes;
