@@ -109,16 +109,16 @@ public class SnapshotController : ControllerBase
     {
         _logger.LogInformation("DeleteSnapshotByIdAsync");
         var userId = HttpContext.GetUserIdAsUlid();
-        var result = await _repository.DeleteSnapshotByIdAsync(id, userId, cancellationToken);
+        var result = await _repository.DeleteSnapshotByIdAsync(snapshotId, userId, cancellationToken);
 
         switch (result)
         {
             case Abstractions.DatabaseActionResult.Success:
-                _logger.LogInformation("Snapshot {0} deleted in DB.", id);
-                return Ok($"Snapshot with Id: {id} was sucessfully deleted.");
+                _logger.LogInformation("Snapshot {0} deleted in DB.", snapshotId);
+                return Ok($"Snapshot with Id: {snapshotId} was sucessfully deleted.");
             case Abstractions.DatabaseActionResult.NotFound:
-                _logger.LogInformation("Snapshot {0} was not found.", id);
-                return NotFound($"Snapshot with Id: {id} was not found.");
+                _logger.LogInformation("Snapshot {0} was not found.", snapshotId);
+                return NotFound($"Snapshot with Id: {snapshotId} was not found.");
             default:
                 return BadRequest();
         }
