@@ -5,7 +5,7 @@ namespace Ufo.Server.Mappers
 { // TODO LA - Cover with Unit tests  
     public static class FileMapper
     {
-        public static FileDto ToDto(this FsFileEntity entity)
+        public static FileDto ToDto(this FileEntity entity)
         {
             if (entity == null) return null!;
 
@@ -36,7 +36,7 @@ namespace Ufo.Server.Mappers
             return dto;
         }
 
-        public static List<FileDto> ToDtoList(this List<FsFileEntity> entity) =>
+        public static List<FileDto> ToDtoList(this List<FileEntity> entity) =>
             entity.Select(ToDto).ToList();
 
     }

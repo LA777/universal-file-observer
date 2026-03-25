@@ -15,8 +15,8 @@ public class SnapshotEntity : EntityWithUserAndIdBase
     public string? Description { get; set; }    
 
     [JsonPropertyOrder(15)]
-    [OneToOne(nameof(FsFolderEntity))]
-    public FsFolderEntity? RootFolder { get; set; }
+    [OneToOne(nameof(FolderEntity))]
+    public FolderEntity? RootFolder { get; set; }
 
     [JsonPropertyOrder(20)]
     [OneToOne(nameof(VolumeInfoEntity))]

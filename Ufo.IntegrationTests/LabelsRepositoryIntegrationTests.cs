@@ -1388,7 +1388,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder = new FsFolderEntity
+            var rootFolder = new FolderEntity
             {
                 Name = "Root",
                 Size = 0,

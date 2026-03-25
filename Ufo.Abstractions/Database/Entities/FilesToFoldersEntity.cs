@@ -13,10 +13,10 @@ public class FilesToFoldersEntity
     public Ulid SnapshotId { get; set; }
 
     [JsonConverter(typeof(UlidJsonConverter))]
-    [ForeignKey(typeof(FsFolderEntity))]
+    [ForeignKey(typeof(FolderEntity))]
     public Ulid FolderId { get; set; }
 
     [JsonConverter(typeof(UlidJsonConverter))]
-    [ForeignKey(typeof(FsFileEntity))]
+    [ForeignKey(typeof(FileEntity))]
     public Ulid FileId { get; set; }
 }

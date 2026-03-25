@@ -5,5 +5,5 @@ namespace Ufo.Abstractions.Database.Repositories;
 
 public interface ISearchRepository
 {
-    public Task<(List<FsFolderEntity>, List<FsFileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default);
+    public Task<(List<FolderEntity>, List<FileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default);
 }

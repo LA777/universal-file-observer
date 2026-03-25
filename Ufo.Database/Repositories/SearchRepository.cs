@@ -19,7 +19,7 @@ public class SearchRepository : ISearchRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<(List<FsFolderEntity>, List<FsFileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<(List<FolderEntity>, List<FileEntity>)> SearchAsync(SearchRequest searchRequest, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", searchRequest.Query, userId);
 
@@ -34,8 +34,8 @@ public class SearchRepository : ISearchRepository
 
         try
         {
-            var files = new List<FsFileEntity>();
-            var folders = new List<FsFolderEntity>();
+            var files = new List<FileEntity>();
+            var folders = new List<FolderEntity>();
             if (searchRequest.IncludeFiles)
             {
                 files = await PerformFileSearchAsync(sqLiteConnection, rawQuery, userId);
@@ -55,11 +55,11 @@ public class SearchRepository : ISearchRepository
         }
     }
 
-    private async Task<List<FsFileEntity>> PerformFileSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
+    private async Task<List<FileEntity>> PerformFileSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
     {
-        var fileDictionary = new Dictionary<Ulid, FsFileEntity>();
+        var fileDictionary = new Dictionary<Ulid, FileEntity>();
 
-        await sqLiteConnection.QueryAsync<FsFileEntity, SnapshotEntity, LabelEntity, FsFileEntity>(
+        await sqLiteConnection.QueryAsync<FileEntity, SnapshotEntity, LabelEntity, FileEntity>(
             SqlScripts.SearchFilesByNameSql,
             (file, snapshot, label) =>
             {
@@ -91,11 +91,11 @@ public class SearchRepository : ISearchRepository
         return [.. fileDictionary.Values];
     }
 
-    private async Task<List<FsFolderEntity>> PerformFolderSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
+    private async Task<List<FolderEntity>> PerformFolderSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
     {
-        var folderDictionary = new Dictionary<Ulid, FsFolderEntity>();
+        var folderDictionary = new Dictionary<Ulid, FolderEntity>();
 
-        await sqLiteConnection.QueryAsync<FsFolderEntity, SnapshotEntity, LabelEntity, FsFolderEntity>(
+        await sqLiteConnection.QueryAsync<FolderEntity, SnapshotEntity, LabelEntity, FolderEntity>(
             SqlScripts.SearchFoldersByNameSql,
             (folder, snapshot, label) =>
             {

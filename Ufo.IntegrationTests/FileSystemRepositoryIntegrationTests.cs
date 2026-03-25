@@ -291,7 +291,7 @@ namespace Ufo.IntegrationTests
             // Snapshot 1 and Snapshot 2 will share the same files.
             // Count of files in DB should be 1 for each file after adding both snapshots.
             var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
-            var sharedFile = new FsFileEntity
+            var sharedFile = new FileEntity
             {
                 Name = "sharedfile",
                 FileExtension = ".txt",
@@ -349,7 +349,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "H:\\",
                 Size = 0,
@@ -399,7 +399,7 @@ namespace Ufo.IntegrationTests
             // Snapshot 1 and Snapshot 2 will share the same folder.
             // Count of folders in DB should be 1 after adding both snapshots.
             var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
-            var sharedFolder = new FsFolderEntity
+            var sharedFolder = new FolderEntity
             {
                 Name = "SharedFolder",
                 Size = 5000,
@@ -456,7 +456,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "I:\\",
                 Size = 0,
@@ -540,7 +540,7 @@ namespace Ufo.IntegrationTests
             // Arrange
             // Create snapshot 1 with unique folder structure
             var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
-            var sharedFolder = new FsFolderEntity
+            var sharedFolder = new FolderEntity
             {
                 Name = "SharedFolder",
                 Size = 100,
@@ -548,7 +548,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var uniqueFolder1 = new FsFolderEntity
+            var uniqueFolder1 = new FolderEntity
             {
                 Name = "UniqueFolder1",
                 Size = 200,
@@ -604,7 +604,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "D:\\",
                 Size = 0,
@@ -657,7 +657,7 @@ namespace Ufo.IntegrationTests
 
             // Unique folder should be deleted
             //await using var connection = new SqliteConnection(_connectionString);
-            var uniqueFolderExists = await _sqLiteConnection.QueryFirstOrDefaultAsync<FsFolderEntity>(
+            var uniqueFolderExists = await _sqLiteConnection.QueryFirstOrDefaultAsync<FolderEntity>(
                 "SELECT * FROM Folders WHERE Id = @Id",
                 new { Id = uniqueFolderId });
             uniqueFolderExists.Should().BeNull();
@@ -669,7 +669,7 @@ namespace Ufo.IntegrationTests
             // Arrange
             // Create snapshot 1 with shared and unique files
             var snapshot1 = CreateSnapshotWithSystemInfo(testUser.Id);
-            var sharedFile = new FsFileEntity
+            var sharedFile = new FileEntity
             {
                 Name = "shared",
                 FileExtension = ".txt",
@@ -678,7 +678,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var uniqueFile = new FsFileEntity
+            var uniqueFile = new FileEntity
             {
                 Name = "unique",
                 FileExtension = ".txt",
@@ -735,7 +735,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "E:\\",
                 Size = 0,
@@ -779,7 +779,7 @@ namespace Ufo.IntegrationTests
 
             // Unique file should be deleted
             //await using var connection = new SqliteConnection(_connectionString);
-            var uniqueFileExists = await _sqLiteConnection.QueryFirstOrDefaultAsync<FsFileEntity>(
+            var uniqueFileExists = await _sqLiteConnection.QueryFirstOrDefaultAsync<FileEntity>(
                 "SELECT * FROM Files WHERE Id = @Id",
                 new { Id = uniqueFileId });
             uniqueFileExists.Should().BeNull();
@@ -836,7 +836,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "F:\\",
                 Size = 0,
@@ -933,7 +933,7 @@ namespace Ufo.IntegrationTests
                 UserId = testUser.Id,
                 User = testUser
             };
-            var rootFolder2 = new FsFolderEntity
+            var rootFolder2 = new FolderEntity
             {
                 Name = "G:\\",
                 Size = 0,
@@ -1253,7 +1253,7 @@ namespace Ufo.IntegrationTests
                 UserId = userId,
                 User = null!
             };
-            var rootFolder = new FsFolderEntity
+            var rootFolder = new FolderEntity
             {
                 Name = "Root",
                 Size = 0,
@@ -1284,7 +1284,7 @@ namespace Ufo.IntegrationTests
             var snapshot = CreateSnapshotWithSimpleFolder(userId);
             var rootFolder = snapshot.RootFolder;
 
-            var childFolder1 = new FsFolderEntity
+            var childFolder1 = new FolderEntity
             {
                 Name = "ChildFolder1",
                 Size = 100,
@@ -1293,7 +1293,7 @@ namespace Ufo.IntegrationTests
                 User = null!
             };
 
-            var grandchildFolder = new FsFolderEntity
+            var grandchildFolder = new FolderEntity
             {
                 Name = "GrandchildFolder",
                 Size = 50,
@@ -1316,7 +1316,7 @@ namespace Ufo.IntegrationTests
             var snapshot = CreateSnapshotWithSimpleFolder(userId);
             var rootFolder = snapshot.RootFolder;
 
-            var file1 = new FsFileEntity
+            var file1 = new FileEntity
             {
                 Name = "file1",
                 FileExtension = ".txt",
@@ -1326,7 +1326,7 @@ namespace Ufo.IntegrationTests
                 User = null!
             };
 
-            var file2 = new FsFileEntity
+            var file2 = new FileEntity
             {
                 Name = "file2",
                 FileExtension = ".pdf",
@@ -1336,7 +1336,7 @@ namespace Ufo.IntegrationTests
                 User = null!
             };
 
-            var file3 = new FsFileEntity
+            var file3 = new FileEntity
             {
                 Name = "file3",
                 FileExtension = ".jpg",
@@ -1362,7 +1362,7 @@ namespace Ufo.IntegrationTests
             var snapshot = CreateSnapshotWithFiles(userId);
             var rootFolder = snapshot.RootFolder;
 
-            var folder1 = new FsFolderEntity
+            var folder1 = new FolderEntity
             {
                 Name = "Documents",
                 Size = 500,
@@ -1371,7 +1371,7 @@ namespace Ufo.IntegrationTests
                 User = null!
             };
 
-            var folder2 = new FsFolderEntity
+            var folder2 = new FolderEntity
             {
                 Name = "SubDocuments",
                 Size = 300,
@@ -1386,7 +1386,7 @@ namespace Ufo.IntegrationTests
             folder1.ChildFolders.Add(folder2);
             folder2.ParentFolders.Add(folder1);
 
-            var docFile = new FsFileEntity
+            var docFile = new FileEntity
             {
                 Name = "document",
                 FileExtension = ".docx",
@@ -1399,7 +1399,7 @@ namespace Ufo.IntegrationTests
             folder1.Files.Add(docFile);
             docFile.ParentFolders.Add(folder1);
 
-            var subDocFile = new FsFileEntity
+            var subDocFile = new FileEntity
             {
                 Name = "subdocument",
                 FileExtension = ".doc",
@@ -1459,7 +1459,7 @@ namespace Ufo.IntegrationTests
                 UserId = userId,
                 User = null!
             };
-            var rootFolder = new FsFolderEntity
+            var rootFolder = new FolderEntity
             {
                 Name = "C:\\",
                 Size = 0,
@@ -1491,7 +1491,7 @@ namespace Ufo.IntegrationTests
             var rootFolder = snapshot.RootFolder;
 
             var random = new Random(42);
-            var folders = new Queue<FsFolderEntity>();
+            var folders = new Queue<FolderEntity>();
             folders.Enqueue(rootFolder!);
 
             int folderCount = 0;
@@ -1500,7 +1500,7 @@ namespace Ufo.IntegrationTests
                 var currentFolder = folders.Dequeue();
                 for (int i = 0; i < 3; i++)
                 {
-                    var newFolder = new FsFolderEntity
+                    var newFolder = new FolderEntity
                     {
                         Name = $"Folder_{folderCount}_{i}",
                         Size = random.Next(100, 1000),
@@ -1514,7 +1514,7 @@ namespace Ufo.IntegrationTests
 
                     for (int j = 0; j < 5; j++)
                     {
-                        var file = new FsFileEntity
+                        var file = new FileEntity
                         {
                             Name = $"File_{folderCount}_{i}_{j}",
                             FileExtension = ".txt",
@@ -1540,7 +1540,7 @@ namespace Ufo.IntegrationTests
             return snapshot;
         }
 
-        private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
+        private void SortFoldersAndFilesRecursively(FolderEntity folderEntity)
         {
             // Sort child folders by name
             folderEntity.ChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
@@ -1555,10 +1555,10 @@ namespace Ufo.IntegrationTests
             }
         }
 
-        private List<FsFolderEntity> GetAllFolders(FsFolderEntity rootFolder)
+        private List<FolderEntity> GetAllFolders(FolderEntity rootFolder)
         {
-            var allFolders = new List<FsFolderEntity> { rootFolder };
-            var queue = new Queue<FsFolderEntity>();
+            var allFolders = new List<FolderEntity> { rootFolder };
+            var queue = new Queue<FolderEntity>();
             queue.Enqueue(rootFolder);
 
             while (queue.Count > 0)
@@ -1574,7 +1574,7 @@ namespace Ufo.IntegrationTests
             return allFolders;
         }
 
-        private int GetTotalFileCount(FsFolderEntity folder)
+        private int GetTotalFileCount(FolderEntity folder)
         {
             int count = folder.Files.Count;
             foreach (var childFolder in folder.ChildFolders)

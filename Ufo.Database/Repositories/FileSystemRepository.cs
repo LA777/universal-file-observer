@@ -37,13 +37,13 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<IEnumerable<FsFileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<FileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetFilesByNameAndExtensionAsync - UserId: {UserId}", userId);
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var fileEntities = await sqLiteConnection.QueryAsync<FsFileEntity>(SqlScripts.SelectFilesByNameAndExtensionSql, new { Name = name, FileExtension = extension });
+            var fileEntities = await sqLiteConnection.QueryAsync<FileEntity>(SqlScripts.SelectFilesByNameAndExtensionSql, new { Name = name, FileExtension = extension });
 
             return fileEntities;
         }
@@ -54,13 +54,13 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    public async Task<IEnumerable<FsFolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<FolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetFoldersByNameAsync - UserId: {UserId}", userId);
         try
         {
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var folderEntities = await sqLiteConnection.QueryAsync<FsFolderEntity>(SqlScripts.SelectFoldersByNameSql, new { Name = name });
+            var folderEntities = await sqLiteConnection.QueryAsync<FolderEntity>(SqlScripts.SelectFoldersByNameSql, new { Name = name });
 
             return folderEntities;
         }
@@ -115,13 +115,13 @@ public class FileSystemRepository : IFileSystemRepository
                 throw new ArgumentNullException(nameof(snapshotResult));
             }
 
-            FsFolderEntity? currentFolder = null;
-            var folders = new Dictionary<Ulid, FsFolderEntity>();
-            var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
+            FolderEntity? currentFolder = null;
+            var folders = new Dictionary<Ulid, FolderEntity>();
+            var childFolders = new Dictionary<Ulid, IList<FolderEntity>>();
             var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
 
             await sqLiteConnection
-                .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
+                .QueryAsync<FolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FileEntity, FolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
                     (fsFolderEntity, foldersToFoldersEntity, filesToFoldersEntity, fsFileEntity) =>
                     {
@@ -174,7 +174,7 @@ public class FileSystemRepository : IFileSystemRepository
                                 }
                                 else
                                 {
-                                    childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FsFolderEntity> { fsFolderEntity });
+                                    childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FolderEntity> { fsFolderEntity });
                                 }
                             }
 
@@ -270,13 +270,13 @@ public class FileSystemRepository : IFileSystemRepository
                 return null;
             }
 
-            FsFolderEntity? currentFolder = null;
-            var folders = new Dictionary<Ulid, FsFolderEntity>();
-            var childFolders = new Dictionary<Ulid, IList<FsFolderEntity>>();
+            FolderEntity? currentFolder = null;
+            var folders = new Dictionary<Ulid, FolderEntity>();
+            var childFolders = new Dictionary<Ulid, IList<FolderEntity>>();
             var processedFolderIds = new HashSet<Ulid>(); // Track folders already processed for relationships
 
             await sqLiteConnection
-                .QueryAsync<FsFolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FsFileEntity, FsFolderEntity>(
+                .QueryAsync<FolderEntity, FoldersToFoldersEntity, FilesToFoldersEntity, FileEntity, FolderEntity>(
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
                     (fsFolderEntity, foldersToFoldersEntity, filesToFoldersEntity, fsFileEntity) =>
                     {
@@ -333,7 +333,7 @@ public class FileSystemRepository : IFileSystemRepository
                                     }
                                     else
                                     {
-                                        childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FsFolderEntity> { fsFolderEntity });
+                                        childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FolderEntity> { fsFolderEntity });
                                     }
                                 }
                             }                            
@@ -395,7 +395,7 @@ public class FileSystemRepository : IFileSystemRepository
 
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             await sqLiteConnection
-            .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcEntity, FsFolderEntity, SnapshotEntity>(
+            .QueryAsync<SnapshotEntity, VolumeInfoEntity, VolumeEntity, StorageDriveEntity, PcEntity, FolderEntity, SnapshotEntity>(
                 SqlScripts.SelectSnapshotsWithSystemInfoSql,
                 (snapshotEntity, volumeInfoEntity, volumeEntity, storageDriveEntity, pcEntity, fsFolderEntity) =>
                 {
@@ -634,11 +634,11 @@ public class FileSystemRepository : IFileSystemRepository
         return 1;
     }
 
-    private async Task AddFolderWithFilesRecursivelyAsync(IDbConnection sqLiteConnection, Ulid userId, FsFolderEntity folderEntity, FsFolderEntity? parentFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task AddFolderWithFilesRecursivelyAsync(IDbConnection sqLiteConnection, Ulid userId, FolderEntity folderEntity, FolderEntity? parentFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
         { // check if Folder in DB
-            var folderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FsFolderEntity>(SqlScripts.SelectFolderByNameAndParentFolderPathAndStorageDriveIdSql,
+            var folderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FolderEntity>(SqlScripts.SelectFolderByNameAndParentFolderPathAndStorageDriveIdSql,
                 new { folderEntity.Name, folderEntity.Size, folderEntity.Sha256Hash, UserId = userId }, transaction);
 
             if (folderInDb == null) // Folder does not exist in DB
@@ -665,7 +665,7 @@ public class FileSystemRepository : IFileSystemRepository
             //var sortedFiles = folderEntity.Files.OrderBy(f => f.Name).ToList();
             foreach (var fileEntity in folderEntity.Files)
             { // check if File in DB
-                var fileInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FsFileEntity>(SqlScripts.SelectFileByNameAndParentFolderPathAndStorageDriveIdSql,
+                var fileInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FileEntity>(SqlScripts.SelectFileByNameAndParentFolderPathAndStorageDriveIdSql,
                     new { fileEntity.Name, fileEntity.Size, fileEntity.FileExtension, fileEntity.Sha256Hash, UserId = userId }, transaction);
 
                 if (fileInDb == null) // File does not exist in DB
@@ -689,7 +689,7 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    private async Task BindFolderWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, FsFolderEntity? parentFolderEntity, FsFolderEntity childFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task BindFolderWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, FolderEntity? parentFolderEntity, FolderEntity childFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
         {
@@ -710,7 +710,7 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    private async Task BindFileWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, FsFolderEntity folderEntity, FsFileEntity fileEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    private async Task BindFileWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, FolderEntity folderEntity, FileEntity fileEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
         {
@@ -784,7 +784,7 @@ public class FileSystemRepository : IFileSystemRepository
         }
     }
 
-    private void SortFoldersAndFilesRecursively(FsFolderEntity folderEntity)
+    private void SortFoldersAndFilesRecursively(FolderEntity folderEntity)
     {
         if (folderEntity is null)
         {

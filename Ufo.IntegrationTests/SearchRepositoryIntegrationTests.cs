@@ -494,9 +494,9 @@ namespace Ufo.IntegrationTests
                 User = secondUser
             };
             var volumeInfo2 = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = secondUser.Id, User = secondUser };
-            var rootFolder2 = new FsFolderEntity { Name = "Root2", Size = 0, Sha256Hash = "root2", UserId = secondUser.Id, User = secondUser };
+            var rootFolder2 = new FolderEntity { Name = "Root2", Size = 0, Sha256Hash = "root2", UserId = secondUser.Id, User = secondUser };
 
-            var uniqueFile = new FsFileEntity
+            var uniqueFile = new FileEntity
             {
                 Name = "secretfile_user2",
                 FileExtension = ".txt",
@@ -613,11 +613,11 @@ namespace Ufo.IntegrationTests
                 User = testUser
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = testUser.Id, User = testUser };
 
-            var file1 = new FsFileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = testUser.Id, User = testUser };
-            var file2 = new FsFileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = testUser.Id, User = testUser };
-            var file3 = new FsFileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = testUser.Id, User = testUser };
+            var file1 = new FileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = testUser.Id, User = testUser };
+            var file2 = new FileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = testUser.Id, User = testUser };
+            var file3 = new FileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = testUser.Id, User = testUser };
 
             rootFolder.Files.Add(file1);
             rootFolder.Files.Add(file2);
@@ -670,11 +670,11 @@ namespace Ufo.IntegrationTests
                 User = user
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = user.Id, User = user };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = user.Id, User = user };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "abc123", UserId = user.Id, User = user };
 
-            var file1 = new FsFileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = user.Id, User = user };
-            var file2 = new FsFileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = user.Id, User = user };
-            var file3 = new FsFileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = user.Id, User = user };
+            var file1 = new FileEntity { Name = "file1", FileExtension = ".txt", Size = 100, Sha256Hash = "hash1", UserId = user.Id, User = user };
+            var file2 = new FileEntity { Name = "file2", FileExtension = ".pdf", Size = 200, Sha256Hash = "hash2", UserId = user.Id, User = user };
+            var file3 = new FileEntity { Name = "file3", FileExtension = ".docx", Size = 300, Sha256Hash = "hash3", UserId = user.Id, User = user };
 
             rootFolder.Files.Add(file1);
             rootFolder.Files.Add(file2);
@@ -727,10 +727,10 @@ namespace Ufo.IntegrationTests
                 User = testUser
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
-            var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
-            var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = testUser.Id, User = testUser };
+            var folder1 = new FolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
+            var folder2 = new FolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = testUser.Id, User = testUser };
 
             rootFolder.ChildFolders.Add(folder1);
             folder1.ParentFolders.Add(rootFolder);
@@ -781,10 +781,10 @@ namespace Ufo.IntegrationTests
                 User = user
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = user.Id, User = user };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = user.Id, User = user };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = user.Id, User = user };
 
-            var folder1 = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = user.Id, User = user };
-            var folder2 = new FsFolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = user.Id, User = user };
+            var folder1 = new FolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = user.Id, User = user };
+            var folder2 = new FolderEntity { Name = "SubDocuments", Size = 300, Sha256Hash = "subdoc", UserId = user.Id, User = user };
 
             rootFolder.ChildFolders.Add(folder1);
             folder1.ParentFolders.Add(rootFolder);
@@ -835,20 +835,20 @@ namespace Ufo.IntegrationTests
                 User = testUser
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
             // Add folders
-            var documentsFolder = new FsFolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
+            var documentsFolder = new FolderEntity { Name = "Documents", Size = 500, Sha256Hash = "doc", UserId = testUser.Id, User = testUser };
             rootFolder.ChildFolders.Add(documentsFolder);
             documentsFolder.ParentFolders.Add(rootFolder);
 
             // Add files to folders
-            var docFile = new FsFileEntity { Name = "document.docx", FileExtension = ".docx", Size = 150, Sha256Hash = "docfile", UserId = testUser.Id, User = testUser };
+            var docFile = new FileEntity { Name = "document.docx", FileExtension = ".docx", Size = 150, Sha256Hash = "docfile", UserId = testUser.Id, User = testUser };
             documentsFolder.Files.Add(docFile);
             docFile.ParentFolders.Add(documentsFolder);
 
             // Add files to root
-            var textFile = new FsFileEntity { Name = "readme.txt", FileExtension = ".txt", Size = 100, Sha256Hash = "txtfile", UserId = testUser.Id, User = testUser };
+            var textFile = new FileEntity { Name = "readme.txt", FileExtension = ".txt", Size = 100, Sha256Hash = "txtfile", UserId = testUser.Id, User = testUser };
             rootFolder.Files.Add(textFile);
             textFile.ParentFolders.Add(rootFolder);
 
@@ -896,11 +896,11 @@ namespace Ufo.IntegrationTests
                 User = testUser
             };
             var volumeInfo = new VolumeInfoEntity { FreeSpace = 250000, DriveStatus = "OK", UserId = testUser.Id, User = testUser };
-            var rootFolder = new FsFolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
+            var rootFolder = new FolderEntity { Name = "Root", Size = 0, Sha256Hash = "root", UserId = testUser.Id, User = testUser };
 
             // Create many folders and files
             var random = new Random(42);
-            var folders = new Queue<FsFolderEntity>();
+            var folders = new Queue<FolderEntity>();
             folders.Enqueue(rootFolder);
 
             int folderCount = 0;
@@ -909,7 +909,7 @@ namespace Ufo.IntegrationTests
                 var currentFolder = folders.Dequeue();
                 for (int i = 0; i < 5; i++)
                 {
-                    var newFolder = new FsFolderEntity
+                    var newFolder = new FolderEntity
                     {
                         Name = $"Folder_{folderCount}_{i}",
                         Size = random.Next(100, 1000),
@@ -926,7 +926,7 @@ namespace Ufo.IntegrationTests
 
                     for (int j = 0; j < 3; j++)
                     {
-                        var file = new FsFileEntity
+                        var file = new FileEntity
                         {
                             Name = $"File_{folderCount}_{i}_{j}",
                             FileExtension = ".txt",

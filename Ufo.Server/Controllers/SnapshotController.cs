@@ -124,12 +124,12 @@ public class SnapshotController : ControllerBase
         }
     }
 
-    private FsFolderEntity CreateFolderTree(string path, SnapshotEntity snapshot, FsFolderEntity? parentFolder, UserEntity user)
+    private FolderEntity CreateFolderTree(string path, SnapshotEntity snapshot, FolderEntity? parentFolder, UserEntity user)
     {// TODO LA - move to a separate service
         _logger.LogInformation($"Indexing {path}");
         var directoryInfo = new DirectoryInfo(path);
 
-        var folder = new FsFolderEntity
+        var folder = new FolderEntity
         {
             Name = directoryInfo.Name,
             Sha256Hash = string.Empty,
@@ -154,7 +154,7 @@ public class SnapshotController : ControllerBase
         foreach (var filePath in Directory.EnumerateFiles(path))
         {
             var fileInfo = new FileInfo(filePath);
-            var file = new FsFileEntity
+            var file = new FileEntity
             {
                 Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
                 Size = fileInfo.Length,
@@ -177,7 +177,7 @@ public class SnapshotController : ControllerBase
         return folder;
     }
 
-    private static string GetFolderSha256Hash(FsFolderEntity folder)
+    private static string GetFolderSha256Hash(FolderEntity folder)
     {
         var sb = new StringBuilder();
         var orderedFiles = folder.Files.OrderBy(x => x.Name);

@@ -459,7 +459,7 @@ public class SearchController_ResultTests : IAsyncLifetime
     {
         await SearchSeeder.SeedFullAsync(_db, _userId, "report_q3");
 
-        var filesInDb = await _db.QueryAsync<FsFileEntity>("SELECT * FROM Files WHERE UserId = @UserId", new { UserId = _userId });
+        var filesInDb = await _db.QueryAsync<FileEntity>("SELECT * FROM Files WHERE UserId = @UserId", new { UserId = _userId });
 
         var response = await _client.PostAsJsonAsync(SearchTestConstants.ApiBase,
             new SearchRequest { Query = "report" });

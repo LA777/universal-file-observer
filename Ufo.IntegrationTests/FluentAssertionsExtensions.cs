@@ -67,8 +67,8 @@ namespace Ufo.IntegrationTests
         /// Configures equivalency options to exclude circular references in folder entities.
         /// Recursively excludes ParentFolders at all levels to handle nested folder hierarchies.
         /// </summary>
-        public static EquivalencyAssertionOptions<FsFolderEntity> ExcludingCircularReferences(
-            this EquivalencyAssertionOptions<FsFolderEntity> options)
+        public static EquivalencyAssertionOptions<FolderEntity> ExcludingCircularReferences(
+            this EquivalencyAssertionOptions<FolderEntity> options)
         {
             return options
                 .Excluding(x => x.ParentFolders)
@@ -79,8 +79,8 @@ namespace Ufo.IntegrationTests
         /// <summary>
         /// Configures equivalency options to exclude circular references in file entities.
         /// </summary>
-        public static EquivalencyAssertionOptions<FsFileEntity> ExcludingCircularReferences(
-            this EquivalencyAssertionOptions<FsFileEntity> options)
+        public static EquivalencyAssertionOptions<FileEntity> ExcludingCircularReferences(
+            this EquivalencyAssertionOptions<FileEntity> options)
         {
             return options
                 .Excluding(x => x.ParentFolders)

@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Ufo.Abstractions.Database.Entities;
 
 [Table("Folders")]
-public class FsFolderEntity : FsItemEntity // TODO LA - Rename to FileEntity
+public class FolderEntity : FsItemEntity
 {
     [JsonIgnore]
     [ManyToMany(typeof(FoldersToFoldersEntity))]
@@ -13,13 +13,13 @@ public class FsFolderEntity : FsItemEntity // TODO LA - Rename to FileEntity
 
     [JsonPropertyOrder(100)]
     [ManyToMany(typeof(FilesToFoldersEntity))]
-    public IList<FsFileEntity> Files { get; set; } = [];
+    public IList<FileEntity> Files { get; set; } = [];
 
     [JsonPropertyOrder(99)]
     [ManyToMany(typeof(FoldersToFoldersEntity))]
-    public  IList<FsFolderEntity> ChildFolders { get; set; } = [];
+    public  IList<FolderEntity> ChildFolders { get; set; } = [];
 
     [JsonIgnore]
     [ManyToMany(typeof(FoldersToFoldersEntity))]
-    public IList<FsFolderEntity> ParentFolders { get; set; } = [];
+    public IList<FolderEntity> ParentFolders { get; set; } = [];
 }
