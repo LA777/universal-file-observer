@@ -104,8 +104,8 @@ public class SnapshotController : ControllerBase
         return Ok(snapshot.ToSummaryDto()); // TODO LA - Check front end.
     }
 
-    [HttpDelete("delete/{id}")]
-    public async Task<IActionResult> DeleteSnapshotByIdAsync(Ulid id, CancellationToken cancellationToken)
+    [HttpDelete("delete/{snapshotId}")]
+    public async Task<IActionResult> DeleteSnapshotByIdAsync(Ulid snapshotId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("DeleteSnapshotByIdAsync");
         var userId = HttpContext.GetUserIdAsUlid();
