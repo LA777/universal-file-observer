@@ -17,7 +17,7 @@ namespace Ufo.IntegrationTests
         private Mock<ILogger<LabelsRepository>> _loggerMock;
         private Mock<IDbConnectionFactory> _dbConnectionFactoryMock;
         private SqliteConnection _sqLiteConnection;
-        private FileSystemRepository _fileSystemRepository;
+        private SnapshotRepository _fileSystemRepository;
         private LabelsRepository _labelsRepository;
 
         #region Database Initialization and Cleanup
@@ -34,8 +34,8 @@ namespace Ufo.IntegrationTests
                 .ReturnsAsync(() => _sqLiteConnection);
 
             _loggerMock = new Mock<ILogger<LabelsRepository>>();
-            var fileSystemSqLiteRepositoryLoggerMock = new Mock<ILogger<FileSystemRepository>>();
-            _fileSystemRepository = new FileSystemRepository(_dbConnectionFactoryMock.Object, fileSystemSqLiteRepositoryLoggerMock.Object);
+            var fileSystemSqLiteRepositoryLoggerMock = new Mock<ILogger<SnapshotRepository>>();
+            _fileSystemRepository = new SnapshotRepository(_dbConnectionFactoryMock.Object, fileSystemSqLiteRepositoryLoggerMock.Object);
 
             await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
             _labelsRepository = new LabelsRepository(_dbConnectionFactoryMock.Object, _loggerMock.Object);

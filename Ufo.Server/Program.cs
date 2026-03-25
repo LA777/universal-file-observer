@@ -59,7 +59,7 @@ builder.Services.AddScoped<ISearchService, SearchService>();
 
 builder.Services.AddScoped<IDbConnectionFactory, SqliteConnectionFactory>();
 builder.Services.AddTransient<ISystemInfoProvider, SystemInfoProvider>();
-builder.Services.AddScoped<IFileSystemRepository, FileSystemRepository>();
+builder.Services.AddScoped<ISnapshotRepository, SnapshotRepository>();
 builder.Services.AddScoped<ILabelsRepository, LabelsRepository>();
 builder.Services.AddScoped<ISearchRepository, SearchRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();

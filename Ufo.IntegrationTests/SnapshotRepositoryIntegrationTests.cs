@@ -12,13 +12,13 @@ using Ufo.Database.Repositories;
 
 namespace Ufo.IntegrationTests
 {
-    public class FileSystemRepositoryIntegrationTests : IAsyncLifetime
+    public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
     {
         private UserEntity testUser = new() { Id = Ulid.NewUlid(), Name = "TestUser" };
-        private Mock<ILogger<FileSystemRepository>> _loggerMock;
+        private Mock<ILogger<SnapshotRepository>> _loggerMock;
         private Mock<IDbConnectionFactory> _dbConnectionFactoryMock;
         private SqliteConnection _sqLiteConnection;
-        private FileSystemRepository _fileSystemRepository;
+        private SnapshotRepository _fileSystemRepository;
 
         #region Database Initialization and Cleanup
 
@@ -33,10 +33,10 @@ namespace Ufo.IntegrationTests
             _dbConnectionFactoryMock.Setup(f => f.GetSqliteConnectionAsync())
                 .ReturnsAsync(() => _sqLiteConnection);
 
-            _loggerMock = new Mock<ILogger<FileSystemRepository>>();
+            _loggerMock = new Mock<ILogger<SnapshotRepository>>();
 
             await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
-            _fileSystemRepository = new FileSystemRepository(_dbConnectionFactoryMock.Object, _loggerMock.Object);
+            _fileSystemRepository = new SnapshotRepository(_dbConnectionFactoryMock.Object, _loggerMock.Object);
 
             // Insert test user
             await _sqLiteConnection.ExecuteAsync(

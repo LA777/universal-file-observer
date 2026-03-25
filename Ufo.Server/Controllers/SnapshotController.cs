@@ -17,13 +17,13 @@ namespace Ufo.Server.Controllers;
 public class SnapshotController : ControllerBase
 {
     private readonly ILogger<SnapshotController> _logger;
-    private readonly IFileSystemRepository _repository;
+    private readonly ISnapshotRepository _repository;
     private readonly IUserRepository _userRepository;
     private readonly ISystemInfoProvider _systemInfoProvider;
 
     public SnapshotController(
         ILogger<SnapshotController> logger,
-        IFileSystemRepository repository,
+        ISnapshotRepository repository,
         ISystemInfoProvider systemInfoProvider,
         IUserRepository userRepository)
     {

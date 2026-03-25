@@ -20,16 +20,4 @@ public abstract class FsItemEntity: EntityWithUserAndNameAndIdBase
 
     [MaxLength(64)] // TODO LA - Update tests to cover this field. Verify MaxLength.
     public string UpdatedAt { get; set; } = string.Empty;
-
-    // TODO LA - remove this code
-    //[Ignore]
-    //public string? FullPath { get; set; }
-
-    //[JsonPropertyOrder(4)]
-    //[Ignore]
-    //public bool HasParent { get; set; }
-
-    // [JsonPropertyOrder(5)]
-    //[Ignore]
-    //public bool IsHidden { get; set; }
 }

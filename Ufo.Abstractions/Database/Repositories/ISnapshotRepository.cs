@@ -2,12 +2,9 @@
 
 namespace Ufo.Abstractions.Database.Repositories;
 
-public interface IFileSystemRepository
+public interface ISnapshotRepository
 {
     public Task<int> AddSnapshotAsync(SnapshotEntity snapshotEntity, Ulid userId, CancellationToken cancellationToken = default);
-    public Task DropDataInTables(CancellationToken cancellationToken = default);
-    public Task<IEnumerable<FileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default); // TODO LA - Consider removing. Not used anywhere.
-    public Task<IEnumerable<FolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default);  // TODO LA - Consider removing. Not used anywhere.
     public Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(Ulid userId, CancellationToken cancellationToken = default);
     public Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default);
     public Task<IList<SnapshotEntity>> GetAllSnapshotsAsync(Ulid userId, CancellationToken cancellationToken = default);

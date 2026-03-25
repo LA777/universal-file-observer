@@ -9,66 +9,15 @@ using Ufo.Abstractions.Database.Repositories;
 
 namespace Ufo.Database.Repositories;
 
-public class FileSystemRepository : IFileSystemRepository
+public class SnapshotRepository : ISnapshotRepository
 {
-    // TODO LA - rename to SnapshotRepository
-
-    private readonly ILogger<FileSystemRepository> _logger;
+    private readonly ILogger<SnapshotRepository> _logger;
     private readonly IDbConnectionFactory _dbConnectionFactory;
 
-    public FileSystemRepository(IDbConnectionFactory dbConnectionFactory, ILogger<FileSystemRepository>? logger)
+    public SnapshotRepository(IDbConnectionFactory dbConnectionFactory, ILogger<SnapshotRepository>? logger)
     {
         _dbConnectionFactory = dbConnectionFactory ?? throw new ArgumentNullException(nameof(dbConnectionFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
-    // TODO LA - Move this method to a separate Repository and create an interface for it. This is only for testing purposes to clear the DB after each test run.
-    public async Task DropDataInTables(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            await sqLiteConnection.QueryAsync<SnapshotEntity>(SqlScripts.ClearDataInTablesSql);
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "ERROR - DropDataInTables");
-            throw;
-        }
-    }
-
-    public async Task<IEnumerable<FileEntity>> GetFilesByNameAndExtensionAsync(string name, string extension, Ulid userId, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("GetFilesByNameAndExtensionAsync - UserId: {UserId}", userId);
-        try
-        {
-            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var fileEntities = await sqLiteConnection.QueryAsync<FileEntity>(SqlScripts.SelectFilesByNameAndExtensionSql, new { Name = name, FileExtension = extension });
-
-            return fileEntities;
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "ERROR - GetFilesByNameAndExtensionAsync");
-            throw;
-        }
-    }
-
-    public async Task<IEnumerable<FolderEntity>> GetFoldersByNameAsync(string name, Ulid userId, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("GetFoldersByNameAsync - UserId: {UserId}", userId);
-        try
-        {
-            var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-            var folderEntities = await sqLiteConnection.QueryAsync<FolderEntity>(SqlScripts.SelectFoldersByNameSql, new { Name = name });
-
-            return folderEntities;
-        }
-        catch (Exception exception)
-        {
-            _logger.LogError(exception, "ERROR - GetFoldersByNameAsync");
-            throw;
-        }
     }
 
     public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
