@@ -2,17 +2,16 @@
 using SQLiteNetExtensions.Attributes;
 using System.Text.Json.Serialization;
 
-namespace Ufo.Abstractions.Database.Entities
-{
-    [Table("Labels")]
-    public class LabelEntity: EntityWithUserAndNameAndIdBase
-    {
-        [JsonPropertyOrder(14)]
-        [MaxLength(32)]
-        public string ColorHex { get; set; } = string.Empty;
+namespace Ufo.Abstractions.Database.Entities;
 
-        [JsonIgnore]
-        [ManyToMany(typeof(LabelsToSnapshotsEntity))]
-        public IList<SnapshotEntity> Snapshots { get; set; } = [];
-    }
+[Table("Labels")]
+public class LabelEntity: EntityWithUserAndNameAndIdBase
+{
+    [JsonPropertyOrder(14)]
+    [MaxLength(32)]
+    public string ColorHex { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    [ManyToMany(typeof(LabelsToSnapshotsEntity))]
+    public IList<SnapshotEntity> Snapshots { get; set; } = [];
 }
