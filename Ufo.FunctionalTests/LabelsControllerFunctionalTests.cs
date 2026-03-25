@@ -19,9 +19,9 @@ using System.Text;
 using System.Text.Json;
 using Ufo.Abstractions;
 using Ufo.Abstractions.Database;
+using Ufo.Abstractions.DataTransferObjects;
 using Ufo.Abstractions.Options;
 using Ufo.Abstractions.Requests;
-using Ufo.Abstractions.Responses;
 using Ufo.Database;
 using Ufo.Database.Contexts;
 using Ufo.FunctionalTests.Extensions;
@@ -428,7 +428,7 @@ public class LabelController_AddLabelTests : IAsyncLifetime
         await _client.PostAsJsonAsync(TestConstants.ApiBase, label);
 
         var getResponse = await _client.GetAsync(TestConstants.ApiBase);
-        var labels = await Json.ReadAsync<List<LabelResponse>>(getResponse);
+        var labels = await Json.ReadAsync<List<LabelDto>>(getResponse);
 
         Assert.NotNull(labels);
         Assert.Contains(labels, l => l.Name == "PersistCheck");
@@ -442,7 +442,7 @@ public class LabelController_AddLabelTests : IAsyncLifetime
         await _client.PostAsJsonAsync(TestConstants.ApiBase, label);
 
         var getResponse = await _client.GetAsync(TestConstants.ApiBase);
-        var labels = await Json.ReadAsync<List<LabelResponse>>(getResponse);
+        var labels = await Json.ReadAsync<List<LabelDto>>(getResponse);
 
         Assert.NotNull(labels);
         Assert.Contains(labels, l => l.Name == "ColorTest" && l.ColorHex == color);
@@ -485,7 +485,7 @@ public class LabelController_GetAllLabelsTests : IAsyncLifetime
         var response = await _client.GetAsync(TestConstants.ApiBase);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var labels = await Json.ReadAsync<List<LabelResponse>>(response);
+        var labels = await Json.ReadAsync<List<LabelDto>>(response);
         Assert.NotNull(labels);
         Assert.Equal(2, labels.Count);
     }
@@ -502,10 +502,10 @@ public class LabelController_GetAllLabelsTests : IAsyncLifetime
 
         // User 1 should only see their own label.
         var response = await _client.GetAsync(TestConstants.ApiBase);
-        var labels = await Json.ReadAsync<List<LabelResponse>>(response);
+        var labels = await Json.ReadAsync<List<LabelDto>>(response);
 
         Assert.NotNull(labels);
-        Assert.All(labels, l => Assert.Equal(_userId.ToString(), l.UserId));
+        Assert.All(labels, l => Assert.Equal(_userId, l.UserId));
         Assert.DoesNotContain(labels, l => l.Name == "User2Label");
 
         client2.Dispose();
@@ -567,7 +567,7 @@ public class LabelController_GetLabelsBySnapshotTests : IAsyncLifetime
         var response = await _client.GetAsync($"{TestConstants.ApiBase}/snapshot/{snapshotId}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var labels = await Json.ReadAsync<List<LabelResponse>>(response);
+        var labels = await Json.ReadAsync<List<LabelDto>>(response);
         Assert.NotNull(labels);
         Assert.Contains(labels, l => l.Name == "SnapshotLabel");
     }
@@ -663,7 +663,7 @@ public class LabelController_UpdateLabelTests : IAsyncLifetime
         await _client.PostAsJsonAsync(TestConstants.ApiBase, label);
         await _client.PutAsJsonAsync(TestConstants.ApiBase, label with { Name = "AfterUpdate", ColorHex = "#FFFFFF" });
 
-        var all = await Json.ReadAsync<List<LabelResponse>>(
+        var all = await Json.ReadAsync<List<LabelDto>>(
             await _client.GetAsync(TestConstants.ApiBase));
 
         Assert.NotNull(all);
@@ -909,7 +909,7 @@ public class LabelController_DeleteLabelTests : IAsyncLifetime
         // Either 404 (no labels) or 200 (other labels exist) – ours must not appear.
         if (getResponse.StatusCode == HttpStatusCode.OK)
         {
-            var labels = await Json.ReadAsync<List<LabelResponse>>(getResponse);
+            var labels = await Json.ReadAsync<List<LabelDto>>(getResponse);
             Assert.DoesNotContain(labels!, l => l.Name == "WillBeGone");
         }
         else
@@ -988,7 +988,7 @@ public class LabelController_GetLabelByNameTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var result = await Json.ReadAsync<LabelResponse>(response);
+        var result = await Json.ReadAsync<LabelDto>(response);
         Assert.NotNull(result);
         Assert.Equal("FindMe", result.Name);
         Assert.Equal(label.Id, result.Id);
@@ -1014,7 +1014,7 @@ public class LabelController_GetLabelByNameTests : IAsyncLifetime
             $"{TestConstants.ApiBase}/by-name",
             new LabelNameRequest { Name = "ColorLabel" });
 
-        var result = await Json.ReadAsync<LabelResponse>(response);
+        var result = await Json.ReadAsync<LabelDto>(response);
         Assert.NotNull(result);
         Assert.Equal("#123456", result.ColorHex);
     }
@@ -1032,7 +1032,7 @@ public class LabelController_GetLabelByNameTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var result = await Json.ReadAsync<LabelResponse>(response);
+        var result = await Json.ReadAsync<LabelDto>(response);
         Assert.NotNull(result);
         Assert.Equal(specialName, result.Name);
     }
@@ -1109,7 +1109,7 @@ public class LabelController_GetLabelByNameTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var result = await Json.ReadAsync<LabelResponse>(response);
+        var result = await Json.ReadAsync<LabelDto>(response);
         Assert.NotNull(result);
         Assert.Equal(label.Id, result.Id);
         Assert.Equal("AfterRename", result.Name);
