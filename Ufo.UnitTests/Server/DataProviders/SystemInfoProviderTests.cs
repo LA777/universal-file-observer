@@ -1,12 +1,19 @@
-﻿using FluentAssertions;
-using Newtonsoft.Json;
+﻿using Microsoft.Extensions.Logging;
+using Moq;
 using Ufo.DataProviders;
 
 namespace Ufo.UnitTests.Server.DataProviders;
 
 public class SystemInfoProviderTests : BaseTest
 {
-    private readonly SystemInfoProvider _sut = new SystemInfoProvider();
+    private readonly Mock<ILogger<SystemInfoProvider>> _loggerMock;
+    private readonly SystemInfoProvider _sut;
+
+    public SystemInfoProviderTests()
+    {
+        _loggerMock = new Mock<ILogger<SystemInfoProvider>>();
+        _sut = new SystemInfoProvider(_loggerMock.Object);
+    }
 
     // TODO LA: Implement tests for SystemInfoProvider
     //[Fact]

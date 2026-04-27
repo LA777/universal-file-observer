@@ -221,7 +221,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
 
         var snapshot2 = CreateSnapshotWithSystemInfo(testUser.Id);
         snapshot2.VolumeInfo!.Volume!.StorageDrive!.Pcs[0].Name = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].Name;
-        snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].DeviceId;
+        snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].MachineId = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].MachineId;
+        snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].HardwareUuid = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].HardwareUuid;
+        snapshot2.VolumeInfo.Volume.StorageDrive.Pcs[0].HardwareSerialNumber = snapshot1.VolumeInfo.Volume.StorageDrive.Pcs[0].HardwareSerialNumber;
 
         // Act
         await _fileSystemRepository.AddSnapshotAsync(snapshot2, testUser.Id);
@@ -316,7 +318,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "TestPc5",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-123",
+            HardwareUuid = "hardware-uuid-456",
+            HardwareSerialNumber = "serial-789",
             UserId = testUser.Id,
             User = testUser
         };
@@ -423,14 +427,15 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "TestPc6",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-234",
+            HardwareUuid = "hardware-uuid-567",
+            HardwareSerialNumber = "serial-890",
             UserId = testUser.Id,
             User = testUser
         };
         var storageDrive2 = new StorageDriveEntity
         {
             Name = "Drive6",
-            DeviceId = Guid.NewGuid().ToString(),
             SerialNumber = Guid.NewGuid().ToString(),
             TotalSize = 1099511627776,
             Description = "Disk drive",
@@ -571,7 +576,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "TestPc2",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-345",
+            HardwareUuid = "hardware-uuid-678",
+            HardwareSerialNumber = "serial-901",
             UserId = testUser.Id,
             User = testUser
         };
@@ -702,7 +709,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "TestPc3",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-456",
+            HardwareUuid = "hardware-uuid-789",
+            HardwareSerialNumber = "serial-012",
             UserId = testUser.Id,
             User = testUser
         };
@@ -803,7 +812,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "UniqueTestPc",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-567",
+            HardwareUuid = "hardware-uuid-890",
+            HardwareSerialNumber = "serial-123",
             UserId = testUser.Id,
             User = testUser
         };
@@ -900,7 +911,6 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc2 = new PcEntity
         {
             Name = "TestPc4",
-            DeviceId = Guid.NewGuid().ToString(),
             UserId = testUser.Id,
             User = testUser
         };
@@ -1220,7 +1230,6 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc = new PcEntity
         {
             Name = "TestPC",
-            DeviceId = Guid.NewGuid().ToString(),
             UserId = userId,
             User = null!
         };
@@ -1426,7 +1435,9 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         var pc = new PcEntity
         {
             Name = "TestPc30290",
-            DeviceId = Guid.NewGuid().ToString(),
+            MachineId = "machine-id-system",
+            HardwareUuid = "hardware-uuid-system",
+            HardwareSerialNumber = "serial-system",
             UserId = userId,
             User = null!
         };

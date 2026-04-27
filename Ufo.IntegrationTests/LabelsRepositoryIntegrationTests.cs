@@ -1359,7 +1359,15 @@ public class LabelsRepositoryIntegrationTests : IAsyncLifetime
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot 93853", UserId = testUser.Id, User = testUser };
 
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-labels",
+            HardwareUuid = "hardware-uuid-labels",
+            HardwareSerialNumber = "serial-labels",
+            UserId = testUser.Id, 
+            User = testUser 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",

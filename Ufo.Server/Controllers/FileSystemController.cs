@@ -11,6 +11,7 @@ namespace Ufo.Server.Controllers;
 [Authorize]
 public class FileSystemController : ControllerBase
 {
+    // TODO LA - Cover with Functional tests
     private readonly ILogger<FileSystemController> _logger;
 
     public FileSystemController(ILogger<FileSystemController> logger)

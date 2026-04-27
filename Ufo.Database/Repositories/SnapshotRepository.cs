@@ -285,7 +285,7 @@ public class SnapshotRepository : ISnapshotRepository
                                         childFolders.Add(foldersToFoldersEntity.ParentFolderId.Value, new List<FolderEntity> { fsFolderEntity });
                                     }
                                 }
-                            }                            
+                            }
 
                             // find ChildFolders
                             var childFoldersWasFound = childFolders.TryGetValue(fsFolderEntity.Id, out var childFoldersList);
@@ -512,9 +512,9 @@ public class SnapshotRepository : ISnapshotRepository
             var storageDriveEntity = volumeEntity!.StorageDrive;
 
             // Find same PC in DB
-            var pcEntity = storageDriveEntity!.Pcs[0];            
-            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql, 
-                new { PcName = pcEntity.Name, pcEntity.DeviceId, UserId = userId });
+            var pcEntity = storageDriveEntity!.Pcs[0];
+            var pcInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<PcEntity>(SqlScripts.SelectPcSql,
+                new { pcEntity.HardwareUuid, pcEntity.HardwareSerialNumber, UserId = userId });
             if (pcInDb == null)
             {
                 _logger.LogInformation($"Insert PC: {pcEntity.Id}");

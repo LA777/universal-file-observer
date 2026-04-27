@@ -1,5 +1,8 @@
-﻿using System.Runtime.InteropServices;
+﻿using Microsoft.Win32;
+using System.Management;
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Principal;
 using System.Text;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.DataProviders;
@@ -12,11 +15,19 @@ namespace Ufo.DataProviders;
 
 public class SystemInfoProvider : ISystemInfoProvider
 {
+    private readonly ILogger<SystemInfoProvider> _logger;
+
+    public SystemInfoProvider(ILogger<SystemInfoProvider> logger)
+    {
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
     public SnapshotEntity GetSystemInformation(string path, UserEntity user)
     {
         var driveLetter = char.ToUpper(path[0]);
         var snapshotEntity = new SnapshotEntity() { User = user, UserId = user.Id };
-        var pc = new PcEntity { Name = Environment.MachineName, DeviceId = GetStableDeviceId(), User = user, UserId = user.Id };
+        var (hardwareUuid, hardwareSerialNumber, machineId) = GetDeviceIdentifiers();
+        var pc = new PcEntity { Name = Environment.MachineName, HardwareUuid = hardwareUuid, HardwareSerialNumber = hardwareSerialNumber, MachineId = machineId, User = user, UserId = user.Id };
         var storageDriveEntity = new StorageDriveEntity() { User = user, UserId = user.Id };
         var volume = new VolumeEntity() { User = user, UserId = user.Id };
         var volumeInfo = new VolumeInfoEntity() { User = user, UserId = user.Id };
@@ -137,18 +148,76 @@ public class SystemInfoProvider : ISystemInfoProvider
 #endif
     }
 
-    /// <summary>
-    /// Retrieves a stable, hardware-linked ID based on the OS.
-    /// </summary>
-    static string? GetStableDeviceId()
+    (string HardwareUuid, string HardwareSerialNumber, string MachineId) GetDeviceIdentifiers()
     {
+        string uuid = "Unknown";
+        string serial = "Unknown";
+        string machineId = "Unknown";
+
         if (OperatingSystem.IsWindows())
         {
-            return GetWindowsDeviceId();
+            try
+            {
+                // Get UUID
+                using var searcherUuid = new ManagementObjectSearcher("SELECT UUID FROM Win32_ComputerSystemProduct");
+                foreach (var obj in searcherUuid.Get())
+                {
+                    uuid = obj["UUID"]?.ToString() ?? "Unknown";
+                }
+
+                // Get Serial Number
+                using var searcherSerial = new ManagementObjectSearcher("SELECT SerialNumber FROM Win32_Bios");
+                foreach (var obj in searcherSerial.Get())
+                {
+                    serial = obj["SerialNumber"]?.ToString() ?? "Unknown";
+                }
+
+                // HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\SQMClient
+                using (RegistryKey? key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\SQMClient"))
+                {
+                    // 3. Retrieve the 'MachineId' value
+                   var machineIdObj = key?.GetValue("MachineId");
+
+                    if (machineIdObj != null)
+                    {
+                        // Format: {UUID} -> we trim the curly braces to match the 'Settings' UI
+                        machineId = machineIdObj.ToString()?.Trim('{', '}') ?? "ID Empty";
+                    }
+                }
+
+                return (HardwareUuid: uuid, HardwareSerialNumber: serial, MachineId: machineId);
+            }
+            catch(Exception exception)
+            {
+                _logger.LogError(exception, "Error retrieving Windows device identifiers.");
+            }
         }
         else if (OperatingSystem.IsLinux())
         {
-            return GetLinuxDeviceId();
+            try
+            {
+                // 1. Hardware UUID (Requires root for some distros, but often readable)
+                uuid = ReadLinuxFile("/sys/class/dmi/id/product_uuid");
+
+                // 2. Hardware Serial Number
+                serial = ReadLinuxFile("/sys/class/dmi/id/product_serial");
+
+                // 3. Machine ID (The OS-install specific ID)
+                // This is the Linux equivalent to the Windows 'Device ID'`
+                machineId = ReadLinuxFile("/etc/machine-id");
+
+                // Some systems use /var/lib/dbus/machine-id as a fallback
+                if (string.Equals(machineId, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    machineId = ReadLinuxFile("/var/lib/dbus/machine-id");
+                }
+
+                return (HardwareUuid: uuid, HardwareSerialNumber: serial, MachineId: machineId);
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, "Error retrieving Linux device identifiers.");
+            }
         }
         // Add other platforms like macOS if needed (requires P/Invoke calls)
         // else if (OperatingSystem.IsMacOS())
@@ -156,12 +225,37 @@ public class SystemInfoProvider : ISystemInfoProvider
         //     return GetMacOsDeviceId();
         // }
 
-        return null;
+        throw new PlatformNotSupportedException("OS not supported.");
+    }
+
+    private string ReadLinuxFile(string filePath)
+    {
+        try
+        {
+            if (File.Exists(filePath))
+            {
+                // Read the text, trim whitespace/newlines common in system files
+                string content = File.ReadAllText(filePath).Trim();
+
+                // Return content if not empty, otherwise fallback to Unknown
+                return !string.IsNullOrWhiteSpace(content) ? content : "Unknown";
+            }
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _logger.LogWarning("Permission denied accessing Linux system file: {FilePath}", filePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error reading Linux system file: {FilePath}", filePath);
+        }
+
+        return "Unknown";
     }
 
     #region Windows Implementation (WMI)
 
-    static string? GetWindowsDeviceId()
+    static string GetWindowsDeviceId()
     {
 #if WINDOWS
             try
@@ -169,7 +263,7 @@ public class SystemInfoProvider : ISystemInfoProvider
                 // Query WMI for the Motherboard Serial Number (considered stable)
                 // Use Win32_BaseBoard or Win32_ComputerSystemProduct
                 string query = "SELECT SerialNumber FROM Win32_BaseBoard";
-                
+
                 using (var searcher = new ManagementObjectSearcher(query))
                 {
                     foreach (ManagementObject obj in searcher.Get())
@@ -179,16 +273,16 @@ public class SystemInfoProvider : ISystemInfoProvider
                     }
                 }
                 Console.WriteLine("Warning: Failed to query Win32_BaseBoard.");
-                return null;
+                return string.Empty;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error querying WMI on Windows: {ex.Message}");
-                return null;
+                return string.Empty;
             }
 #else
         // This case should be unreachable if using OperatingSystem.IsWindows()
-        return null;
+        return string.Empty;
 #endif
     }
 
@@ -197,7 +291,7 @@ public class SystemInfoProvider : ISystemInfoProvider
     #region Linux Implementation (Reading /etc/machine-id)
 
     // On Linux, the standard stable ID is the /etc/machine-id
-    static string? GetLinuxDeviceId()
+    static string GetLinuxDeviceId()
     {
         const string machineIdPath = "/etc/machine-id";
 
@@ -213,18 +307,18 @@ public class SystemInfoProvider : ISystemInfoProvider
                     return id;
                 }
                 Console.WriteLine($"Warning: Found file, but ID format is incorrect: {id.Length} chars.");
-                return null;
+                return id;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading {machineIdPath}: {ex.Message}");
-                return null;
+                return string.Empty;
             }
         }
         else
         {
             Console.WriteLine($"Warning: {machineIdPath} not found. This is normal in some environments (e.g., containers).");
-            return null;
+            return string.Empty;
         }
     }
 

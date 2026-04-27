@@ -65,7 +65,9 @@ public class LabelDto : DtoWithUserIdAndNameAndIdBase
 
 public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
-    public string? DeviceId { get; set; }
+    public string MachineId { get; set; } = string.Empty;
+    public string HardwareUuid { get; set; } = string.Empty;
+    public string HardwareSerialNumber { get; set; } = string.Empty;
 
     // TODO LA - Consider adding these fields
     //[JsonPropertyOrder(80)]
@@ -167,7 +169,7 @@ public class SnapshotSummaryDto : DtoWithUserIdAndIdBase
     public DateTimeOffset Timestamp { get; set; }
 
     [JsonPropertyOrder(6)]
-    public string? Description { get; set; }   
+    public string? Description { get; set; }
 
     [JsonPropertyOrder(99)]
     public List<LabelDto> Labels { get; set; } = [];

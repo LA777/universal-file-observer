@@ -9,6 +9,7 @@ namespace Ufo.Server.Controllers;
 [Authorize]
 public class VideoController : ControllerBase
 {
+    // TODO LA - Cover with Functional tests
     [HttpGet()]
     public IActionResult GetVideo([FromQuery]string filePath)
     {

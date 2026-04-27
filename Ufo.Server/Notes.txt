@@ -7,6 +7,12 @@ How to run:
 
 
 
+Test account
+Username: testacc
+Password: test@001
+
+
+
 Material tree
 https://www.geeksforgeeks.org/angular-material-tree/
 https://material.angular.io/components/tree/overview
@@ -19,7 +25,8 @@ https://medium.com/@vag/angular-material-tree-26adccadc63b
 https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
-TODO:- 
+TODO:-
+- Finish Functional test coverage
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 - Verify FunctionalTest contain User data separation tests
 - Add Authorization and Authentication on Back-end
@@ -51,6 +58,9 @@ TODO:-
 - [UI] Make Two panel file view
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 - Add SSL certificate
+- Add Docker support
+- Add ability to run in Linux and MacOS
+- Add Tags, Ratings, Flags to File/Folder
 
 DONE:
 + Use ULID instead of Guid
@@ -80,7 +90,7 @@ Windows LINK/DIR https://stackoverflow.com/questions/1485155/check-if-a-file-is-
 
 
 
-Cross-Platform Path Handling: Remember that Windows uses C:\Path and Linux uses /home/path. 
+Cross-Platform Path Handling: Remember that Windows uses C:\Path and Linux uses /home/path.
 Use System.IO.Path.Combine and Path.DirectorySeparatorChar in your C# code to ensure it runs on both OS types without modification.
 
 

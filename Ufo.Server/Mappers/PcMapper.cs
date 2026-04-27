@@ -16,10 +16,12 @@ public static class PcMapper
             Id = entity.Id,
             UserId = entity.UserId,
             Name = entity.Name,
-            DeviceId = entity.DeviceId
+            MachineId = entity.MachineId,
+            HardwareUuid = entity.HardwareUuid,
+            HardwareSerialNumber = entity.HardwareSerialNumber
         };
     }
 
-    public static List<PcDto> ToDtoList(this IList<PcEntity> entities) => 
+    public static List<PcDto> ToDtoList(this IList<PcEntity> entities) =>
         [.. entities.Select(e => e.ToDto())];
 }

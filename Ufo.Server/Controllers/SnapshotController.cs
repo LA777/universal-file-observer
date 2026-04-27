@@ -17,6 +17,7 @@ namespace Ufo.Server.Controllers;
 [JwtClaimsRequired]
 public class SnapshotController : ControllerBase
 {
+    // TODO LA - Cover with Functional tests
     private readonly ILogger<SnapshotController> _logger;
     private readonly ISnapshotRepository _repository;
     private readonly IUserRepository _userRepository;

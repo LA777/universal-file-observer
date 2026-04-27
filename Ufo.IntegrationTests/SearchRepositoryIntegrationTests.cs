@@ -470,7 +470,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
             UserId = secondUser.Id,
             User = secondUser
         };
-        var pc2 = new PcEntity { Name = "PC2", DeviceId = Guid.NewGuid().ToString(), UserId = secondUser.Id, User = secondUser };
+        var pc2 = new PcEntity 
+        { 
+            Name = "PC2", 
+            MachineId = "machine-id-user2",
+            HardwareUuid = "hardware-uuid-user2",
+            HardwareSerialNumber = "serial-user2",
+            UserId = secondUser.Id, 
+            User = secondUser 
+        };
         var storageDrive2 = new StorageDriveEntity
         {
             Name = "Drive2",
@@ -589,7 +597,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateSnapshotWithFiles()
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files", UserId = testUser.Id, User = testUser };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-test",
+            HardwareUuid = "hardware-uuid-test",
+            HardwareSerialNumber = "serial-test",
+            UserId = testUser.Id, 
+            User = testUser 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",
@@ -646,7 +662,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateSnapshotWithFilesForUser(UserEntity user)
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files", UserId = user.Id, User = user };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = user.Id, User = user };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-user",
+            HardwareUuid = "hardware-uuid-user",
+            HardwareSerialNumber = "serial-user",
+            UserId = user.Id, 
+            User = user 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",
@@ -703,7 +727,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateSnapshotWithFolders()
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders", UserId = testUser.Id, User = testUser };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-folders",
+            HardwareUuid = "hardware-uuid-folders",
+            HardwareSerialNumber = "serial-folders",
+            UserId = testUser.Id, 
+            User = testUser 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",
@@ -757,7 +789,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateSnapshotWithFoldersForUser(UserEntity user)
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot with Folders", UserId = user.Id, User = user };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = user.Id, User = user };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-folders-user",
+            HardwareUuid = "hardware-uuid-folders-user",
+            HardwareSerialNumber = "serial-folders-user",
+            UserId = user.Id, 
+            User = user 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",
@@ -811,7 +851,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateSnapshotWithFilesAndFolders()
     {
         var snapshot = new SnapshotEntity { Description = "Test Snapshot with Files and Folders", UserId = testUser.Id, User = testUser };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-combined",
+            HardwareUuid = "hardware-uuid-combined",
+            HardwareSerialNumber = "serial-combined",
+            UserId = testUser.Id, 
+            User = testUser 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",
@@ -872,7 +920,15 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
     private SnapshotEntity CreateLargeSnapshot()
     {
         var snapshot = new SnapshotEntity { Description = "Large Test Snapshot", UserId = testUser.Id, User = testUser };
-        var pc = new PcEntity { Name = "TestPC", DeviceId = Guid.NewGuid().ToString(), UserId = testUser.Id, User = testUser };
+        var pc = new PcEntity 
+        { 
+            Name = "TestPC", 
+            MachineId = "machine-id-large",
+            HardwareUuid = "hardware-uuid-large",
+            HardwareSerialNumber = "serial-large",
+            UserId = testUser.Id, 
+            User = testUser 
+        };
         var storageDrive = new StorageDriveEntity
         {
             Name = "Test Drive",

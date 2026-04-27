@@ -7,7 +7,9 @@ namespace Ufo.Abstractions.Database.Entities;
 [Table("Pcs")]
 public class PcEntity : EntityWithUserAndNameAndIdBase
 {
-    public string? DeviceId { get; set; }
+    public string MachineId { get; set; } = string.Empty;
+    public string HardwareUuid { get; set; } = string.Empty;
+    public string HardwareSerialNumber { get; set; } = string.Empty;
 
     [JsonPropertyOrder(80)]
     [JsonIgnore]

@@ -12,7 +12,9 @@ public class SqlScripts
 
         CREATE TABLE IF NOT EXISTS Pcs (
             Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Pcs PRIMARY KEY,
-            DeviceId                  TEXT NOT NULL,
+            MachineId                 TEXT,
+            HardwareUuid              TEXT, 
+            HardwareSerialNumber      TEXT,
             Name                      TEXT NOT NULL,
             UserId                    TEXT NOT NULL,
 
@@ -157,11 +159,11 @@ public class SqlScripts
         );
     ";
 
-    public const string SelectPcSql = "SELECT * FROM Pcs WHERE Name = @PcName AND DeviceId = @DeviceId AND UserId = @UserId;";
+    public const string SelectPcSql = "SELECT * FROM Pcs WHERE HardwareUuid = @HardwareUuid AND HardwareSerialNumber = @HardwareSerialNumber AND UserId = @UserId;";
     public const string InsertPcSql = "INSERT INTO Pcs " +
-                                        "(Id, Name, DeviceId, UserId) " +
+                                        "(Id, Name, MachineId, HardwareUuid, HardwareSerialNumber, UserId) " +
                                         "VALUES " +
-                                        "(@Id, @Name, @DeviceId, @UserId)";
+                                        "(@Id, @Name, @MachineId, @HardwareUuid, @HardwareSerialNumber, @UserId)";
     public const string SelectStorageDriveSql = "SELECT * FROM StorageDrives WHERE SerialNumber = @SerialNumber AND DeviceId = @DeviceId AND Name = @Name AND UserId = @UserId;";
     public const string InsertStorageDriveSql = "INSERT INTO StorageDrives " +
                                                 "(Id, Name, DeviceId, SerialNumber, TotalSize, Description, MediaType, InterfaceType, UserId) " +

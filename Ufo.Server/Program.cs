@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.Data.Sqlite;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Serilog;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Runtime.InteropServices;
@@ -26,6 +27,18 @@ var builder = WebApplication.CreateBuilder(args);
 var environment = builder.Configuration.GetSection("ASPNETCORE_ENVIRONMENT").Value ?? "Production";
 builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 builder.Configuration.AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true);
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: "logs/ufo-.txt",
+        rollingInterval: RollingInterval.Day,
+        outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container.
 var applicationSettings = builder.Configuration.Get<ApplicationSettings>();
@@ -199,7 +212,18 @@ if (!app.Environment.IsFunctionalTesting())
     OpenBrowser(appEndpointUrl);
 }
 
-await app.RunAsync();
+try
+{
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
 
 return;
 
