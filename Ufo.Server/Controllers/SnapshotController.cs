@@ -18,6 +18,8 @@ namespace Ufo.Server.Controllers;
 public class SnapshotController : ControllerBase
 {
     // TODO LA - Cover with Functional tests
+    // TODO LA - Add pagination for GetAllSnapshotsSummaryAsync method.
+    // TODO LA - Consider adding SnapshotService to handle business logic in SnapshotController and cover it with Unit tests.
     private readonly ILogger<SnapshotController> _logger;
     private readonly ISnapshotRepository _repository;
     private readonly IUserRepository _userRepository;
@@ -72,12 +74,12 @@ public class SnapshotController : ControllerBase
         return Ok(snapshot.ToDto());
     }
 
-    [HttpGet("all")]
-    public async Task<IActionResult> GetAllSnapshotsAsync(CancellationToken cancellationToken)
+    [HttpGet("all/summary")]
+    public async Task<IActionResult> GetAllSnapshotsSummaryAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetAllSnapshotsAsync");
         var userId = HttpContext.GetUserIdAsUlid();
-        var snapshots = await _repository.GetAllSnapshotsAsync(userId, cancellationToken);
+        var snapshots = await _repository.GetAllSnapshotsAsync(userId, cancellationToken); // TODO LA - Get summary only from DB, without related entities.
         _logger.LogInformation("Snapshots retrieved from DB");
 
         return Ok(snapshots.ToSummaryDtoList());

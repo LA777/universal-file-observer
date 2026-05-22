@@ -1078,8 +1078,8 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
         result2.Should().Be(DatabaseActionResult.Success);
 
         // Snapshot should no longer exist for User 2
-        await Assert.ThrowsAsync<ArgumentNullException>(async () =>
-            await _fileSystemRepository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id));
+        var deletedSnapshot = await _fileSystemRepository.GetSnapshotByIdAsync(snapshot2.Id, secondUser.Id);
+        deletedSnapshot.Should().BeNull();
     }
 
     [Fact]

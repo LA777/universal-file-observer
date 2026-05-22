@@ -68,7 +68,7 @@ public static class FileInfoExtension
     public static string GetFileHashSha256(this FileInfo fileInfo)
     {
         using var sha256 = SHA256.Create();
-        using var fileStream = File.OpenRead(fileInfo.FullName);
+        using var fileStream = File.OpenRead(fileInfo.FullName); // TODO LA - Use async method and Try - Throws exception
         var byteArray = sha256.ComputeHash(fileStream);
         var result = BitConverter.ToString(byteArray).Replace("-", string.Empty).ToLower();
 

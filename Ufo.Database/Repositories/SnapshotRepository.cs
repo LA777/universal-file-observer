@@ -20,7 +20,7 @@ public class SnapshotRepository : ISnapshotRepository
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<SnapshotEntity> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<SnapshotEntity?> GetSnapshotByIdAsync(Ulid snapshotId, Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try
@@ -36,21 +36,25 @@ public class SnapshotRepository : ISnapshotRepository
                     if (snapshotResult == null)
                     {
                         snapshotResult = snapshotEntity;
-                        snapshotResult.VolumeInfo = volumeInfoEntity;
-                        volumeInfoEntity.Snapshot = snapshotResult;
-                        volumeInfoEntity.SnapshotId = snapshotResult.Id;
-                        volumeInfoEntity.Volume = volumeEntity;
-                        volumeInfoEntity.VolumeId = volumeEntity.Id;
-                        volumeEntity.VolumeInfos.Add(volumeInfoEntity);
-                        volumeEntity.StorageDrive = storageDriveEntity;
-                        volumeEntity.StorageDriveId = storageDriveEntity.Id;
-                        storageDriveEntity.Snapshots.Add(snapshotResult);
-                        storageDriveEntity.Volumes.Add(volumeEntity);
-                        if (pcEntity != null)
+
+                        if (volumeInfoEntity != null && volumeEntity != null && storageDriveEntity != null)
                         {
-                            storageDriveEntity.Pcs.Add(pcEntity);
-                            pcEntity.Snapshots.Add(snapshotResult);
-                            pcEntity.StorageDrives.Add(storageDriveEntity);
+                            snapshotResult.VolumeInfo = volumeInfoEntity;
+                            volumeInfoEntity.Snapshot = snapshotResult;
+                            volumeInfoEntity.SnapshotId = snapshotResult.Id;
+                            volumeInfoEntity.Volume = volumeEntity;
+                            volumeInfoEntity.VolumeId = volumeEntity.Id;
+                            volumeEntity.VolumeInfos.Add(volumeInfoEntity);
+                            volumeEntity.StorageDrive = storageDriveEntity;
+                            volumeEntity.StorageDriveId = storageDriveEntity.Id;
+                            storageDriveEntity.Snapshots.Add(snapshotResult);
+                            storageDriveEntity.Volumes.Add(volumeEntity);
+                            if (pcEntity != null)
+                            {
+                                storageDriveEntity.Pcs.Add(pcEntity);
+                                pcEntity.Snapshots.Add(snapshotResult);
+                                pcEntity.StorageDrives.Add(storageDriveEntity);
+                            }
                         }
                     }
 
@@ -61,7 +65,7 @@ public class SnapshotRepository : ISnapshotRepository
 
             if (snapshotResult == null)
             {
-                throw new ArgumentNullException(nameof(snapshotResult));
+                return null;
             }
 
             FolderEntity? currentFolder = null;
@@ -174,7 +178,7 @@ public class SnapshotRepository : ISnapshotRepository
         }
     }
 
-    public async Task<SnapshotEntity> GetLatestSnapshotWithAllEntitiesAsync(Ulid userId, CancellationToken cancellationToken = default)
+    public async Task<SnapshotEntity?> GetLatestSnapshotWithAllEntitiesAsync(Ulid userId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("GetLatestSnapshotWithAllEntitiesAsync - UserId: {UserId}", userId);
         try
@@ -191,21 +195,25 @@ public class SnapshotRepository : ISnapshotRepository
                     if (snapshotResult == null)
                     {
                         snapshotResult = snapshotEntity;
-                        snapshotResult.VolumeInfo = volumeInfoEntity;
-                        volumeInfoEntity.Snapshot = snapshotResult;
-                        volumeInfoEntity.SnapshotId = snapshotResult.Id;
-                        volumeInfoEntity.Volume = volumeEntity;
-                        volumeInfoEntity.VolumeId = volumeEntity.Id;
-                        volumeEntity.VolumeInfos.Add(volumeInfoEntity);
-                        volumeEntity.StorageDrive = storageDriveEntity;
-                        volumeEntity.StorageDriveId = storageDriveEntity.Id;
-                        storageDriveEntity.Snapshots.Add(snapshotResult);
-                        storageDriveEntity.Volumes.Add(volumeEntity);
-                        if (pcEntity != null)
+
+                        if (volumeInfoEntity != null && volumeEntity != null && storageDriveEntity != null)
                         {
-                            storageDriveEntity.Pcs.Add(pcEntity);
-                            pcEntity.Snapshots.Add(snapshotResult);
-                            pcEntity.StorageDrives.Add(storageDriveEntity);
+                            snapshotResult.VolumeInfo = volumeInfoEntity;
+                            volumeInfoEntity.Snapshot = snapshotResult;
+                            volumeInfoEntity.SnapshotId = snapshotResult.Id;
+                            volumeInfoEntity.Volume = volumeEntity;
+                            volumeInfoEntity.VolumeId = volumeEntity.Id;
+                            volumeEntity.VolumeInfos.Add(volumeInfoEntity);
+                            volumeEntity.StorageDrive = storageDriveEntity;
+                            volumeEntity.StorageDriveId = storageDriveEntity.Id;
+                            storageDriveEntity.Snapshots.Add(snapshotResult);
+                            storageDriveEntity.Volumes.Add(volumeEntity);
+                            if (pcEntity != null)
+                            {
+                                storageDriveEntity.Pcs.Add(pcEntity);
+                                pcEntity.Snapshots.Add(snapshotResult);
+                                pcEntity.StorageDrives.Add(storageDriveEntity);
+                            }
                         }
                     }
 
@@ -348,19 +356,23 @@ public class SnapshotRepository : ISnapshotRepository
                 SqlScripts.SelectSnapshotsWithSystemInfoSql,
                 (snapshotEntity, volumeInfoEntity, volumeEntity, storageDriveEntity, pcEntity, fsFolderEntity) =>
                 {
-                    snapshotEntity.VolumeInfo = volumeInfoEntity;
-                    volumeInfoEntity.Snapshot = snapshotEntity;
-                    volumeInfoEntity.SnapshotId = snapshotEntity.Id;
-                    volumeInfoEntity.Volume = volumeEntity;
-                    volumeInfoEntity.VolumeId = volumeEntity.Id;
-                    volumeEntity.VolumeInfos.Add(volumeInfoEntity);
-                    volumeEntity.StorageDrive = storageDriveEntity;
-                    volumeEntity.StorageDriveId = storageDriveEntity.Id;
-                    storageDriveEntity.Snapshots.Add(snapshotEntity);
-                    storageDriveEntity.Volumes.Add(volumeEntity);
-                    storageDriveEntity.Pcs.Add(pcEntity);
-                    pcEntity.Snapshots.Add(snapshotEntity);
-                    pcEntity.StorageDrives.Add(storageDriveEntity);
+                    if (volumeInfoEntity != null && volumeEntity != null && storageDriveEntity != null && pcEntity != null)
+                    {
+                        snapshotEntity.VolumeInfo = volumeInfoEntity;
+                        volumeInfoEntity.Snapshot = snapshotEntity;
+                        volumeInfoEntity.SnapshotId = snapshotEntity.Id;
+                        volumeInfoEntity.Volume = volumeEntity;
+                        volumeInfoEntity.VolumeId = volumeEntity.Id;
+                        volumeEntity.VolumeInfos.Add(volumeInfoEntity);
+                        volumeEntity.StorageDrive = storageDriveEntity;
+                        volumeEntity.StorageDriveId = storageDriveEntity.Id;
+                        storageDriveEntity.Snapshots.Add(snapshotEntity);
+                        storageDriveEntity.Volumes.Add(volumeEntity);
+                        storageDriveEntity.Pcs.Add(pcEntity);
+                        pcEntity.Snapshots.Add(snapshotEntity);
+                        pcEntity.StorageDrives.Add(storageDriveEntity);
+                    }
+
                     snapshotEntity.RootFolder = fsFolderEntity;
 
                     snapshots.Add(snapshotEntity);
