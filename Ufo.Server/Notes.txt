@@ -25,8 +25,11 @@ https://medium.com/@vag/angular-material-tree-26adccadc63b
 https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
-TODO:-
+TODO:
+- add functional tests for FileSystemController
+- add functional tests for VideoController
 - Finish Functional test coverage
+- Update Front-end with changes in PcEntity
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 - Verify FunctionalTest contain User data separation tests
 - Add Authorization and Authentication on Back-end
@@ -76,6 +79,7 @@ DONE:
 + API - create Snapshot with Labels
 + Integration tests use in-memory SQLite DB
 + Functional tests for API including in-memory SQLite DB
++ Finish SnapshotControllerFunctionalTest - check if all is OK
 
 
 UnauthorizedAccessException

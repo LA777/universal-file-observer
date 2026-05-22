@@ -17,7 +17,6 @@ namespace Ufo.Server.Controllers;
 [JwtClaimsRequired]
 public class SnapshotController : ControllerBase
 {
-    // TODO LA - Cover with Functional tests
     // TODO LA - Add pagination for GetAllSnapshotsSummaryAsync method.
     // TODO LA - Consider adding SnapshotService to handle business logic in SnapshotController and cover it with Unit tests.
     private readonly ILogger<SnapshotController> _logger;
