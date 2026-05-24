@@ -2,7 +2,7 @@
 using Ufo.Abstractions.DataTransferObjects;
 
 namespace Ufo.Server.Mappers;
-// TODO LA - Cover with Unit tests  
+// TODO LA - Cover with Unit tests
 public static class FileMapper
 {
     public static FileDto ToDto(this FileEntity entity)
@@ -12,7 +12,6 @@ public static class FileMapper
         var dto = new FileDto
         {
             Id = entity.Id,
-            UserId = entity.UserId,
             Name = entity.Name,
             Size = entity.Size,
             Sha256Hash = entity.Sha256Hash,

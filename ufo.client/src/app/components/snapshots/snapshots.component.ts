@@ -7,7 +7,7 @@ import { MatTableModule } from '@angular/material/table';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Snapshot, StorageDrive, VolumeInfo, DialogData } from '../../models/models';
+import { Snapshot, StorageDrive, VolumeInfo, DialogData, Pc } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
 import { MatDialog } from '@angular/material/dialog';
 import { Subscription } from 'rxjs';
@@ -73,6 +73,21 @@ private subscriptionAllSnapshots: Subscription;
   getAllSnapshots() {
     this.subscriptionAllSnapshots = this.snapshotService.getAllSnapshots().subscribe({
       next: (result) => {
+        // Fetch full snapshot details for each summary to populate table display
+        result.forEach(summarySnapshot => {
+          this.snapshotService.getSnapshotById(summarySnapshot.id).subscribe({
+            next: (fullSnapshot) => {
+              // Find and replace the summary with full snapshot data
+              const index = result.indexOf(summarySnapshot);
+              if (index !== -1) {
+                result[index] = fullSnapshot;
+              }
+            },
+            error: (error) => {
+              console.error(`Error loading full snapshot ${summarySnapshot.id}:`, error);
+            }
+          });
+        });
         this.snapshots = result;
         console.log(result);
       },
@@ -117,8 +132,17 @@ private subscriptionAllSnapshots: Subscription;
     });
   }
 
+  getPcTooltip(element: Pc): string{
+    return `ID: ${element.id}\r\n
+            Machine ID: ${element.machineId}\r\n
+            Hardware UUID: ${element.hardwareUuid}\r\n
+            Hardware Serial Number: ${element.hardwareSerialNumber}`;
+  }
+
   getStorageDriveTooltip(element: StorageDrive): string{
-    return `Device ID: ${element.deviceId}\r\n
+    return `ID: ${element.id}\r\n
+            Name: ${element.name}\r\n
+            Device ID: ${element.deviceId}\r\n
             Serial number: ${element.serialNumber}\r\n
             Total size: ${element.totalSize}\r\n
             Description: ${element.description}\r\n
@@ -127,10 +151,11 @@ private subscriptionAllSnapshots: Subscription;
   }
 
   getVolumeInfoTooltip(element: VolumeInfo): string{
-    return `Volume name: ${element.volume.volumeName}\r\n
-            Description: ${element.volume.description}\r\n
-            Volume Serial Number: ${element.volume.volumeSerialNumber}\r\n
-            Volume size: ${element.volume.volumeSize}\r\n
+    return `ID: ${element.id}\r\n
+            Volume name: ${element.volume?.volumeName}\r\n
+            Description: ${element.volume?.description}\r\n
+            Volume Serial Number: ${element.volume?.volumeSerialNumber}\r\n
+            Volume size: ${element.volume?.volumeSize}\r\n
             Free space: ${element.freeSpace}\r\n
             Drive status: ${element.driveStatus}`;
   }

@@ -169,8 +169,10 @@ export class FolderTreeComponent implements OnInit {
       this.http.get<Snapshot>('/api/snapshot/latest').subscribe(
         (result) => {
           this.snapshot = result;
-          const treeData = this.buildTreeData(result.rootFolder);
-          //this.dataSource.data = treeData;
+          if (result.rootFolder) {
+            const treeData = this.buildTreeData(result.rootFolder);
+            //this.dataSource.data = treeData;
+          }
           console.log(result);
         },
         (error) => {
@@ -183,8 +185,10 @@ export class FolderTreeComponent implements OnInit {
       this.http.get<Snapshot>('/api/snapshot/' + snapshot.id).subscribe(
         (result) => {
           this.snapshot = result;
-          const treeData = this.buildTreeData(result.rootFolder);
-          //this.dataSource.data = treeData;
+          if (result.rootFolder) {
+            const treeData = this.buildTreeData(result.rootFolder);
+            //this.dataSource.data = treeData;
+          }
           console.log(result);
         },
         (error) => {

@@ -88,11 +88,13 @@ export class SnapshotComponent implements OnInit, AfterViewInit {
     this.snapshotService.getLatestSnapshot().subscribe(
       (result) => {
         this.snapshot = result;
-        this.dataSource.data = [result.rootFolder];
-        this.selectedFolder = result.rootFolder;
-        this.folderData = result.rootFolder.files;
-        this.clickedNode = result.rootFolder;
-        this.expandAllNodes();
+        if (result.rootFolder) {
+          this.dataSource.data = [result.rootFolder];
+          this.selectedFolder = result.rootFolder;
+          this.folderData = result.rootFolder.files;
+          this.clickedNode = result.rootFolder;
+          this.expandAllNodes();
+        }
         console.log(result);
       },
       (error) => {
@@ -105,11 +107,13 @@ export class SnapshotComponent implements OnInit, AfterViewInit {
     this.snapshotService.getSnapshotById(id).subscribe(
       (result) => {
         this.snapshot = result;
-        this.dataSource.data = [result.rootFolder];
-        this.selectedFolder = result.rootFolder;
-        this.folderData = result.rootFolder.files;
-        this.clickedNode = result.rootFolder;
-        this.expandAllNodes();
+        if (result.rootFolder) {
+          this.dataSource.data = [result.rootFolder];
+          this.selectedFolder = result.rootFolder;
+          this.folderData = result.rootFolder.files;
+          this.clickedNode = result.rootFolder;
+          this.expandAllNodes();
+        }
         console.log(result);
       },
       (error) => {
@@ -161,38 +165,38 @@ export class SnapshotComponent implements OnInit, AfterViewInit {
   //   this.unlistenMouseUp();
   // }
 
-  handleButtonClick(folder: Folder){
-    this.selectedFolder = folder;
-    this.folderData = [] as FsItem[];
-    folder.childFolders.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: false,
-        fileExtension: '<DIR>',
-        sha256Hash: element?.sha256Hash,
-        id: element?.id,
-        fullPath: '',
-        parentFolder: element?.parentFolder,
-        isHidden: false
-      };
-      this.folderData.push(folderItem);
-    });
-    folder.files.forEach(element => {
-      const folderItem: FsItem = {
-        name: element.name,
-        size: element?.size,
-        isFile: true,
-        fileExtension: element?.fileExtension,
-        sha256Hash: element?.sha256Hash,
-        id: element?.id,
-        fullPath: '',
-        parentFolder: element?.parentFolder,
-        isHidden: false
-      };
-      this.folderData.push(folderItem);
-    });
-  }
+  // handleButtonClick(folder: Folder){
+  //   this.selectedFolder = folder;
+  //   this.folderData = [] as FsItem[];
+  //   folder.childFolders.forEach(element => {
+  //     const folderItem: FsItem = {
+  //       name: element.name,
+  //       size: element?.size,
+  //       isFile: false,
+  //       fileExtension: '<DIR>',
+  //       sha256Hash: element?.sha256Hash,
+  //       id: element?.id,
+  //       fullPath: '',
+  //       parentFolder: element?.parentFolder,
+  //       isHidden: false
+  //     };
+  //     this.folderData.push(folderItem);
+  //   });
+  //   folder.files.forEach(element => {
+  //     const folderItem: FsItem = {
+  //       name: element.name,
+  //       size: element?.size,
+  //       isFile: true,
+  //       fileExtension: element?.fileExtension,
+  //       sha256Hash: element?.sha256Hash,
+  //       id: element?.id,
+  //       fullPath: '',
+  //       parentFolder: element?.parentFolder,
+  //       isHidden: false
+  //     };
+  //     this.folderData.push(folderItem);
+  //   });
+  // }
 
   announceSortChange(sortState: Sort) {
     // This example uses English messages. If your application supports

@@ -24,7 +24,7 @@
       <button (click)="navigateForward()" title="Forward">
         <mat-icon>arrow_forward</mat-icon>
       </button>
-      <button (click)="navigateToPath(selectedFolder.parentFolder?.fullPath)" [disabled]="!selectedFolder.parentFolder"
+      <button (click)="navigateToPath(selectedFolder.parentFolderPath)" [disabled]="!selectedFolder.hasParent"
         title="Upward">
         <mat-icon>arrow_upward</mat-icon>
       </button>

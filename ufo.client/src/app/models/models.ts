@@ -3,65 +3,97 @@ export interface FsItem {
   name: string;
   size?: number;
   sha256Hash: string;
-  isFile: boolean;
-  fullPath: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  createdAt: string;
+  updatedAt: string;
   isHidden: boolean;
-  fileExtension: string;
-  parentFolder?: Folder;
+  fullPath: string;
+  hasParent: boolean;
+  parentFolderPath: string;
 }
+
+export interface FsItemUi extends FsItem {
+  fileExtension: string;
+  isFile: boolean;
+}
+
 
 export interface File extends FsItem {
+  fileExtension: string;
+  //  snapshots: SnapshotSummary[]; - not needed in client models, as we will get the snapshots for a file when we click on it, not when we load the folder tree
 }
 
-export interface Folder extends FsItem  {
+export interface Folder extends FsItem {
   files: File[];
   childFolders: Folder[];
+  // snapshots: SnapshotSummary[]; - not needed in client models, as we will get the snapshots for a folder when we click on it, not when we load the folder tree
 }
 
-export interface Volume {
+export interface Label {
   id: string;
-  driveLetter: string;
-  volumeName: string;
-  description: string;
-  volumeSerialNumber: string;
-  volumeSize: number;
-  storageDrive: StorageDrive;
+  name: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  colorHex: string;
+  snapshotIds: string[];
+}
+
+export interface Pc {
+  id: string;
+  name: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  machineId: string;
+  hardwareUuid: string;
+  hardwareSerialNumber: string;
 }
 
 export interface StorageDrive {
   id: string;
   name: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
   deviceId: string;
   serialNumber: string;
   totalSize: number;
   description: string;
   mediaType: string;
   interfaceType: string;
-  pcs: Pc[]
+  pcs: Pc[];
 }
 
-export interface Pc {
+export interface Volume {
   id: string;
-  name: string;
-}
-
-export interface Snapshot {
-  id: string;
-  timestamp: string;
-  rootFolder: Folder;
-  volumeInfo: VolumeInfo;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  driveLetter: string;
+  volumeName: string;
+  description: string;
+  volumeSerialNumber: string;
+  volumeSize: number;
+  storageDrive?: StorageDrive;
 }
 
 export interface VolumeInfo {
   id: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
   freeSpace: number;
   driveStatus: string;
-  volumeId: string;
-  volume: Volume;
-};
+  volume?: Volume;
+}
+
+export interface SnapshotSummary {
+  id: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  timestamp: string;
+  description?: string;
+  labels: Label[];
+  volumeInfo?: VolumeInfo;
+  rootOnlyFolder?: Folder;
+}
+
+export interface Snapshot extends SnapshotSummary {
+  rootFolder?: Folder;
+}
 
 export interface SnapshotData {
-  snapshotEntity: Snapshot;
+  snapshot: Snapshot;
 }
 
 export interface FileSystemRoot {

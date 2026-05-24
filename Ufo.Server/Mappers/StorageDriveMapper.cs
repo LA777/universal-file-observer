@@ -14,7 +14,6 @@ public static class StorageDriveMapper
         return new StorageDriveDto
         {
             Id = entity.Id,
-            UserId = entity.UserId,
             DeviceId = entity.DeviceId,
             SerialNumber = entity.SerialNumber,
             TotalSize = entity.TotalSize,

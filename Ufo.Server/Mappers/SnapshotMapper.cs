@@ -11,10 +11,11 @@ public static class SnapshotMapper
         new()
         {
             Id = entity.Id,
-            Description = entity.Description,               
+            Description = entity.Description,
             Timestamp = entity.Timestamp,
-            UserId = entity.UserId,
-            Labels = entity.Labels.ToDtoList()
+            Labels = entity.Labels.ToDtoList(),
+            RootOnlyFolder = entity.RootFolder?.ToRootOnlyDto(),
+            VolumeInfo = entity.VolumeInfo?.ToDto()
         };
 
     public static List<SnapshotSummaryDto> ToSummaryDtoList(this IList<SnapshotEntity> entities) =>
@@ -26,7 +27,6 @@ public static class SnapshotMapper
             Id = entity.Id,
             Description = entity.Description,
             Timestamp = entity.Timestamp,
-            UserId = entity.UserId,
             Labels = entity.Labels.ToDtoList(),
             RootFolder = entity.RootFolder?.ToDto(),
             VolumeInfo = entity.VolumeInfo?.ToDto()

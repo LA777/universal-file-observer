@@ -52,6 +52,9 @@ public abstract class FsItemDto : DtoWithUserIdAndNameAndIdBase
 
     [JsonPropertyOrder(14)]
     public bool HasParent { get; set; }
+
+    [JsonPropertyOrder(15)]
+    public string ParentFolderPath { get; set; } = string.Empty;
 }
 
 public class LabelDto : DtoWithUserIdAndNameAndIdBase
@@ -59,14 +62,19 @@ public class LabelDto : DtoWithUserIdAndNameAndIdBase
     [JsonPropertyOrder(14)]
     public string ColorHex { get; set; } = string.Empty;
 
-    [JsonPropertyOrder(10)]
+    [JsonPropertyOrder(20)]
     public List<Ulid> SnapshotIds { get; set; } = [];
 }
 
 public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
+    [JsonPropertyOrder(14)]
     public string MachineId { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(15)]
     public string HardwareUuid { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(16)]
     public string HardwareSerialNumber { get; set; } = string.Empty;
 
     // TODO LA - Consider adding these fields
@@ -163,7 +171,13 @@ public class FolderDto : FsItemDto
 /// Lightweight snapshot reference used inside File and Folder
 /// to avoid circular references with the full Snapshot class.
 /// </summary>
-public class SnapshotSummaryDto : DtoWithUserIdAndIdBase
+public class SnapshotSummaryDto : SnapshotSummaryBase
+{
+    [JsonPropertyOrder(15)]
+    public FolderDto? RootOnlyFolder { get; set; }
+}
+
+public class SnapshotSummaryBase : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(5)]
     public DateTimeOffset Timestamp { get; set; }
@@ -173,13 +187,13 @@ public class SnapshotSummaryDto : DtoWithUserIdAndIdBase
 
     [JsonPropertyOrder(99)]
     public List<LabelDto> Labels { get; set; } = [];
-}
-
-public class SnapshotDto : SnapshotSummaryDto
-{
-    [JsonPropertyOrder(15)]
-    public FolderDto? RootFolder { get; set; }
 
     [JsonPropertyOrder(20)]
     public VolumeInfoDto? VolumeInfo { get; set; }
+}
+
+public class SnapshotDto : SnapshotSummaryBase
+{
+    [JsonPropertyOrder(15)]
+    public FolderDto? RootFolder { get; set; }
 }

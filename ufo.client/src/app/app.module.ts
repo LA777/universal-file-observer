@@ -1,4 +1,4 @@
-import { provideHttpClient, withInterceptorsFromDi } from '@angular/common/http';
+import { provideHttpClient, withInterceptorsFromDi, HTTP_INTERCEPTORS } from '@angular/common/http';
 import { NgModule, provideZoneChangeDetection } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 
@@ -48,6 +48,7 @@ import {MatProgressBar} from '@angular/material/progress-bar';
 
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
+import { AuthInterceptor } from './interceptors/auth.interceptor';
 
 import { ForecastComponent } from './components/forecast/forecast.component';
 import { SnapshotComponent } from './components/snapshot/snapshot.component';
@@ -119,7 +120,12 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
     providers: [
       provideAnimationsAsync(),
       provideZoneChangeDetection(),
-      provideHttpClient(withInterceptorsFromDi())
+      provideHttpClient(withInterceptorsFromDi()),
+      {
+        provide: HTTP_INTERCEPTORS,
+        useClass: AuthInterceptor,
+        multi: true
+      }
     ]
   })
 export class AppModule { }

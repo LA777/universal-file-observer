@@ -26,29 +26,26 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
-- Update Front-end with changes in PcEntity
+- Check get all snapshots summary - do not return user id
+- [UI] Snapsots page - add Lables
+- Create snapshot - check why no Volume and Storage info is populated
+- Add tests for SnapshotMapper
+- Front - when Snapshot is generating - show a spinner
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
-- Verify FunctionalTest contain User data separation tests
-- Add Authorization and Authentication on Back-end
-- [UI] Add Create User Page
-- [UI] Add Login Page
 - Add Search by File name or Folder name
 - Search inside Snapshot/Snapshots
 - [UI] Add Spinner while data is loading
 - [UI] Finish FolderTree Angular component
 - [UI] Change UI for Snapshot Tree MatTree
 - [UI] Ability to View Photo, Video and TXT files
-- [UI] View file Hash
+- [UI] View file Hash (for files not in snapshot)
 - Delete User Account
 - Delete Snapshot Folder
 - Delete Snapshot File
 - API - Get Snapshots by Label
 - Add Indexes to DB
-- Add CreatedAt and UpdatedAt for Entities
 - Delete All Snapshots. Labels shall preserve
-- Split Entites (Entity for DB and Entity for UI)
 - Split Entites (UI)
-- add PIN to enter the APP
 - add Encryption for all fields in DB
 - [UI] Remove Forecast Controller and UI tab
 - [UI] Create navigation for Forward and Backward
@@ -63,6 +60,7 @@ TODO:
 - Add Tags, Ratings, Flags to File/Folder
 - add functional tests for VideoController
 - Finish Functional test coverage
+- Add Authorization (admin role)
 
 
 DONE:
@@ -82,6 +80,16 @@ DONE:
 + Finish SnapshotControllerFunctionalTest - check if all is OK
 + add functional tests for FileSystemController
 + check FileSystemControllerFunctionalTests
++ Verify FunctionalTest contain User data separation tests
++ Update Front-end with changes in PcEntity
++ Add Authentication
++ [UI] Add Create User Page
++ [UI] Add Login Page
++ Add CreatedAt and UpdatedAt for Entities
++ Split Entites (Entity for DB and Entity for UI)
+= add PIN to enter the APP
+
+
 
 
 UnauthorizedAccessException

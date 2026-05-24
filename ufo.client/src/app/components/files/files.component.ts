@@ -9,7 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { NestedTreeControl } from '@angular/cdk/tree';
-import { Folder, File, FsItem, SnapshotData, FileSystemRoot, DialogData } from '../../models/models';
+import { Folder, File, FsItem, SnapshotData, FileSystemRoot, DialogData, FsItemUi } from '../../models/models';
 import { DialogComponent } from '../dialog/dialog.component';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
@@ -90,49 +90,57 @@ export class FilesComponent implements OnInit {
 
   initiateFolder(folder: Folder){
     this.selectedFolder = folder;
-    this.folderData = [] as FsItem[];
+    this.folderData = [] as FsItemUi[];
 
-    if (folder.parentFolder) {
-      const folderItem: FsItem = {
+    if (folder.hasParent) {
+      const folderItem: FsItemUi = {
         name: "..",
         size: undefined,
-        isFile: false,
         fileExtension: '<DIR>',
         sha256Hash: '',
         id: '',
-        fullPath: folder.fullPath,
+        fullPath: folder.parentFolderPath,
         isHidden: false,
-        parentFolder: folder?.parentFolder
+        hasParent: false,
+        parentFolderPath: '',
+        createdAt: '',
+        updatedAt: '',
+        isFile: false
       };
       this.folderData.push(folderItem);
     }
 
     folder.childFolders.forEach(element => {
-      const folderItem: FsItem = {
+const folderItem: FsItemUi = {
         name: element.name,
-        size: element?.size,
-        isFile: false,
+        size: element.size,
         fileExtension: '<DIR>',
-        sha256Hash: element?.sha256Hash,
-        id: element?.id,
-        fullPath: element.fullPath,
-        isHidden: element?.isHidden,
-        parentFolder: element?.parentFolder
-      };
-      this.folderData.push(folderItem);
+        sha256Hash: element.sha256Hash,
+        id: element.id,
+        fullPath: element.parentFolderPath,
+        isHidden: element.isHidden,
+        hasParent: element.hasParent,
+        parentFolderPath: element.parentFolderPath,
+        createdAt: element.createdAt,
+        updatedAt: element.updatedAt,
+        isFile: false
+      };      this.folderData.push(folderItem);
     });
 
     folder.files.forEach(element => {
-      const folderItem: FsItem = {
+      const folderItem: FsItemUi = {
         name: element.name,
         size: element?.size,
-        isFile: true,
         fileExtension: element.fileExtension,
         sha256Hash: element?.sha256Hash,
         id: element?.id,
         fullPath: element.fullPath,
         isHidden: element?.isHidden,
-        parentFolder: element?.parentFolder
+        hasParent: element.hasParent,
+        parentFolderPath: element.parentFolderPath,
+        createdAt: element.createdAt,
+        updatedAt: element.updatedAt,
+        isFile: true
       };
       this.folderData.push(folderItem);
     });
@@ -182,7 +190,7 @@ export class FilesComponent implements OnInit {
     this.isImagesView = true;
   }
 
-  isVideoFile(fsItem: FsItem): boolean {
+  isVideoFile(fsItem: FsItemUi): boolean {
     if(this.isVideosView === false){
       return false;
     }
@@ -194,7 +202,7 @@ export class FilesComponent implements OnInit {
     return false;
   }
 
-  isImageFile(fsItem: FsItem): boolean {
+  isImageFile(fsItem: FsItemUi): boolean {
     if(this.isImagesView === false){
       return false;
     }
@@ -214,7 +222,7 @@ export class FilesComponent implements OnInit {
     return this.sanitizer.bypassSecurityTrustResourceUrl(fullApiUrl);
   }
 
-  getVideoMimeType(fsItem: FsItem){
+  getVideoMimeType(fsItem: FsItemUi){
     const lastDotIndex = fsItem.fullPath.lastIndexOf('.');
     if (lastDotIndex === -1) {
       return 'application/octet-stream'; // Default or unknown type
@@ -250,13 +258,13 @@ export class FilesComponent implements OnInit {
     }
   }
 
-  onRowDoubleClick(fsItem: FsItem) {
+  onRowDoubleClick(fsItem: FsItemUi) {
     if (fsItem.isFile) {
       return;
     }
 
     if (fsItem.name === "..") {
-      this.navigateToPath(fsItem.parentFolder?.fullPath);
+      this.navigateToPath(fsItem.parentFolderPath);
      }
     else {
       this.navigateToPath(fsItem.fullPath);

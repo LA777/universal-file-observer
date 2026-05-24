@@ -1,6 +1,6 @@
 @if (selectedSnapshot) {
   <div>
-    <div>Snapshot root folder: [{{selectedSnapshot.rootFolder.name}}] Snapshot ID: [{{selectedSnapshot.id}}]</div>
+    <div>Snapshot root folder: [{{selectedSnapshot.rootFolder?.name}}] Snapshot ID: [{{selectedSnapshot.id}}]</div>
   </div>
 }
 <div class="buttons-list">
@@ -29,7 +29,11 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Pc Name">
           Pc Name
         </th>
-        <td mat-cell *matCellDef="let element"> {{element.volumeInfo.volume.storageDrive.pcs[0].name}} </td>
+        <td mat-cell *matCellDef="let element"> {{element.volumeInfo?.volume?.storageDrive?.pcs?.[0]?.name}}
+          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
+            [matTooltip]="element.volumeInfo?.volume?.storageDrive?.pcs?.[0] ? getPcTooltip(element.volumeInfo?.volume?.storageDrive?.pcs?.[0]) : ''"
+          matTooltipPosition="above">table_view</mat-icon>
+        </td>
       </ng-container>
 
       <ng-container matColumnDef="StorageDriveName">
@@ -37,9 +41,9 @@
           Storage Drive Name
         </th>
         <td mat-cell *matCellDef="let element">
-          {{element.volumeInfo.volume.storageDrive.name}}
+          {{element.volumeInfo?.volume?.storageDrive?.name}} {{element.volumeInfo?.volume?.driveLetter}}
           <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
-            [matTooltip]="getStorageDriveTooltip(element.volumeInfo.volume.storageDrive)"
+            [matTooltip]="element.volumeInfo?.volume?.storageDrive ? getStorageDriveTooltip(element.volumeInfo?.volume?.storageDrive) : ''"
           matTooltipPosition="above">table_view</mat-icon>
         </td>
       </ng-container>
@@ -49,9 +53,9 @@
           Volume Drive Letter
         </th>
         <td mat-cell *matCellDef="let element">
-          {{element.volumeInfo.volume.driveLetter}}
+          {{element.volumeInfo?.volume?.driveLetter}}
           <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
-          [matTooltip]="getVolumeInfoTooltip(element.volumeInfo)" matTooltipPosition="above">table_view</mat-icon>
+          [matTooltip]="element.volumeInfo ? getVolumeInfoTooltip(element.volumeInfo) : ''" matTooltipPosition="above">table_view</mat-icon>
         </td>
       </ng-container>
 
@@ -73,14 +77,14 @@
         <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Name">
           RootFolder Name
         </th>
-        <td mat-cell *matCellDef="let element"> {{element.rootFolder.name}} </td>
+        <td mat-cell *matCellDef="let element"> {{element.rootOnlyFolder?.name}} </td>
       </ng-container>
 
       <ng-container matColumnDef="RootFolderSize">
         <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Size">
           RootFolder Size
         </th>
-        <td mat-cell *matCellDef="let element"> {{element.rootFolder.size}} </td>
+        <td mat-cell *matCellDef="let element"> {{element.rootOnlyFolder?.size}} </td>
       </ng-container>
 
 

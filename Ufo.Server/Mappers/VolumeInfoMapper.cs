@@ -15,7 +15,6 @@ public static class VolumeInfoMapper
         return new VolumeInfoDto
         {
             Id = entity.Id,
-            UserId = entity.UserId,
             FreeSpace = entity.FreeSpace,
             DriveStatus = entity.DriveStatus,
             Volume = entity.Volume?.ToDto()
