@@ -1,7 +1,29 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .dashboard-content {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-top: 0;
+}
+
+.dashboard-content .mat-mdc-tab-group {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+:host ::ng-deep .dashboard-content .mat-mdc-tab-body-wrapper {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 tr:nth-child(even) {
@@ -27,24 +49,34 @@ table {
 }
 
 .mat-tab-label {
-  min-width: 20px;
+  /* min-width: 20px;
   padding: 0 0px;
-  font-size: 10px;
+  font-size: 10px; */
+
 }
 
 .mat-mdc-tab-label-container {
-  min-width: 20px;
+  /* min-width: 20px;
   padding: 0 0px;
-  font-size: 10px;
+  font-size: 10px; */
 }
 
 .mat-mdc-tab-header {
-  min-width: 20px;
-  padding: 0 0px;
-  font-size: 10px;
-  --mat-tab-container-height: 12px;
+  --mat-tab-container-height: 40px;
+  --mdc-secondary-navigation-tab-container-height: 40px;
+  min-height: 40px;
+  height: 40px;
 }
 
-.mat-mdc-tab-labels {
-  min-width: 20px;
+:host ::ng-deep .mat-mdc-tab-header,
+:host ::ng-deep .mat-mdc-tab-header .mat-mdc-tab-label-container,
+:host ::ng-deep .mat-mdc-tab-header .mat-mdc-tab-labels,
+:host ::ng-deep .mat-mdc-tab-header .mdc-tab {
+  height: 40px;
+  min-height: 40px  ;
+}
+
+:host ::ng-deep .mat-mdc-tab-header .mdc-tab__text-label {
+  font-size: 12px;
+  line-height: 1;
 }

@@ -30,7 +30,14 @@ html {
   background-color: rgb(129, 172, 233);
 }
 
-.app-root {
-  margin: 0px;
-  /* padding: 0 !important; */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+app-root {
+  display: block;
+  height: 100%;
 }

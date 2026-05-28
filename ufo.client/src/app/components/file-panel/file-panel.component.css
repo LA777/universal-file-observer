@@ -1,0 +1,96 @@
+.file-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  background-color: rgb(40, 219, 219);
+  border: 3px solid transparent;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease-in-out;
+  overflow: hidden;
+}
+
+.file-panel.active {
+  border-color: rgb(255, 140, 0);
+  box-shadow: 0 0 8px rgba(255, 140, 0, 0.5);
+}
+
+.panel-header {
+  padding: 4px 6px;
+  background-color: rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.current-folder {
+  font-size: 12px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.current-folder .path {
+  margin-left: 8px;
+  color: #333;
+  font-style: italic;
+}
+
+.drive-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.drive-list button {
+  margin: 0;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.folder-details-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+table {
+  width: 100%;
+  table-layout: fixed;
+  word-break: break-all;
+}
+
+th.mat-sort-header-sorted {
+  color: rgb(63, 95, 69);
+}
+
+.mat-header-row {
+  height: 24px;
+}
+
+.mat-mdc-row {
+  height: 12px;
+}
+
+.mat-cell,
+.mat-header-cell {
+  padding: 0 8px;
+}
+
+:host ::ng-deep .folder-details-panel .mat-mdc-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+:host ::ng-deep .folder-details-panel .mat-mdc-header-cell {
+  background-color: #3f51b5;
+  color: white;
+}
+
+.thumbnail-image {
+  width: 300px;
+  height: 300px;
+}

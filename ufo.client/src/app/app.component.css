@@ -17,15 +17,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 2px 16px;
+    height: 40px;
+    padding: 0 16px;
+    box-sizing: border-box;
     background-color: #333;
     color: white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+
 }
 
 .app-header h1 {
     margin: 0;
     font-size: 24px;
+    line-height: 1;
+    font-family: monospace;
 }
 
 .user-info {
@@ -60,44 +65,3 @@ table {
     margin: 0 auto;
 }
 
-.mat-tab-group {
-    margin: 0px;
-    background-color: rgb(145, 100, 63);
- }
-
- .mat-tab-label {
-  min-width: 20px; /* Adjust this value as needed */
-  padding: 0 0px;
-  font-size: 10px;
-}
-
-.mat-mdc-tab-label-container {
-  min-width: 20px; /* Adjust this value as needed */
-  padding: 0 0px;
-  font-size: 10px;
-}
-
-.mat-mdc-tab-header {
-  min-width: 20px; /* Adjust this value as needed */
-  padding: 0 0px;
-  font-size: 10px;
-  --mat-tab-container-height: 12px;
-}
-
-.mat-mdc-tab-labels {
-  min-width: 20px; /* Adjust this value as needed */
-  padding: 0 0px;
-  font-size: 10px;
-}
-
-.mat-mdc-tab-list {
-  min-width: 20px; /* Adjust this value as needed */
-  padding: 0 0px;
-  font-size: 10px;
-}
-
-.mat-tab-header {
-  &.mat-mdc-tab-header {
-    --mat-tab-container-height: 12px;
-  }
-}

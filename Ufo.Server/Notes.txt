@@ -28,6 +28,8 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 TODO:
 - Check get all snapshots summary - do not return user id
 - [UI] Snapsots page - add Lables
+- Add ability to save UI Theme name to DB and load it on UI
+- [UI] Add ability to change UI Theme
 - Create snapshot - check why no Volume and Storage info is populated
 - Add tests for SnapshotMapper
 - Front - when Snapshot is generating - show a spinner
