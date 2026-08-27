@@ -1,0 +1,258 @@
+.label-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 70vh;
+  padding: 12px;
+  box-sizing: border-box;
+  color: #e0e0e0;
+  text-align: left;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #4d4d4d;
+}
+
+.header-icon {
+  color: #7986cb;
+}
+
+.dialog-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.dialog-subtitle {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #9e9e9e;
+}
+
+.close-button {
+  flex: 0 0 auto;
+}
+
+/* Create / edit area */
+.create-row {
+  padding: 10px 0;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease-in-out, border-color 0.1s ease-in-out;
+}
+
+.swatch:hover {
+  transform: scale(1.15);
+}
+
+.swatch.selected {
+  border-color: #ffffff;
+}
+
+.create-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.name-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #1f1f1f;
+  color: #e0e0e0;
+  font-size: 12px;
+  outline: none;
+}
+
+.name-input:focus {
+  border-color: #5c6bc0;
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.action-button:hover:not(:disabled) {
+  background-color: #4a4a4a;
+  border-color: #777;
+}
+
+.action-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.action-button mat-icon,
+.icon-button mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #9e9e9e;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.icon-button.delete:hover {
+  color: #ef9a9a;
+}
+
+.error-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  border: 1px solid #b71c1c;
+  border-radius: 4px;
+  background-color: rgba(183, 28, 28, 0.15);
+  color: #ef9a9a;
+  font-size: 12px;
+}
+
+.error-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.error-close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #ef9a9a;
+  cursor: pointer;
+}
+
+.error-close:hover {
+  background-color: rgba(183, 28, 28, 0.35);
+  color: #ffffff;
+}
+
+.error-close mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+/* Labels list */
+.labels-list {
+  flex: 1 1 auto;
+  min-height: 60px;
+  overflow-y: auto;
+  margin-top: 4px;
+  scrollbar-color: #6b6b6b #2e2e2e;
+}
+
+.hint {
+  padding: 12px 4px;
+  color: #757575;
+  font-size: 12px;
+}
+
+.label-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  border-radius: 4px;
+}
+
+.label-row:hover {
+  background-color: #353535;
+}
+
+.assign-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.assign-toggle input[type='checkbox'] {
+  accent-color: #5c6bc0;
+  width: 14px;
+  height: 14px;
+}
+
+.color-dot {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.label-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit-area {
+  flex: 1 1 auto;
+  padding: 4px 0;
+}

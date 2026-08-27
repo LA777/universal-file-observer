@@ -1,9 +1,15 @@
 <div class="app-container">
   <!-- Header with logout button (only show when authenticated) -->
   <div class="app-header" *ngIf="(currentUser$ | async) as user">
-    <h1>UFO</h1>
+    <div class="app-title">
+      <h1>UFO</h1>
+      <span class="app-subtitle">Universal File Observer</span>
+    </div>
     <div class="user-info">
-      <span class="user-name">{{ user }}</span>
+      <span class="user-name">
+        <mat-icon>person</mat-icon>
+        {{ user }}
+      </span>
       <button mat-icon-button (click)="logout()" matTooltip="Logout">
         <mat-icon>logout</mat-icon>
       </button>

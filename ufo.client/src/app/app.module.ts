@@ -58,18 +58,8 @@ import { FolderTreeComponent } from './components/folder-tree/folder-tree.compon
 import { DialogComponent } from './components/dialog/dialog.component';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 
-@NgModule({ declarations: [
-        AppComponent,
-        ForecastComponent,
-        SnapshotComponent,
-        SnapshotsComponent,
-        FilesComponent,
-        FolderTreeComponent,
-        DialogComponent
-    ],
-    bootstrap: [
-      AppComponent
-    ],
+@NgModule({ declarations: [],
+    bootstrap: [],
     imports: [
       BrowserModule,
       AppRoutingModule,

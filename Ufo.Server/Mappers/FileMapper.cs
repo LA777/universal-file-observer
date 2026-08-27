@@ -12,6 +12,7 @@ public static class FileMapper
         var dto = new FileDto
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Name = entity.Name,
             Size = entity.Size,
             Sha256Hash = entity.Sha256Hash,

@@ -7,10 +7,10 @@ import { takeUntil } from 'rxjs/operators';
 import { TabChangeService } from '../../services/tab-change.service';
 import { AuthService } from '../../services/auth.service';
 import { SnapshotComponent } from '../snapshot/snapshot.component';
-import { ForecastComponent } from '../forecast/forecast.component';
 import { SnapshotsComponent } from '../snapshots/snapshots.component';
 import { FilesComponent } from '../files/files.component';
-import { FolderTreeComponent } from '../folder-tree/folder-tree.component';
+import { LabelsComponent } from '../labels/labels.component';
+import { SearchComponent } from '../search/search.component';
 
 // Material imports
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -65,11 +65,11 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     MatTooltipModule,
     MatTreeModule,
     MatProgressBarModule,
-    ForecastComponent,
     SnapshotComponent,
     SnapshotsComponent,
     FilesComponent,
-    FolderTreeComponent
+    LabelsComponent,
+    SearchComponent
   ],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']

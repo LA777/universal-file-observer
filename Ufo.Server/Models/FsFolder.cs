@@ -23,6 +23,12 @@ public abstract class FsItem
     public bool IsHidden { get; set; }
 
     public FsFolder? ParentFolder { get; set; }
+
+    // Serialized for the client: the UI models expect hasParent/parentFolderPath
+    // flags rather than the nested parentFolder object.
+    public bool HasParent => ParentFolder != null;
+
+    public string? ParentFolderPath => ParentFolder?.FullPath;
 }
 
 public class FsFile : FsItem

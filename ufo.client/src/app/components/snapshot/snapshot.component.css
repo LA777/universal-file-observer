@@ -1,186 +1,200 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background-color: #2e2e2e;
+  text-align: left;
+}
+
+/* Header bar with the loaded snapshot's identity. */
+.snapshot-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  background-color: #242424;
+  border-bottom: 1px solid #4d4d4d;
+}
+
+.snapshot-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #e0e0e0;
+  background-color: #1f1f1f;
+  border: 1px solid #444;
+  border-radius: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.snapshot-info .folder-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: #ffd04c;
+}
+
+.snapshot-name {
+  font-family: 'Segoe UI', system-ui, Roboto, sans-serif;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.snapshot-meta {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid #444;
+  color: #9e9e9e;
+}
+
+.snapshot-id {
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid #444;
+  color: #9e9e9e;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loading-hint {
+  color: #9e9e9e;
+  font-size: 12px;
+}
+
+/* Two panes: folder tree | file grid. */
 .explorer-container {
   display: flex;
-  height: 100vh; /* Or adjust as needed */
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .tree-container {
-  width: 35%;
-  border-right: 1px solid #ccc;
-  overflow-y: auto;
+  flex: 0 0 300px;
+  min-width: 180px;
+  overflow: auto;
+  background-color: #262626;
+  border-right: 1px solid #4d4d4d;
+  padding: 4px 0;
+  scrollbar-color: #6b6b6b #262626;
 }
 
-.file-list-container {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
+.tree-container .mat-tree {
+  background: transparent;
 }
 
-.file-tree {
-  padding: 16px;
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #e0e0e0;
+  cursor: pointer;
+  white-space: nowrap;
+  border-radius: 3px;
+  margin: 0 4px;
 }
 
-.mat-tree-node {
+.tree-row:hover {
+  background-color: #3a3a3a;
+}
+
+.tree-row.selected {
+  background-color: rgba(92, 107, 192, 0.35);
+  color: #ffffff;
+}
+
+/* Leaf rows have no toggle; indent to line up with expandable rows. */
+.tree-row.leaf {
+  padding-left: 30px;
+}
+
+.tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9e9e9e;
   cursor: pointer;
 }
 
-.tree-nested {
-  padding-left: 20px;
+.tree-toggle:hover {
+  color: #ffffff;
 }
 
-.file-table {
-  width: 100%;
-}
-
-table {
-    border-collapse: collapse;
-}
-
-th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: left;
-}
-
-th {
-    background-color: #f2f2f2;
-}
-
-
-
-
-
-
-
-
-
-/* ... (your existing CSS) ... */
-
-.loading-indicator {
-  position: absolute; /* Or relative, depending on your layout */
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  /* Add other styling as needed */
-}
-
-.file-explorer-container {
-  display: flex;
-  height: 500px; /* Adjust as needed */
-  border: 1px solid #ccc; /* Optional border */
-}
-
-.mat-tree {
-  width: 500px; /* Adjust width as needed */
-  border-right: 1px solid #ccc; /* Optional separator */
-  overflow-y: auto; /* Add scroll if content overflows */
-}
-
-.folder-view {
-  flex: 1; /* Takes up remaining space */
-  padding: 16px;
-  overflow-y: auto; /* Add scroll if content overflows */
-}
-
-.selected {
-    font-weight: bold;
-}
-
-.example-tree-progress-bar {
-  margin-left: 15px;
-  max-width: 40px;
-}
-
-
-
-/* -------------- */
-
-.example-tree-invisible {
-  display: none;
-}
-
-.example-tree ul,
-.example-tree li {
-  margin-top: 0;
-  margin-bottom: 0;
-  list-style-type: none;
-}
-
-/*
- * This padding sets alignment of the nested nodes.
- */
-/* .example-tree .mat-nested-tree-node div[role=group] {
-  padding-left: 40px;
-} */
-
-/*
- * Padding for leaf nodes.
- * Leaf nodes need to have padding so as to align with other non-leaf nodes
- * under the same parent.
- */
-/* .example-tree div[role=group] > .mat-nested-tree-node {
-  padding-left: 40px;
-} */
-
-/* .example-tree-node {
-  display: block;
-  line-height: 40px;
-} */
-
-.example-tree-node {
-  padding-left: 0px;
-  margin-left: 0px;
-}
-
-.example-tree-node .example-tree-node {
-  /* padding-left: 40px; */
-  margin-left: 30px;
-}
-
-.example-toggle {
-  /* vertical-align: middle; */
-}
-
-
-.mat-tree-node {
-  /* display: block; */
-  line-height: 40px;
-  /* padding-left: 40px; */
-  max-height: 20px;
-}
-
-.mat-nested-tree-node {
-   /* padding-left: 40px; */
-   display: block;
-   /* margin-left: 80px; */
-   /* text-align: left; */
-}
-
-.mat-tree-node .mat-tree-node {
-  /* padding-left: 40px; */
-  /* display: block; */
-  margin-left: 30px;
-  /* text-align: left; */
-}
-
-
-.leaf-tree {
-  text-align: left;
-  margin-left: 35px;
-}
-
-.mat-icon-rtl-mirror {
-  max-height: 16px;
-  max-width: 20px;
+.tree-toggle .mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
   line-height: 18px;
 }
 
-.expandable-tree-item-button {
-  max-height: 24px;
-  max-width: 24px;
-  padding: 0px;
+.tree-folder-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: #ffd04c;
+  flex: 0 0 auto;
 }
 
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
+.tree-children {
+  padding-left: 18px;
+}
 
+.tree-invisible {
+  display: none;
+}
 
+.file-list-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
 
+.snapshot-files-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  scrollbar-color: #6b6b6b #2e2e2e;
+}
+
+/* Cell renderer output is created outside Angular's scoping. */
+:host ::ng-deep .name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  overflow: hidden;
+}
+
+:host ::ng-deep .name-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+:host ::ng-deep .name-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

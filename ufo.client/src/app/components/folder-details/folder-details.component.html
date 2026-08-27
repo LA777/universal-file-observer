@@ -1,0 +1,11 @@
+<ag-grid-angular
+  class="folder-grid"
+  [theme]="gridTheme"
+  [rowData]="folderData"
+  [columnDefs]="columnDefs"
+  [defaultColDef]="defaultColDef"
+  [getRowHeight]="getRowHeight"
+  [headerHeight]="28"
+  (gridReady)="onGridReady($event)"
+  (rowDoubleClicked)="onRowDoubleClicked($event)">
+</ag-grid-angular>

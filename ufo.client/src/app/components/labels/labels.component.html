@@ -1,0 +1,76 @@
+<div class="labels-toolbar">
+  <button class="toolbar-button" (click)="openCreateEditor()" title="Create a new label">
+    <mat-icon>add</mat-icon>
+    New Label
+  </button>
+  <button class="toolbar-button" [disabled]="!selectedLabel" (click)="openEditEditor()" title="Edit the selected label">
+    <mat-icon>edit</mat-icon>
+    Edit
+  </button>
+  <button class="toolbar-button delete-button" [disabled]="!selectedLabel" (click)="deleteSelected()" title="Delete the selected label (removed from all snapshots)">
+    <mat-icon>delete</mat-icon>
+    Delete
+  </button>
+
+  @if (!editorOpen && !selectedLabel) {
+    <span class="selection-hint">Select a label to edit or delete it</span>
+  }
+</div>
+
+@if (editorOpen) {
+  <div class="editor-row">
+    <div class="palette">
+      @for (color of palette; track color) {
+        <button
+          class="swatch"
+          [class.selected]="editorColor === color"
+          [style.background-color]="color"
+          (click)="editorColor = color"
+          [title]="color">
+        </button>
+      }
+    </div>
+    <input
+      class="name-input"
+      type="text"
+      [placeholder]="editingLabel ? 'Label name...' : 'New label name...'"
+      [(ngModel)]="editorName"
+      (keydown.enter)="saveEditor()"
+      (keydown.escape)="closeEditor()"
+      maxlength="256"
+      spellcheck="false" />
+    <button class="toolbar-button" [disabled]="!editorName.trim()" (click)="saveEditor()">
+      <mat-icon>check</mat-icon>
+      {{editingLabel ? 'Save' : 'Create'}}
+    </button>
+    <button class="toolbar-button" (click)="closeEditor()">
+      <mat-icon>close</mat-icon>
+      Cancel
+    </button>
+  </div>
+}
+
+@if (error) {
+  <div class="error-row">
+    <span class="error-text">{{error}}</span>
+    <button class="error-close" (click)="error = ''" title="Dismiss">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+}
+
+@if (labelRows && labelRows.length === 0 && !editorOpen) {
+  <p class="loading-hint"><em>No labels yet — create the first one with "New Label".</em></p>
+}
+
+<ag-grid-angular
+  class="labels-grid"
+  [theme]="gridTheme"
+  [rowData]="labelRows"
+  [columnDefs]="columnDefs"
+  [defaultColDef]="defaultColDef"
+  [rowSelection]="rowSelection"
+  [rowHeight]="30"
+  [headerHeight]="28"
+  (selectionChanged)="onSelectionChanged($event)">
+</ag-grid-angular>

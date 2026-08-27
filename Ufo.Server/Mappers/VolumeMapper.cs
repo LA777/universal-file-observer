@@ -15,6 +15,7 @@ public static class VolumeMapper
         return new VolumeDto
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             DriveLetter = entity.DriveLetter,
             VolumeName = entity.VolumeName,
             Description = entity.Description,

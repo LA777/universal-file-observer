@@ -1,0 +1,98 @@
+<div class="label-dialog">
+  <div class="dialog-header">
+    <mat-icon class="header-icon">label</mat-icon>
+    <span class="dialog-title">Labels</span>
+    <span class="dialog-subtitle" [title]="data.snapshotId">{{data.snapshotName}}</span>
+    <button class="icon-button close-button" (click)="close()" title="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Create a new label (auto-assigned to this snapshot) -->
+  <div class="create-row">
+    <div class="palette">
+      @for (color of palette; track color) {
+        <button
+          class="swatch"
+          [class.selected]="newColor === color"
+          [style.background-color]="color"
+          (click)="newColor = color"
+          [title]="color">
+        </button>
+      }
+    </div>
+    <div class="create-controls">
+      <input
+        class="name-input"
+        type="text"
+        placeholder="New label name..."
+        [(ngModel)]="newName"
+        (keydown.enter)="createLabel()"
+        maxlength="256"
+        spellcheck="false" />
+      <button class="action-button" [disabled]="!newName.trim()" (click)="createLabel()">
+        <mat-icon>add</mat-icon>
+        Create &amp; assign
+      </button>
+    </div>
+  </div>
+
+  @if (error) {
+    <div class="error-row">
+      <span class="error-text">{{error}}</span>
+      <button class="error-close" (click)="error = ''" title="Dismiss">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+
+  <!-- Existing labels -->
+  <div class="labels-list">
+    @if (loading) {
+      <div class="hint">Loading labels...</div>
+    } @else if (labels.length === 0) {
+      <div class="hint">No labels yet — create the first one above.</div>
+    }
+
+    @for (row of labels; track row.id) {
+      <div class="label-row">
+        @if (!row.editing) {
+          <label class="assign-toggle">
+            <input type="checkbox" [checked]="row.assigned" (change)="toggleAssigned(row)" />
+            <span class="color-dot" [style.background-color]="row.colorHex || '#7986cb'"></span>
+            <span class="label-name">{{row.name}}</span>
+          </label>
+          <button class="icon-button" (click)="startEdit(row)" title="Edit label">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button class="icon-button delete" (click)="deleteLabel(row)" title="Delete label (removed from all snapshots)">
+            <mat-icon>delete</mat-icon>
+          </button>
+        } @else {
+          <div class="edit-area">
+            <div class="palette">
+              @for (color of palette; track color) {
+                <button
+                  class="swatch"
+                  [class.selected]="row.editColor === color"
+                  [style.background-color]="color"
+                  (click)="row.editColor = color"
+                  [title]="color">
+                </button>
+              }
+            </div>
+            <div class="create-controls">
+              <input class="name-input" type="text" [(ngModel)]="row.editName" (keydown.enter)="saveEdit(row)" maxlength="256" spellcheck="false" />
+              <button class="icon-button" (click)="saveEdit(row)" title="Save">
+                <mat-icon>check</mat-icon>
+              </button>
+              <button class="icon-button" (click)="cancelEdit(row)" title="Cancel">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

@@ -25,7 +25,7 @@ public class SnapshotRepository : ISnapshotRepository
         _logger.LogInformation("GetSnapshotByIdAsync - SnapshotId: {SnapshotId}, UserId: {UserId}", snapshotId, userId);
         try
         {
-            SnapshotEntity snapshotResult = null;
+            SnapshotEntity? snapshotResult = null;
 
             var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
             await sqLiteConnection
@@ -382,6 +382,21 @@ public class SnapshotRepository : ISnapshotRepository
                 param: new { UserId = userId },
                 splitOn: "Id, Id, Id, Id, Id");
 
+            // Attach labels so snapshot summaries can render them.
+            var labelRows = await sqLiteConnection.QueryAsync<LabelForSnapshotRow>(
+                SqlScripts.SelectLabelsForAllSnapshotsSql,
+                new { UserId = userId });
+            var snapshotsById = snapshots
+                .GroupBy(x => x.Id)
+                .ToDictionary(g => g.Key, g => g.First());
+            foreach (var labelRow in labelRows)
+            {
+                if (snapshotsById.TryGetValue(labelRow.LinkedSnapshotId, out var labeledSnapshot))
+                {
+                    labeledSnapshot.Labels.Add(labelRow);
+                }
+            }
+
             return snapshots;
 
         }
@@ -390,6 +405,12 @@ public class SnapshotRepository : ISnapshotRepository
             _logger.LogError(exception, "ERROR - GetLatestSnapshotWithAllEntitiesAsync");
             throw;
         }
+    }
+
+    /// <summary>Flat row for the labels-per-snapshot join query.</summary>
+    private sealed class LabelForSnapshotRow : LabelEntity
+    {
+        public Ulid LinkedSnapshotId { get; set; }
     }
 
     #region DeleteSnapshotByIdAsync
@@ -721,7 +742,7 @@ public class SnapshotRepository : ISnapshotRepository
             {
                 // Check if label exists
                 var labelInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<LabelEntity>(SqlScripts.SelectLabelByIdSql,
-                    new { labelEntity.Id }, transaction);
+                    new { LabelId = labelEntity.Id, UserId = userId }, transaction);
                 if (labelInDb == null) // Label does not exist in DB
                 {
                     _logger.LogInformation($"Insert Label: {labelEntity.Id}");

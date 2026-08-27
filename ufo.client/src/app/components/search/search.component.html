@@ -1,0 +1,124 @@
+<div class="search-panel">
+  <!-- What -->
+  <div class="form-row">
+    <span class="row-label">What</span>
+    <label class="check">
+      <input type="checkbox" [(ngModel)]="includeFiles" />
+      <mat-icon class="check-icon file-icon">description</mat-icon>
+      Files
+    </label>
+    <label class="check">
+      <input type="checkbox" [(ngModel)]="includeFolders" />
+      <mat-icon class="check-icon folder-icon">folder</mat-icon>
+      Folders
+    </label>
+  </div>
+
+  <!-- Criteria -->
+  <div class="form-row">
+    <span class="row-label">By</span>
+    <input class="text-input name-input" type="text" placeholder="Name contains... (min 3 chars)" [(ngModel)]="name" (keydown.enter)="search()" spellcheck="false" />
+    <input class="text-input ext-input" type="text" placeholder=".ext" [(ngModel)]="extension" [disabled]="!includeFiles" title="File extension (files only)" spellcheck="false" />
+    <span class="field-group" title="Size range">
+      <mat-icon class="field-icon">straighten</mat-icon>
+      <input class="text-input size-input" type="number" min="0" placeholder="min" [(ngModel)]="sizeMin" />
+      <span class="dash">–</span>
+      <input class="text-input size-input" type="number" min="0" placeholder="max" [(ngModel)]="sizeMax" />
+      <select class="unit-select" [(ngModel)]="sizeUnit">
+        @for (unit of sizeUnits; track unit.factor) {
+          <option [ngValue]="unit.factor">{{unit.label}}</option>
+        }
+      </select>
+    </span>
+    <span class="field-group" title="Date range">
+      <mat-icon class="field-icon">event</mat-icon>
+      <input class="text-input date-input" type="date" [(ngModel)]="dateFrom" />
+      <span class="dash">–</span>
+      <input class="text-input date-input" type="date" [(ngModel)]="dateTo" />
+    </span>
+  </div>
+
+  <!-- Where -->
+  <div class="form-row">
+    <span class="row-label">Where</span>
+    <label class="check">
+      <input type="radio" name="source" value="snapshots" [(ngModel)]="source" />
+      Snapshots
+    </label>
+    <label class="check">
+      <input type="radio" name="source" value="labels" [(ngModel)]="source" />
+      Labels
+    </label>
+    <label class="check">
+      <input type="radio" name="source" value="filesystem" [(ngModel)]="source" />
+      Current file system
+    </label>
+
+    <button class="search-button" (click)="search()" [disabled]="searching">
+      <mat-icon>search</mat-icon>
+      {{searching ? 'Searching...' : 'Search'}}
+    </button>
+  </div>
+
+  <!-- Source-specific pickers -->
+  @if (source === 'snapshots') {
+    <div class="form-row picker-row">
+      <span class="row-label hint-label">{{selectedSnapshotIds.size === 0 ? 'All snapshots' : selectedSnapshotIds.size + ' selected'}}</span>
+      <div class="chip-list">
+        @for (snapshot of snapshots; track snapshot.id) {
+          <button class="pick-chip" [class.selected]="selectedSnapshotIds.has(snapshot.id)" (click)="toggleSnapshot(snapshot.id)" [title]="snapshot.id">
+            <mat-icon class="chip-icon">photo_camera</mat-icon>
+            {{snapshotChipName(snapshot)}}
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  @if (source === 'labels') {
+    <div class="form-row picker-row">
+      <span class="row-label hint-label">{{selectedLabelIds.size}} selected</span>
+      <div class="chip-list">
+        @for (label of labels; track label.id) {
+          <button class="pick-chip" [class.selected]="selectedLabelIds.has(label.id)" (click)="toggleLabel(label.id)" [style.border-color]="selectedLabelIds.has(label.id) ? (label.colorHex || '#7986cb') : ''">
+            <span class="color-dot" [style.background-color]="label.colorHex || '#7986cb'"></span>
+            {{label.name}}
+          </button>
+        }
+        @if (labels.length === 0) {
+          <span class="hint">No labels yet — create some on the Labels tab.</span>
+        }
+      </div>
+    </div>
+  }
+
+  @if (source === 'filesystem') {
+    <div class="form-row picker-row">
+      <span class="row-label hint-label">Root path</span>
+      <input class="text-input path-input" type="text" placeholder="e.g. C:\Users\me\Documents" [(ngModel)]="fsPath" (keydown.enter)="search()" spellcheck="false" />
+    </div>
+  }
+
+  @if (error) {
+    <div class="error-row">
+      <span class="error-text">{{error}}</span>
+      <button class="error-close" (click)="error = ''" title="Dismiss">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  }
+</div>
+
+@if (rows) {
+  <div class="results-bar">{{rows.length}} result{{rows.length === 1 ? '' : 's'}}</div>
+}
+
+<ag-grid-angular
+  class="search-grid"
+  [theme]="gridTheme"
+  [rowData]="rows"
+  [columnDefs]="columnDefs"
+  [defaultColDef]="defaultColDef"
+  [rowHeight]="28"
+  [headerHeight]="28">
+</ag-grid-angular>

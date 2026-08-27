@@ -382,6 +382,72 @@ public class SearchRepositoryIntegrationTests : IAsyncLifetime
         file1Results.First().Snapshots.Should().HaveCount(2);
     }
 
+    [Fact]
+    public async Task SearchAsync_WithSnapshotIdsFilter_BindsUlidsCorrectly()
+    {
+        // Arrange
+        var snapshot = CreateSnapshotWithFiles();
+        await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+
+        // Act - filter on the snapshot that contains the files
+        var matchingRequest = new SearchRequest
+        {
+            Query = "file",
+            IncludeFiles = true,
+            IncludeFolders = false,
+            SnapshotIds = [snapshot.Id]
+        };
+        var (_, matchingFiles) = await _searchRepository!.SearchAsync(matchingRequest, testUser.Id);
+
+        // Act - filter on a snapshot id that does not exist
+        var nonMatchingRequest = new SearchRequest
+        {
+            Query = "file",
+            IncludeFiles = true,
+            IncludeFolders = false,
+            SnapshotIds = [Ulid.NewUlid()]
+        };
+        var (_, nonMatchingFiles) = await _searchRepository.SearchAsync(nonMatchingRequest, testUser.Id);
+
+        // Assert - the Ulid IN-list must bind as stored 26-char strings
+        matchingFiles.Should().NotBeEmpty("files exist in the selected snapshot");
+        nonMatchingFiles.Should().BeEmpty("no files belong to an unknown snapshot");
+    }
+
+    [Fact]
+    public async Task SearchAsync_WithLabelIdsFilter_ReturnsOnlyLabeledSnapshotContent()
+    {
+        // Arrange
+        var snapshot = CreateSnapshotWithFiles();
+        var label = new LabelEntity { Name = "test-label", ColorHex = "#e57373", UserId = testUser.Id, User = testUser };
+        snapshot.Labels.Add(label);
+        await _fileSystemRepository!.AddSnapshotAsync(snapshot, testUser.Id);
+
+        // Act - filter on the assigned label
+        var matchingRequest = new SearchRequest
+        {
+            Query = "file",
+            IncludeFiles = true,
+            IncludeFolders = false,
+            LabelIds = [label.Id]
+        };
+        var (_, matchingFiles) = await _searchRepository!.SearchAsync(matchingRequest, testUser.Id);
+
+        // Act - filter on an unknown label
+        var nonMatchingRequest = new SearchRequest
+        {
+            Query = "file",
+            IncludeFiles = true,
+            IncludeFolders = false,
+            LabelIds = [Ulid.NewUlid()]
+        };
+        var (_, nonMatchingFiles) = await _searchRepository.SearchAsync(nonMatchingRequest, testUser.Id);
+
+        // Assert
+        matchingFiles.Should().NotBeEmpty("the snapshot carrying the files has the label");
+        nonMatchingFiles.Should().BeEmpty("no snapshot carries the unknown label");
+    }
+
     #endregion
 
     #region SearchAsync - Performance Tests

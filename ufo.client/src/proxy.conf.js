@@ -11,6 +11,7 @@ const PROXY_CONFIG = [
       "/api/weatherforecast",
       "/api/snapshot",
       "/api/filesystem",
+      "/api/label",
       "/api/labels",
       "/api/search"
     ],

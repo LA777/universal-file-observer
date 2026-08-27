@@ -27,34 +27,34 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 TODO:
 - Check get all snapshots summary - do not return user id
-- [UI] Snapsots page - add Lables
++ [UI] Snapsots page - add Lables
 - Add ability to save UI Theme name to DB and load it on UI
 - [UI] Add ability to change UI Theme
 - Create snapshot - check why no Volume and Storage info is populated
 - Add tests for SnapshotMapper
 - Front - when Snapshot is generating - show a spinner
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
-- Add Search by File name or Folder name
-- Search inside Snapshot/Snapshots
++ Add Search by File name or Folder name
++ Search inside Snapshot/Snapshots
 - [UI] Add Spinner while data is loading
-- [UI] Finish FolderTree Angular component
-- [UI] Change UI for Snapshot Tree MatTree
++ [UI] Finish FolderTree Angular component
++ [UI] Change UI for Snapshot Tree MatTree
 - [UI] Ability to View Photo, Video and TXT files
 - [UI] View file Hash (for files not in snapshot)
 - Delete User Account
 - Delete Snapshot Folder
 - Delete Snapshot File
 - API - Get Snapshots by Label
-- Add Indexes to DB
++ Add Indexes to DB
 - Delete All Snapshots. Labels shall preserve
 - Split Entites (UI)
 - add Encryption for all fields in DB
-- [UI] Remove Forecast Controller and UI tab
-- [UI] Create navigation for Forward and Backward
++ [UI] Remove Forecast Controller and UI tab
++ [UI] Create navigation for Forward and Backward
 - [UI] Ability to edit text files
 - [UI] Ability to Download files
 - [UI] Copy, Move, Delete files
-- [UI] Make Two panel file view
++ [UI] Make Two panel file view
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 - Add SSL certificate
 - Add Docker support

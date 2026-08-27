@@ -24,10 +24,21 @@ public class SearchController : ControllerBase
     public async Task<IActionResult> SearchAsync(SearchRequest searchRequest, CancellationToken cancellationToken)
     {
         _logger.LogInformation("SearchAsync");
+
+        if (!searchRequest.HasAnyCriteria)
+        {
+            return BadRequest("At least one search criterion is required.");
+        }
+
+        if (searchRequest.Query.Length is > 0 and < 3)
+        {
+            return BadRequest("Query must be at least 3 characters long.");
+        }
+
         var userId = HttpContext.GetUserIdAsUlid();
 
         var result = await _searchService.SearchAsync(searchRequest, userId, cancellationToken);
-        if (result.Files.Count > 0 && result.Folders.Count > 0)
+        if (result.Files.Count > 0 || result.Folders.Count > 0)
         {
             return Ok(result);
         }

@@ -14,6 +14,7 @@ public static class PcMapper
         return new PcDto
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Name = entity.Name,
             MachineId = entity.MachineId,
             HardwareUuid = entity.HardwareUuid,

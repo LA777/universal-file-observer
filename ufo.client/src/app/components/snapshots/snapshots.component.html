@@ -1,98 +1,49 @@
-@if (selectedSnapshot) {
-  <div>
-    <div>Snapshot root folder: [{{selectedSnapshot.rootFolder?.name}}] Snapshot ID: [{{selectedSnapshot.id}}]</div>
-  </div>
-}
-<div class="buttons-list">
+<div class="snapshots-toolbar">
+  <button class="toolbar-button delete-button" [disabled]="!selectedSnapshot" (click)="deleteSnapshot(selectedSnapshot!.id)" title="Delete the selected snapshot">
+    <mat-icon>delete</mat-icon>
+    Delete Snapshot
+  </button>
 
-  <button [disabled]="!selectedSnapshot" title="" (click)="deleteSnapshot(selectedSnapshot.id)">Delete
-  Snapshot</button>
+  <button class="toolbar-button" [disabled]="!selectedSnapshot" (click)="openLabelDialog()" title="Assign labels to the selected snapshot">
+    <mat-icon>label</mat-icon>
+    Labels
+  </button>
 
+  @if (activeLabelFilter) {
+    <span class="filter-chip" [style.border-color]="activeLabelFilter.colorHex || '#7986cb'">
+      <mat-icon>filter_alt</mat-icon>
+      {{activeLabelFilter.name}}
+      <button class="chip-clear" (click)="clearLabelFilter()" title="Clear label filter">
+        <mat-icon>close</mat-icon>
+      </button>
+    </span>
+  }
+
+  @if (selectedSnapshot) {
+    <span class="selection-info" [title]="selectedSnapshot.id">
+      <mat-icon class="folder-icon">folder</mat-icon>
+      <span class="selection-name">{{selectedSnapshot.rootOnlyFolder?.name ?? selectedSnapshot.rootFolder?.name}}</span>
+      <span class="selection-id">{{selectedSnapshot.id}}</span>
+    </span>
+  } @else {
+    <span class="selection-hint">Select a snapshot — double-click opens its tree</span>
+  }
 </div>
-
-
 
 @if (!snapshots) {
-  <p><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
+  <p class="loading-hint"><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
 }
 
-
-
-
-<div class="folder-panel-wrapper">
-  <div class="folder-details-panel">
-
-    <table mat-table [dataSource]="snapshots" matSort (matSortChange)="announceSortChange($event)"
-      class="mat-elevation-z8">
-
-      <ng-container matColumnDef="PcName">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Pc Name">
-          Pc Name
-        </th>
-        <td mat-cell *matCellDef="let element"> {{element.volumeInfo?.volume?.storageDrive?.pcs?.[0]?.name}}
-          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
-            [matTooltip]="element.volumeInfo?.volume?.storageDrive?.pcs?.[0] ? getPcTooltip(element.volumeInfo?.volume?.storageDrive?.pcs?.[0]) : ''"
-          matTooltipPosition="above">table_view</mat-icon>
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="StorageDriveName">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Storage Drive Name">
-          Storage Drive Name
-        </th>
-        <td mat-cell *matCellDef="let element">
-          {{element.volumeInfo?.volume?.storageDrive?.name}} {{element.volumeInfo?.volume?.driveLetter}}
-          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
-            [matTooltip]="element.volumeInfo?.volume?.storageDrive ? getStorageDriveTooltip(element.volumeInfo?.volume?.storageDrive) : ''"
-          matTooltipPosition="above">table_view</mat-icon>
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="VolumeDriveLetter">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Volume Drive Letter">
-          Volume Drive Letter
-        </th>
-        <td mat-cell *matCellDef="let element">
-          {{element.volumeInfo?.volume?.driveLetter}}
-          <mat-icon matTooltipHideDelay="200" matTooltipShowDelay="200" matTooltipClass="mat-tooltip-storage-drive"
-          [matTooltip]="element.volumeInfo ? getVolumeInfoTooltip(element.volumeInfo) : ''" matTooltipPosition="above">table_view</mat-icon>
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="SnapshotId">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Id">
-          Snapshot Id
-        </th>
-        <td mat-cell *matCellDef="let element"> {{element.id}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="SnapshotTimestamp">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Snapshot Timestamp">
-          Snapshot Timestamp
-        </th>
-        <td mat-cell *matCellDef="let element"> {{element.timestamp}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="RootFolderName">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Name">
-          RootFolder Name
-        </th>
-        <td mat-cell *matCellDef="let element"> {{element.rootOnlyFolder?.name}} </td>
-      </ng-container>
-
-      <ng-container matColumnDef="RootFolderSize">
-        <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by RootFolder Size">
-          RootFolder Size
-        </th>
-        <td mat-cell *matCellDef="let element"> {{element.rootOnlyFolder?.size}} </td>
-      </ng-container>
-
-
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"
-      (click)="selectSnapshot(row)" [style.background-color]="row === selectedSnapshot ? 'cyan' : ''"></tr>
-
-    </table>
-
-  </div>
-</div>
+<ag-grid-angular
+  class="snapshots-grid"
+  [theme]="gridTheme"
+  [rowData]="filteredSnapshots"
+  [columnDefs]="columnDefs"
+  [defaultColDef]="defaultColDef"
+  [rowSelection]="rowSelection"
+  [rowHeight]="28"
+  [headerHeight]="28"
+  [tooltipShowDelay]="300"
+  (selectionChanged)="onSelectionChanged($event)"
+  (rowDoubleClicked)="onRowDoubleClicked($event)">
+</ag-grid-angular>

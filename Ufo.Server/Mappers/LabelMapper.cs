@@ -9,6 +9,7 @@ public static class LabelMapper
         new()
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Name = entity.Name,
             ColorHex = entity.ColorHex,
             SnapshotIds = entity.Snapshots.Select(s => s.Id).ToList() // TODO LA - Cover this line with Tests and update existent tests

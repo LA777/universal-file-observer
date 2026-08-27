@@ -11,6 +11,7 @@ public static class SnapshotMapper
         new()
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Description = entity.Description,
             Timestamp = entity.Timestamp,
             Labels = entity.Labels.ToDtoList(),
@@ -25,6 +26,7 @@ public static class SnapshotMapper
         new()
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Description = entity.Description,
             Timestamp = entity.Timestamp,
             Labels = entity.Labels.ToDtoList(),
