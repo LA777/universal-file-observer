@@ -408,6 +408,11 @@ FodyWeavers.xsd
 /build-frontend.sh
 /check-wwwroot.bat
 
+# Angular local environment files - hold local dev credentials.
+# environment.example.ts is tracked as the template to copy from.
+/ufo.client/src/environments/environment.ts
+/ufo.client/src/environments/environment.prod.ts
+
 # AI generated documents
 AI_*.md
 AI_*.txt
