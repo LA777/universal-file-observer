@@ -1,0 +1,32 @@
+services:
+  ufo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ufo:latest
+    container_name: ufo
+    restart: unless-stopped
+    ports:
+      # Host port : container port. TLS is expected to be terminated by a reverse
+      # proxy in front of this; the application does not serve HTTPS in a
+      # container (Ufo__EnableHttpsRedirection stays false).
+      - "8080:8080"
+    environment:
+      # Required. Generate your own and keep them out of source control:
+      #   openssl rand -hex 32
+      JWT__Key: "${UFO_JWT_KEY:?set UFO_JWT_KEY in .env}"
+      ApplicationSettings__HashSalt: "${UFO_HASH_SALT:?set UFO_HASH_SALT in .env}"
+      # Every folder listed here must also be mounted below, and vice versa.
+      Ufo__AllowedRoots__0: /library
+      # Identity recorded against each snapshot. Set it to something stable for
+      # this deployment, otherwise the container's regenerated /etc/machine-id is
+      # used and snapshot history fragments whenever the container is recreated.
+      Ufo__MachineId: "${UFO_MACHINE_ID:-}"
+    volumes:
+      # Database, rolling logs and the generated machine id.
+      - ufo-data:/data
+      # The folders to index. Read-only: UFO only ever reads what it indexes.
+      - "${UFO_LIBRARY_PATH:-./library}:/library:ro"
+
+volumes:
+  ufo-data:

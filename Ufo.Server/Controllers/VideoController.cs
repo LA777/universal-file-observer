@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Mime;
+using Ufo.Server.Services;
 
 namespace Ufo.Server.Controllers;
 
@@ -10,6 +11,13 @@ namespace Ufo.Server.Controllers;
 public class VideoController : ControllerBase
 {
     // TODO LA - Cover with Functional tests
+    private readonly IPathGuard _pathGuard;
+
+    public VideoController(IPathGuard pathGuard)
+    {
+        _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
+    }
+
     [HttpGet()]
     public IActionResult GetVideo([FromQuery]string filePath)
     {
@@ -18,12 +26,16 @@ public class VideoController : ControllerBase
             return BadRequest("File path cannot be empty.");
         }
 
-        // Basic path validation to prevent directory traversal attacks
-        // Ensure the file path doesn't contain path separators or tries to escape the base path.
-        if (filePath.Contains("..") /*|| Path.IsPathRooted(filePath)*/)
+        // The path is canonicalised (relative segments and symbolic links
+        // resolved) and checked against the host's allowed roots. The previous
+        // check rejected ".." but explicitly permitted absolute paths, so any
+        // file on the machine was readable.
+        if (!_pathGuard.TryResolve(filePath, out var resolvedFilePath))
         {
-            return BadRequest("Invalid file path.");
+            return Forbid();
         }
+
+        filePath = resolvedFilePath;
 
         if (!System.IO.File.Exists(filePath))
         {

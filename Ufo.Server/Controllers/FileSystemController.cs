@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Runtime.InteropServices;
 using Ufo.Abstractions.Requests;
 using Ufo.Server.Models;
+using Ufo.Server.Services;
 
 namespace Ufo.Server.Controllers;
 
@@ -13,10 +13,12 @@ public class FileSystemController : ControllerBase
 {
     // TODO LA - Cover with Functional tests
     private readonly ILogger<FileSystemController> _logger;
+    private readonly IPathGuard _pathGuard;
 
-    public FileSystemController(ILogger<FileSystemController> logger)
+    public FileSystemController(ILogger<FileSystemController> logger, IPathGuard pathGuard)
     {
         _logger = logger;
+        _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
     }
 
     [HttpGet("root")]
@@ -27,18 +29,19 @@ public class FileSystemController : ControllerBase
         _logger.LogInformation("GetFileSystemRoot");
         var fileSystemRoot = new FileSystemRoot();
 
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        foreach (var root in EnumerateRoots())
         {
-            foreach (DriveInfo driveInfo in DriveInfo.GetDrives())
-            {
-                fileSystemRoot.Drives.Add(driveInfo.Name);
-            }
+            fileSystemRoot.Roots.Add(root);
         }
 
-        var homeFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        var pathModel = new PathRequest { Path = homeFolderPath };
+        var startingFolderPath = ResolveStartingFolderPath(fileSystemRoot.Roots);
+        if (startingFolderPath == null)
+        {
+            _logger.LogWarning("No readable starting folder could be resolved.");
+            return NoContent();
+        }
 
-        var folderEntity = GetFolder(pathModel, cancellationToken);
+        var folderEntity = GetFolder(new PathRequest { Path = startingFolderPath }, cancellationToken);
         if (folderEntity == null)
         {
             return NoContent();
@@ -49,13 +52,61 @@ public class FileSystemController : ControllerBase
         return Ok(fileSystemRoot);
     }
 
+    /// <summary>
+    /// Top-level locations offered to the user.
+    /// </summary>
+    /// <remarks>
+    /// Previously this listed Windows drive letters only, leaving the list empty
+    /// on any other platform. A restricted host offers exactly what it allows;
+    /// an unrestricted POSIX host offers the file-system root.
+    /// </remarks>
+    private IEnumerable<string> EnumerateRoots()
+    {
+        if (_pathGuard.IsRestricted)
+        {
+            return _pathGuard.AllowedRoots;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return DriveInfo.GetDrives().Select(driveInfo => driveInfo.Name);
+        }
+
+        return [Path.GetPathRoot(Environment.CurrentDirectory) ?? "/"];
+    }
+
+    /// <summary>
+    /// The folder the UI opens on: the user's home folder when it is readable,
+    /// otherwise the first available root.
+    /// </summary>
+    private string? ResolveStartingFolderPath(IList<string> roots)
+    {
+        var homeFolderPath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        if (!string.IsNullOrWhiteSpace(homeFolderPath)
+            && _pathGuard.TryResolve(homeFolderPath, out var resolvedHomeFolderPath)
+            && Directory.Exists(resolvedHomeFolderPath))
+        {
+            return resolvedHomeFolderPath;
+        }
+
+        return roots.FirstOrDefault(root => Directory.Exists(root));
+    }
+
     [HttpPost("folder")]
     [ProducesResponseType(typeof(FsFolder), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public IActionResult GetFolderInfo([FromBody] PathRequest folderPath, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetFolderInfo");
-        var folderEntity = GetFolder(folderPath, cancellationToken);
+
+        if (!_pathGuard.TryResolve(folderPath.Path, out var resolvedPath))
+        {
+            return Forbid();
+        }
+
+        var folderEntity = GetFolder(new PathRequest { Path = resolvedPath }, cancellationToken);
         if (folderEntity == null)
         {
             return NoContent();
@@ -115,11 +166,22 @@ public class FileSystemController : ControllerBase
     [HttpPost("search")]
     [ProducesResponseType(typeof(List<FsSearchResult>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public IActionResult SearchFileSystem([FromBody] FileSystemSearchRequest request, CancellationToken cancellationToken)
     {
         _logger.LogInformation("SearchFileSystem - Path: {Path}, Query: {Query}", request.Path, request.Query);
 
-        if (string.IsNullOrWhiteSpace(request.Path) || !Directory.Exists(request.Path))
+        if (string.IsNullOrWhiteSpace(request.Path))
+        {
+            return BadRequest("A valid root path is required.");
+        }
+
+        if (!_pathGuard.TryResolve(request.Path, out var searchRootPath))
+        {
+            return Forbid();
+        }
+
+        if (!Directory.Exists(searchRootPath))
         {
             return BadRequest("A valid root path is required.");
         }
@@ -139,7 +201,17 @@ public class FileSystemController : ControllerBase
 
         var results = new List<FsSearchResult>();
         var pending = new Stack<string>();
-        pending.Push(request.Path);
+
+        // Guarding only the starting path is not enough: the walk descends into
+        // whatever it finds, and a symbolic link inside an allowed root leads
+        // straight out of it. Every directory is re-checked before it is queued,
+        // and the set of directories already visited - keyed on the resolved
+        // physical path - is what stops a link cycle from looping forever.
+        var visitedDirectories = new HashSet<string>(
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
+        pending.Push(searchRootPath);
+        visitedDirectories.Add(searchRootPath);
 
         while (pending.Count > 0 && results.Count < maxResults && !cancellationToken.IsCancellationRequested)
         {
@@ -149,20 +221,26 @@ public class FileSystemController : ControllerBase
             {
                 foreach (var subDir in Directory.EnumerateDirectories(currentDir))
                 {
-                    pending.Push(subDir);
+                    if (!_pathGuard.TryResolve(subDir, out var resolvedSubDir)
+                        || !visitedDirectories.Add(resolvedSubDir))
+                    {
+                        continue;
+                    }
+
+                    pending.Push(resolvedSubDir);
 
                     if (!request.IncludeFolders || results.Count >= maxResults)
                     {
                         continue;
                     }
 
-                    var dirInfo = new DirectoryInfo(subDir);
+                    var dirInfo = new DirectoryInfo(resolvedSubDir);
                     if (MatchesName(dirInfo.Name) && MatchesDate(dirInfo.LastWriteTime))
                     {
                         results.Add(new FsSearchResult
                         {
                             Name = dirInfo.Name,
-                            FullPath = subDir,
+                            FullPath = resolvedSubDir,
                             IsFile = false,
                             Size = null,
                             ModifiedAt = dirInfo.LastWriteTime,
@@ -181,6 +259,14 @@ public class FileSystemController : ControllerBase
                     if (results.Count >= maxResults)
                     {
                         break;
+                    }
+
+                    // A symbolic link to a file outside the allowed roots would
+                    // otherwise be listed here. Only worth the extra syscalls when
+                    // an allow-list is actually in force.
+                    if (_pathGuard.IsRestricted && !_pathGuard.TryResolve(filePath, out _))
+                    {
+                        continue;
                     }
 
                     var fileInfo = new FileInfo(filePath);
@@ -237,11 +323,18 @@ public class FileSystemController : ControllerBase
     [HttpPost("parent")]
     [ProducesResponseType(typeof(FsFolder), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetParentFolderInfo([FromBody] PathRequest folderPath, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetParentFolderInfo");
-        string? parent = new DirectoryInfo(folderPath.Path).Parent?.FullName;
+
+        if (!_pathGuard.TryResolve(folderPath.Path, out var resolvedPath))
+        {
+            return Forbid();
+        }
+
+        string? parent = new DirectoryInfo(resolvedPath).Parent?.FullName;
 
         if (parent is null)
         {

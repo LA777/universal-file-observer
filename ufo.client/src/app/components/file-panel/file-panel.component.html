@@ -6,9 +6,9 @@
   @if (selectedFolder) {
     <div class="panel-header">
       <div class="drive-list">
-        @for (drive of fileSystemRoot.drives; track drive) {
-          <button (click)="navigateToPath(drive)" title="{{drive}}">
-            {{drive.substring(0,1)}}
+        @for (root of fileSystemRoot.roots; track root) {
+          <button (click)="navigateToPath(root)" title="{{root}}">
+            {{rootLabel(root)}}
           </button>
         }
         <button (click)="navigateToPath(fileSystemRoot.folder.fullPath)" title="{{fileSystemRoot.folder.fullPath}}">

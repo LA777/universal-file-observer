@@ -239,7 +239,7 @@ public class FileSystemControllerFunctionalTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("\"folder\"", content);
-        Assert.Contains("\"drives\"", content);
+        Assert.Contains("\"roots\"", content);
     }
 
     #endregion

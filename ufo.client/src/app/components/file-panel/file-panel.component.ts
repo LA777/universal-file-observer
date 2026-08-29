@@ -54,6 +54,21 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.subscriptionCreateSnapshot?.unsubscribe();
   }
 
+  /**
+   * Short button label for a root. A Windows drive keeps its letter; a POSIX
+   * mount is named after its last segment, since every one of them starts with
+   * '/' and taking the first character would label them all identically.
+   */
+  rootLabel(root: string): string {
+    if (/^[a-zA-Z]:/.test(root)) {
+      return root.substring(0, 1).toUpperCase();
+    }
+
+    const segments = root.split(/[\\/]+/).filter(segment => segment.length > 0);
+
+    return segments.length === 0 ? '/' : segments[segments.length - 1];
+  }
+
   onPanelClick() {
     if (!this.isActive) {
       this.activate.emit();

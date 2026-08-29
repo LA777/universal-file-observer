@@ -1,0 +1,114 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe keeps the console window hidden behind the tray icon. -->
+    <OutputType>WinExe</OutputType>
+    <!-- net10.0-windows is what defines the WINDOWS compilation symbol and makes
+         WinForms available; it is also what lets the WMI provider compile. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Lets the project compile on Linux/macOS build agents. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>ufo</AssemblyName>
+    <RootNamespace>Ufo.Desktop</RootNamespace>
+    <ApplicationIcon>Resources\ufo.ico</ApplicationIcon>
+    <!-- Trimming the satellite resource languages saves ~10 MB in the
+         self-contained single file and costs nothing for an English-only UI. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- The Angular bundle is embedded rather than copied, so publishing really
+         does produce one file. See _docs/AI_DUAL_TARGET_PLAN.md section 4.3. -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <!-- Symbols go inside the assembly rather than a loose .pdb next to the exe. -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">embedded</DebugType>
+    <!-- Keeps referenced projects' .pdb and .xml files out of the output. -->
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+    <SpaRoot>..\ufo.client\</SpaRoot>
+    <SpaDist>$(SpaRoot)dist\ufo.client\browser\</SpaDist>
+  </PropertyGroup>
+
+  <!-- Single-file publish, enabled with -p:PublishDesktop=true (publish-desktop.ps1).
+       Scoped to this project rather than passed as a command-line runtime
+       identifier or self-contained switch: those are global properties and would force the referenced
+       RID-agnostic libraries to resolve a runtime identifier of their own, which
+       fails the build. Self-contained bundling happens here and pulls the
+       referenced managed assemblies in regardless.
+       IncludeNativeLibrariesForSelfExtract is the one that matters most - the
+       SQLite native library (e_sqlite3.dll) would otherwise be written beside the
+       executable and it would no longer be a single file.
+       Trimming is off deliberately: Dapper, Swashbuckle and the model binder are
+       reflection-heavy and would break under it. -->
+  <PropertyGroup Condition="'$(PublishDesktop)' == 'true'">
+    <!-- Ufo.Server is itself an executable (the headless entry point), and a
+         self-contained executable may not reference a framework-dependent one.
+         Only its managed assembly is consumed here, so the check is waived.
+         https://aka.ms/netsdk1150 -->
+    <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ufo.Server is a Web SDK project; a plain SDK project hosting it needs the
+         ASP.NET Core shared framework referenced explicitly. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ufo.Abstractions\Ufo.Abstractions.csproj" />
+    <ProjectReference Include="..\Ufo.Platform.Windows\Ufo.Platform.Windows.csproj" />
+    <ProjectReference Include="..\Ufo.Server\Ufo.Server.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Loaded by the tray icon at runtime. -->
+    <EmbeddedResource Include="Resources\ufo.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Configuration stays on disk next to the executable so the port and data
+         directory can be changed without a rebuild. -->
+    <Content Include="..\Ufo.Server\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Evaluated when the project loads, so the Angular bundle must already be
+         built. publish-desktop.ps1 does both steps in order; the AssertSpaEmbedded
+         target below fails the publish loudly if it was skipped. -->
+    <EmbeddedResource Include="$(SpaDist)**\*" Exclude="$(SpaDist)**\*.map">
+      <!-- The manifest generator splits this on the platform's path separator, so
+           a hard-coded backslash produces one flat file named "wwwroot\index.html"
+           on Linux build agents instead of a wwwroot directory. -->
+      <Link>wwwroot$([System.IO.Path]::DirectorySeparatorChar)%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Ufo.Server is an executable project, so its host, dependency manifest and
+       development configuration are copied here as if they were being deployed.
+       None of that belongs beside a single-file desktop build - the goal is
+       ufo.exe plus one editable appsettings.json. -->
+  <Target Name="TrimDesktopPublishOutput" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish
+        Remove="@(ResolvedFileToPublish)"
+        Condition="'%(Extension)' == '.pdb'
+                   Or '%(ResolvedFileToPublish.RelativePath)' == 'Ufo.Server'
+                   Or '%(ResolvedFileToPublish.RelativePath)' == 'Ufo.Server.exe'
+                   Or '%(ResolvedFileToPublish.RelativePath)' == 'Ufo.Server.deps.json'
+                   Or '%(ResolvedFileToPublish.RelativePath)' == 'Ufo.Server.runtimeconfig.json'
+                   Or '%(ResolvedFileToPublish.RelativePath)' == 'appsettings.Development.json'" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="AssertSpaEmbedded" BeforeTargets="Publish">
+    <Error Condition="!Exists('$(SpaDist)index.html')"
+           Text="The Angular bundle was not found at $(SpaDist). Build the front end before publishing (publish-desktop.ps1 does this), otherwise the executable would ship without a UI." />
+  </Target>
+
+</Project>

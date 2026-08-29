@@ -8,32 +8,43 @@
 		<DefaultItemExcludes>$(DefaultItemExcludes);$(SpaRoot)node_modules\**</DefaultItemExcludes>
 		<SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
 		<SpaProxyServerUrl>https://localhost:4200</SpaProxyServerUrl>
-		<AssemblyName>ufo</AssemblyName>
 	</PropertyGroup>
+
+	<ItemGroup>
+		<!-- Development configuration carries its own JWT key and salt; it has no
+		     business inside a published artifact. -->
+		<Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
-		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.9" />
+		<!-- Development only: the container image and the desktop executable must not ship it. -->
+		<PackageReference Include="Microsoft.AspNetCore.SpaProxy" Version="10.0.9" Condition="'$(Configuration)' == 'Debug'" />
 		<PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
 		<PackageReference Include="Serilog" Version="4.4.0" />
 		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
 		<PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
 		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
-		<PackageReference Include="System.Management" Version="10.0.9" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Ufo.Abstractions\Ufo.Abstractions.csproj" />
-		<ProjectReference Include="..\ufo.client\ufo.client.esproj">
+		<!-- Excluded with -p:BuildSpa=false: the Docker build stage does not copy the
+		     Angular sources into the .NET SDK image, and building an esproj there
+		     would need Node anyway. -->
+		<ProjectReference Include="..\ufo.client\ufo.client.esproj" Condition="'$(BuildSpa)' != 'false'">
 			<ReferenceOutputAssembly>false</ReferenceOutputAssembly>
 		</ProjectReference>
 		<ProjectReference Include="..\Ufo.Database\Ufo.Database.csproj" />
 	</ItemGroup>
 
-	<Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish">
+	<!-- Skipped with -p:BuildSpa=false, which is what the Docker build does: the
+	     Angular bundle is produced by a dedicated node stage so the .NET SDK image
+	     does not need Node installed. -->
+	<Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish" Condition="'$(BuildSpa)' != 'false'">
 		<Exec WorkingDirectory="$(SpaRoot)" Command="npm install" />
 		<Exec WorkingDirectory="$(SpaRoot)" Command="npm run build -- --configuration production" />
 

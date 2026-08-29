@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Lets the project compile on Linux/macOS build agents. It still only runs
+         on Windows; this only makes the reference packs restorable elsewhere. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Windows-only dependencies live here and nowhere else, so the container
+         image never carries them. -->
+    <PackageReference Include="System.Management" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ufo.Abstractions\Ufo.Abstractions.csproj" />
+    <ProjectReference Include="..\Ufo.Server\Ufo.Server.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -12,7 +12,8 @@ There is no background watcher — observation is explicit, point-in-time snapsh
 |---|---|
 | Back-end | ASP.NET Core Web API (**.NET 10**), JWT auth (Bearer), Serilog, Swagger/OpenAPI |
 | Database | **SQLite** via **Dapper** (raw SQL, no EF Core, schema created at startup) |
-| Front-end | **Angular 21** + Angular Material (standalone bootstrap), served as SPA from `Ufo.Server/wwwroot` |
+| Front-end | **Angular 21** + Angular Material (standalone bootstrap), served from `Ufo.Server/wwwroot` or embedded in the desktop executable |
+| Packaging | Single self-contained `ufo.exe` (Windows tray app) and a Linux container image, from one codebase |
 | Tests | xUnit: unit (Moq/AutoFixture), integration (in-memory SQLite), functional (`WebApplicationFactory`) |
 
 ## Solution structure
@@ -21,7 +22,9 @@ There is no background watcher — observation is explicit, point-in-time snapsh
 |---|---|
 | `Ufo.Abstractions` | Shared contracts: entities, DTOs, requests/responses, repository interfaces, options |
 | `Ufo.Database` | Dapper repositories, SQLite connection factory, schema DDL (`SqlScripts.cs`) |
-| `Ufo.Server` | Web API: controllers, services, JWT, Swagger, SPA hosting (`Program.cs`) |
+| `Ufo.Server` | Web API: controllers, services, JWT, Swagger, SPA hosting. `Hosting/UfoHost.cs` is the shared composition root; `Program.cs` is the headless/container entry point |
+| `Ufo.Platform.Windows` | Windows-only system information (WMI + registry). Referenced by the desktop application, never by the container |
+| `Ufo.Desktop` | Windows tray application (`net10.0-windows`, WinForms) — publishes as a single `ufo.exe` |
 | `Ufo.UnitTests` | Unit tests |
 | `Ufo.IntegrationTests` | Repository tests against real in-memory SQLite |
 | `Ufo.FunctionalTests` | End-to-end HTTP tests over the real app |
@@ -76,6 +79,53 @@ Then run the server — it serves the SPA and opens the browser at `https://loca
 ```
 dotnet run --project Ufo.Server
 ```
+
+### Run as a Windows desktop application (single `ufo.exe`)
+
+`Ufo.Desktop` hosts the same web application behind a notification-area icon. Publishing
+builds the Angular bundle, embeds it into the executable, and produces one self-contained
+file (~67 MB) plus an editable `appsettings.json`:
+
+```
+cd c:\GitHub\LA777\universal-file-observer
+```
+
+```
+.\publish-desktop.ps1
+```
+
+The database, logs and generated machine id live in `%LOCALAPPDATA%\UFO`, not beside the
+executable.
+
+### Run in a container
+
+The container image is headless: no browser launch, HTTP only (terminate TLS upstream),
+and file-system access restricted to what you mount in.
+
+```
+cd /path/to/universal-file-observer
+```
+
+```
+docker compose up -d --build
+```
+
+Compose reads these from the environment or a local `.env` file:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `UFO_JWT_KEY` | yes | JWT signing key. Compose fails fast if unset — the value in `appsettings.json` is shared by every copy of the image. |
+| `UFO_HASH_SALT` | yes | Password hash salt. Same reasoning. |
+| `UFO_LIBRARY_PATH` | no (`./library`) | Host folder to index. Mounted **read-only** at `/library`, which is the only path the browse, search and video endpoints will serve. |
+| `UFO_MACHINE_ID` | no | Identity recorded against each snapshot. Worth setting: a container's own `/etc/machine-id` is regenerated whenever the container is recreated, which fragments snapshot history. |
+
+Generate the two secrets with `openssl rand -hex 32`.
+
+Everything that differs between the two hosts is an explicit setting under the `Ufo`
+configuration section (`Ufo__DataDirectory`, `Ufo__AllowedRoots__0`,
+`Ufo__OpenBrowserOnStartup`, `Ufo__EnableHttpsRedirection`, `Ufo__EnableFileLogging`,
+`Ufo__MachineId`) rather than a runtime platform check. See
+`_docs/AI_DUAL_TARGET_PLAN.md`.
 
 ### First run
 1. The SQLite database (`Ufo.Server/ufo.db`) and its schema are created automatically at startup.

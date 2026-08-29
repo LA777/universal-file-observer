@@ -97,7 +97,12 @@ export interface SnapshotData {
 }
 
 export interface FileSystemRoot {
-  drives: string[];
+  /**
+   * Top-level locations the user can jump to. Drive letters on Windows
+   * ("C:\\"), the configured allowed roots when the server restricts access,
+   * and "/" on an unrestricted Linux or macOS host.
+   */
+  roots: string[];
   folder: Folder
 }
 

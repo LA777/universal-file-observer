@@ -26,13 +26,14 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
+- split Windows App and Docker
 - migrate to Angular 22
 - _docs/AI_SOLUTION_REVIEW.md
 - Check get all snapshots summary - do not return user id
 + [UI] Snapsots page - add Lables
 - Add ability to save UI Theme name to DB and load it on UI
 - [UI] Add ability to change UI Theme
-- Create snapshot - check why no Volume and Storage info is populated
++ Create snapshot - check why no Volume and Storage info is populated (#if WINDOWS was never defined; Windows provider now lives in Ufo.Platform.Windows)
 - Add tests for SnapshotMapper
 - Front - when Snapshot is generating - show a spinner
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
@@ -59,8 +60,8 @@ TODO:
 + [UI] Make Two panel file view
 - Split Ufo.Abstractions into: Ufo.Server.Abstractions and Ufo.Database.Abstractions
 - Add SSL certificate
-- Add Docker support
-- Add ability to run in Linux and MacOS
++ Add Docker support (Dockerfile / docker-compose.yml)
++ Add ability to run in Linux and MacOS (PosixSystemInfoProvider)
 - Add Tags, Ratings, Flags to File/Folder
 - add functional tests for VideoController
 - Finish Functional test coverage

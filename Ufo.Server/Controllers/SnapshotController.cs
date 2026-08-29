@@ -8,6 +8,7 @@ using Ufo.Abstractions.Requests;
 using Ufo.Extensions;
 using Ufo.Server.Attributes;
 using Ufo.Server.Mappers;
+using Ufo.Server.Services;
 
 namespace Ufo.Server.Controllers;
 
@@ -23,17 +24,20 @@ public class SnapshotController : ControllerBase
     private readonly ISnapshotRepository _repository;
     private readonly IUserRepository _userRepository;
     private readonly ISystemInfoProvider _systemInfoProvider;
+    private readonly IPathGuard _pathGuard;
 
     public SnapshotController(
         ILogger<SnapshotController> logger,
         ISnapshotRepository repository,
         ISystemInfoProvider systemInfoProvider,
-        IUserRepository userRepository)
+        IUserRepository userRepository,
+        IPathGuard pathGuard)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _systemInfoProvider = systemInfoProvider ?? throw new ArgumentNullException(nameof(systemInfoProvider));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
+        _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
     }
 
     [HttpGet("latest")]
@@ -90,14 +94,19 @@ public class SnapshotController : ControllerBase
         _logger.LogInformation("CreateSnapshotAsync");
         var userId = HttpContext.GetUserIdAsUlid();
 
-        if (!Directory.Exists(folderPath.Path))
+        if (!_pathGuard.TryResolve(folderPath.Path, out var snapshotRootPath))
         {
-            throw new DirectoryNotFoundException(folderPath.Path);
+            return Forbid();
+        }
+
+        if (!Directory.Exists(snapshotRootPath))
+        {
+            throw new DirectoryNotFoundException(snapshotRootPath);
         }
 
         var user = await _userRepository.GetUserByIdAsync(userId);
-        var snapshot = _systemInfoProvider.GetSystemInformation(folderPath.Path, user);
-        var folderTree = CreateFolderTree(folderPath.Path, snapshot, null, user);
+        var snapshot = _systemInfoProvider.GetSystemInformation(snapshotRootPath, user);
+        var folderTree = CreateFolderTree(snapshotRootPath, snapshot, null, user);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
         await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);
