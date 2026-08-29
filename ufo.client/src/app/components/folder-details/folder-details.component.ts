@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, ChangeDetectionStrategy } from '@angular/core';
 import { AgGridAngular } from 'ag-grid-angular';
 import {
   ColDef,
@@ -16,6 +16,7 @@ import { darkGridTheme } from '../../shared/grid-theme';
   standalone: true,
   templateUrl: './folder-details.component.html',
   styleUrl: './folder-details.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [AgGridAngular],
 })
 export class FolderDetailsComponent implements OnChanges {

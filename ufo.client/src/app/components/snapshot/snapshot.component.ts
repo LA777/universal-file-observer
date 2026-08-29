@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, OnDestroy, OnInit, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTree, MatTreeModule, MatTreeNestedDataSource } from '@angular/material/tree';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -13,6 +13,7 @@ import { darkGridTheme } from '../../shared/grid-theme';
   templateUrl: './snapshot.component.html',
   styleUrl: './snapshot.component.css',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [MatTreeModule, MatIconModule, AgGridAngular],
 })
 export class SnapshotComponent implements OnInit, OnDestroy {

@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -16,6 +16,7 @@ import { FolderDetailsComponent } from '../folder-details/folder-details.compone
   standalone: true,
   templateUrl: './file-panel.component.html',
   styleUrl: './file-panel.component.css',
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [CommonModule, MatButtonModule, MatIconModule, MatProgressBarModule, FolderDetailsComponent]
 })
 export class FilePanelComponent implements OnInit, OnDestroy {

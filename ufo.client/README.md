@@ -1,6 +1,6 @@
 # UfoClient — UFO Front-end
 
-Angular **21** single-page application for UFO (Universal File Observer). Built with Angular Material + CDK, it provides login/registration and a tabbed dashboard for browsing the file system, creating and inspecting snapshots, and managing labels.
+Angular **22** single-page application for UFO (Universal File Observer). Built with Angular Material + CDK, it provides login/registration and a tabbed dashboard for browsing the file system, creating and inspecting snapshots, and managing labels.
 
 ## How it's wired
 

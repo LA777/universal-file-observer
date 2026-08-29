@@ -12,7 +12,7 @@ There is no background watcher — observation is explicit, point-in-time snapsh
 |---|---|
 | Back-end | ASP.NET Core Web API (**.NET 10**), JWT auth (Bearer), Serilog, Swagger/OpenAPI |
 | Database | **SQLite** via **Dapper** (raw SQL, no EF Core, schema created at startup) |
-| Front-end | **Angular 21** + Angular Material (standalone bootstrap), served from `Ufo.Server/wwwroot` or embedded in the desktop executable |
+| Front-end | **Angular 22** + Angular Material (standalone bootstrap), served from `Ufo.Server/wwwroot` or embedded in the desktop executable |
 | Packaging | Single self-contained `ufo.exe` (Windows tray app) and a Linux container image, from one codebase |
 | Tests | xUnit: unit (Moq/AutoFixture), integration (in-memory SQLite), functional (`WebApplicationFactory`) |
 
@@ -34,7 +34,7 @@ There is no background watcher — observation is explicit, point-in-time snapsh
 
 ### Prerequisites
 - .NET 10 SDK
-- Node.js (Angular CLI 21: `npm install -g @angular/cli`)
+- Node.js `^22.22.3 || ^24.15.0 || >=26.0.0` — the range Angular CLI 22 enforces (odd-numbered releases such as 23.x and 25.x are rejected). CLI: `npm install -g @angular/cli`
 
 ### Run in development (two processes)
 

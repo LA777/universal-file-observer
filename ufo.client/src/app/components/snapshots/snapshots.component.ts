@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnDestroy, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, ChangeDetectionStrategy } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialog } from '@angular/material/dialog';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -23,6 +23,7 @@ import { darkGridTheme } from '../../shared/grid-theme';
   templateUrl: './snapshots.component.html',
   styleUrl: './snapshots.component.css',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [MatIconModule, AgGridAngular],
 })
 export class SnapshotsComponent implements OnInit, OnDestroy {

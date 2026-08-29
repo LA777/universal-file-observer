@@ -10,7 +10,7 @@
 - All `AI_` files live in the `_docs/` folder (gitignored). Consult them (start with `_docs/AI_CODEBASE_INDEX.md` — full back-end/front-end index) to understand active project patterns, constraints, and business logic before proposing changes.
 
 ## What This Project Is
-UFO (Universal File Observer): ASP.NET Core Web API (**.NET 10**) + **Angular 21** SPA for snapshot-based file system indexing. Users create point-in-time snapshots of folders (tree + per-file SHA-256 + PC/drive/volume identity), then browse, search, label, and delete them. There is **no FileSystemWatcher and no background service** — snapshots are explicit.
+UFO (Universal File Observer): ASP.NET Core Web API (**.NET 10**) + **Angular 22** SPA for snapshot-based file system indexing. Users create point-in-time snapshots of folders (tree + per-file SHA-256 + PC/drive/volume identity), then browse, search, label, and delete them. There is **no FileSystemWatcher and no background service** — snapshots are explicit.
 
 ## Architecture Rules (do not violate)
 - **Persistence is SQLite via Dapper with raw SQL** (`Ufo.Database/SqlScripts.cs`). No EF Core, no migrations — schema is idempotent `CREATE TABLE IF NOT EXISTS` DDL executed at startup by `DapperDataContext.InitiateDatabaseAsync`.

@@ -5,7 +5,9 @@
 # Built here rather than by the .NET SDK's PublishRunWebpack target so the SDK
 # image does not need Node installed.
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS spa
+# Angular 22 CLI requires Node ^22.22.3, ^24.15.0 or >=26; pinned so an older
+# cached 22.x layer cannot silently break the build.
+FROM node:22.23-alpine AS spa
 WORKDIR /src/ufo.client
 
 COPY ufo.client/package.json ufo.client/package-lock.json* ./

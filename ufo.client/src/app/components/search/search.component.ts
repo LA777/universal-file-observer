@@ -1,4 +1,4 @@
-import { Component, Input, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, OnDestroy, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
 import { AgGridAngular } from 'ag-grid-angular';
@@ -35,6 +35,7 @@ interface SearchRow {
   templateUrl: './search.component.html',
   styleUrl: './search.component.css',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.Eager,
   imports: [FormsModule, MatIconModule, AgGridAngular],
 })
 export class SearchComponent implements OnInit, OnDestroy {

@@ -110,7 +110,8 @@
   },
   "schematics": {
     "@schematics/angular:component": {
-      "type": "component"
+      "type": "component",
+      "changeDetection": "Eager"
     },
     "@schematics/angular:directive": {
       "type": "directive"

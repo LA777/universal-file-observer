@@ -26,8 +26,9 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
-- split Windows App and Docker
-- migrate to Angular 22
++ split Windows App and Docker
+- split App into Client (thin) - Server (data)
++ migrate to Angular 22
 - _docs/AI_SOLUTION_REVIEW.md
 - Check get all snapshots summary - do not return user id
 + [UI] Snapsots page - add Lables
