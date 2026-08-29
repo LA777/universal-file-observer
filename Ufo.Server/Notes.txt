@@ -26,6 +26,8 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 
 TODO:
+- migrate to Angular 22
+- _docs/AI_SOLUTION_REVIEW.md
 - Check get all snapshots summary - do not return user id
 - [UI] Snapsots page - add Lables
 - Add ability to save UI Theme name to DB and load it on UI
