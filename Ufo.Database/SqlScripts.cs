@@ -157,6 +157,50 @@ public class SqlScripts
             CONSTRAINT FK_UsersToSnapshots_Users_UserId          FOREIGN KEY (UserId)      REFERENCES Users (Id)    ON DELETE NO ACTION,
             CONSTRAINT FK_UsersToSnapshots_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
         );
+
+        -- ============================================================================
+        -- Indexes. SQLite does not index foreign keys automatically; composite PKs
+        -- only cover lookups by their leading column(s). Each index below serves
+        -- specific queries in SqlScripts / repositories.
+        -- ============================================================================
+
+        -- Dedup lookups during snapshot creation (SelectPcSql / SelectStorageDriveSql / SelectVolumeSql).
+        CREATE INDEX IF NOT EXISTS IX_Pcs_UserId_HardwareUuid           ON Pcs (UserId, HardwareUuid);
+        CREATE INDEX IF NOT EXISTS IX_StorageDrives_UserId_SerialNumber ON StorageDrives (UserId, SerialNumber);
+        CREATE INDEX IF NOT EXISTS IX_Volumes_UserId_VolumeSerialNumber ON Volumes (UserId, VolumeSerialNumber);
+
+        -- Orphan cleanup on snapshot delete (DeleteStorageDrivesWithoutVolumes..., DeleteVolumesWithoutVolumeInfos...).
+        CREATE INDEX IF NOT EXISTS IX_Volumes_StorageDriveId            ON Volumes (StorageDriveId);
+        CREATE INDEX IF NOT EXISTS IX_VolumeInfos_VolumeId              ON VolumeInfos (VolumeId);
+
+        -- Snapshot graph reconstruction joins (Select*SnapshotsWithSystemInfoSql).
+        CREATE INDEX IF NOT EXISTS IX_VolumeInfos_SnapshotId            ON VolumeInfos (SnapshotId);
+        CREATE INDEX IF NOT EXISTS IX_PcsToStorageDrives_SnapshotId     ON PcsToStorageDrives (SnapshotId);
+
+        -- Per-user listing ordered by time (SelectLatestSnapshotWithSystemInfoSql, SelectSnapshotsWithSystemInfoSql).
+        CREATE INDEX IF NOT EXISTS IX_Snapshots_UserId_Timestamp        ON Snapshots (UserId, Timestamp DESC);
+
+        -- File/folder dedup by content hash during snapshot creation (the hottest path:
+        -- one lookup per file/folder in the tree) and name lookups / search scoping.
+        CREATE INDEX IF NOT EXISTS IX_Files_UserId_Sha256Hash           ON Files (UserId, Sha256Hash);
+        CREATE INDEX IF NOT EXISTS IX_Files_UserId_Name                 ON Files (UserId, Name);
+        CREATE INDEX IF NOT EXISTS IX_Folders_UserId_Sha256Hash         ON Folders (UserId, Sha256Hash);
+        CREATE INDEX IF NOT EXISTS IX_Folders_UserId_Name               ON Folders (UserId, Name);
+
+        -- Join-table lookups not covered by the composite PK column order:
+        -- FilesToFolders PK is (FolderId, FileId, SnapshotId) -> FileId and SnapshotId lookups need indexes
+        -- (search join ON f.Id = ftf.FileId, deletes by SnapshotId, orphan cleanup NOT IN (SELECT FileId ...)).
+        CREATE INDEX IF NOT EXISTS IX_FilesToFolders_FileId             ON FilesToFolders (FileId);
+        CREATE INDEX IF NOT EXISTS IX_FilesToFolders_SnapshotId         ON FilesToFolders (SnapshotId);
+
+        -- FoldersToFolders PK is (SnapshotId, ParentFolderId, ChildFolderId) -> ChildFolderId lookups need an index
+        -- (tree reconstruction join ON fl2fl.ChildFolderId = folder.Id, orphan cleanup).
+        CREATE INDEX IF NOT EXISTS IX_FoldersToFolders_ChildFolderId    ON FoldersToFolders (ChildFolderId);
+
+        -- Label lookups by user/name and label<->snapshot association by snapshot
+        -- (LabelsToSnapshots PK is (LabelId, SnapshotId), so SnapshotId needs its own index).
+        CREATE INDEX IF NOT EXISTS IX_Labels_UserId_Name                ON Labels (UserId, Name);
+        CREATE INDEX IF NOT EXISTS IX_LabelsToSnapshots_SnapshotId      ON LabelsToSnapshots (SnapshotId);
     ";
 
     public const string SelectPcSql = "SELECT * FROM Pcs WHERE HardwareUuid = @HardwareUuid AND HardwareSerialNumber = @HardwareSerialNumber AND UserId = @UserId;";
@@ -312,6 +356,9 @@ public class SqlScripts
                                                         "VALUES " +
                                                         "(@LabelId, @SnapshotId);";
     public const string SelectAllLabelsSql = "SELECT * FROM Labels WHERE UserId = @UserId;";
+    public const string SelectLabelsForAllSnapshotsSql = "SELECT l.*, l2s.SnapshotId AS LinkedSnapshotId FROM Labels AS l " +
+                                                            "INNER JOIN LabelsToSnapshots AS l2s ON l2s.LabelId = l.Id " +
+                                                            "WHERE l.UserId = @UserId;";
     public const string SelectLabelsBySnapshotIdSql = "SELECT DISTINCT l.* FROM Labels AS l " +
                                                          "INNER JOIN LabelsToSnapshots AS l2s ON l2s.LabelId = l.Id " +
                                                          "WHERE l2s.SnapshotId = @SnapshotId AND UserId = @UserId;";
@@ -381,7 +428,7 @@ public class SqlScripts
         ORDER BY f.Name ASC;";
 
     public const string SearchFoldersByNameSql = @"
-        SELECT 
+        SELECT
             fo.Id, fo.Name, fo.Size, fo.Sha256Hash, fo.UserId,
             s.Id, s.Timestamp, s.Description, s.UserId,
             l.Id, l.Name, l.ColorHex, l.UserId
@@ -392,5 +439,32 @@ public class SqlScripts
         LEFT JOIN LabelsToSnapshots AS lts ON s.Id = lts.SnapshotId
         LEFT JOIN Labels AS l ON lts.LabelId = l.Id
         WHERE fo.Name LIKE '%' || @Query || '%' AND fo.UserId = @UserId
+        ORDER BY fo.Name ASC;";
+
+    // Filterable search templates: {0} is replaced with the composed WHERE conditions.
+    public const string SearchFilesBaseSql = @"
+        SELECT
+            f.Id, f.Name, f.Size, f.Sha256Hash, f.FileExtension, f.UserId,
+            s.Id, s.Timestamp, s.Description, s.UserId,
+            l.Id, l.Name, l.ColorHex, l.UserId
+        FROM Files AS f
+        JOIN FilesToFolders AS ftf ON f.Id = ftf.FileId
+        JOIN Snapshots AS s ON ftf.SnapshotId = s.Id
+        LEFT JOIN LabelsToSnapshots AS lts ON s.Id = lts.SnapshotId
+        LEFT JOIN Labels AS l ON lts.LabelId = l.Id
+        WHERE {0}
+        ORDER BY f.Name ASC;";
+
+    public const string SearchFoldersBaseSql = @"
+        SELECT
+            fo.Id, fo.Name, fo.Size, fo.Sha256Hash, fo.UserId,
+            s.Id, s.Timestamp, s.Description, s.UserId,
+            l.Id, l.Name, l.ColorHex, l.UserId
+        FROM Folders AS fo
+        JOIN FoldersToFolders AS ftf ON fo.Id = ftf.ChildFolderId
+        JOIN Snapshots AS s ON ftf.SnapshotId = s.Id
+        LEFT JOIN LabelsToSnapshots AS lts ON s.Id = lts.SnapshotId
+        LEFT JOIN Labels AS l ON lts.LabelId = l.Id
+        WHERE {0}
         ORDER BY fo.Name ASC;";
 }

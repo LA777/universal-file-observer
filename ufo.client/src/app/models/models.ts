@@ -101,6 +101,59 @@ export interface FileSystemRoot {
   folder: Folder
 }
 
+/** Criteria for POST /api/search (indexed snapshot data). */
+export interface SearchCriteria {
+  query: string;
+  includeFiles: boolean;
+  includeFolders: boolean;
+  extension?: string;
+  minSize?: number;
+  maxSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  snapshotIds?: string[];
+  labelIds?: string[];
+}
+
+/** One file/folder hit from the indexed search. */
+export interface IndexedSearchItem {
+  id: string;
+  name: string;
+  size?: number;
+  fileExtension?: string;
+  fullPath?: string;
+  snapshots?: SnapshotSummary[];
+}
+
+export interface IndexedSearchResponse {
+  files: IndexedSearchItem[];
+  folders: IndexedSearchItem[];
+}
+
+/** Criteria for POST /api/filesystem/search (live disk search). */
+export interface FileSystemSearchCriteria {
+  path: string;
+  query: string;
+  includeFiles: boolean;
+  includeFolders: boolean;
+  extension?: string;
+  minSize?: number;
+  maxSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+  maxResults?: number;
+}
+
+export interface FsSearchResult {
+  name: string;
+  fullPath: string;
+  isFile: boolean;
+  size?: number;
+  fileExtension?: string;
+  modifiedAt: string;
+  isHidden: boolean;
+}
+
 export interface DialogData {
   title: string;
   message: string;

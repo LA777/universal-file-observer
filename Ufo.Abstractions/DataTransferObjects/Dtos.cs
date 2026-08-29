@@ -6,14 +6,19 @@ namespace Ufo.Abstractions.DataTransferObjects;
 
 public abstract class DtoBase
 {
-    // No default value: an unmapped Id must surface as Ulid.Empty rather than a
-    // plausible-looking random value that hides a mapping bug.
     [JsonConverter(typeof(UlidJsonConverter))]
     [JsonPropertyOrder(0)]
-    public Ulid Id { get; set; }
+    public Ulid Id { get; set; } = Ulid.NewUlid();
 }
 
-public abstract class DtoWithNameAndIdBase : DtoBase
+public abstract class DtoWithUserIdAndIdBase : DtoBase
+{
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(7)]
+    public Ulid UserId { get; set; }
+}
+
+public abstract class DtoWithUserIdAndNameAndIdBase : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(1)]
     [Required]
@@ -21,7 +26,7 @@ public abstract class DtoWithNameAndIdBase : DtoBase
     public string Name { get; set; } = string.Empty;
 }
 
-public abstract class FsItemDto : DtoWithNameAndIdBase
+public abstract class FsItemDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(2)]
     public long? Size { get; set; }
@@ -52,7 +57,7 @@ public abstract class FsItemDto : DtoWithNameAndIdBase
     public string ParentFolderPath { get; set; } = string.Empty;
 }
 
-public class LabelDto : DtoWithNameAndIdBase
+public class LabelDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(14)]
     public string ColorHex { get; set; } = string.Empty;
@@ -61,7 +66,7 @@ public class LabelDto : DtoWithNameAndIdBase
     public List<Ulid> SnapshotIds { get; set; } = [];
 }
 
-public class PcDto : DtoWithNameAndIdBase
+public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(14)]
     public string MachineId { get; set; } = string.Empty;
@@ -82,7 +87,7 @@ public class PcDto : DtoWithNameAndIdBase
     //public List<SnapshotEntity> Snapshots { get; set; } = [];
 }
 
-public class StorageDriveDto : DtoWithNameAndIdBase
+public class StorageDriveDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(10)]
     public string DeviceId { get; set; } = string.Empty;
@@ -106,7 +111,7 @@ public class StorageDriveDto : DtoWithNameAndIdBase
     public List<PcDto> Pcs { get; set; } = [];
 }
 
-public class VolumeDto : DtoBase
+public class VolumeDto : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(5)]
     public string DriveLetter { get; set; } = string.Empty;
@@ -127,7 +132,7 @@ public class VolumeDto : DtoBase
     public StorageDriveDto? StorageDrive { get; set; }
 }
 
-public class VolumeInfoDto : DtoBase
+public class VolumeInfoDto : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(5)]
     public long FreeSpace { get; set; }
@@ -172,7 +177,7 @@ public class SnapshotSummaryDto : SnapshotSummaryBase
     public FolderDto? RootOnlyFolder { get; set; }
 }
 
-public class SnapshotSummaryBase : DtoBase
+public class SnapshotSummaryBase : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(5)]
     public DateTimeOffset Timestamp { get; set; }

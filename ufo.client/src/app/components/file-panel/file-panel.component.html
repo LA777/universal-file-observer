@@ -5,9 +5,6 @@
 
   @if (selectedFolder) {
     <div class="panel-header">
-      <div class="current-folder">
-        <strong>{{selectedFolder.name}}</strong>
-      </div>
       <div class="drive-list">
         @for (drive of fileSystemRoot.drives; track drive) {
           <button (click)="navigateToPath(drive)" title="{{drive}}">
@@ -18,58 +15,44 @@
           Home
         </button>
         <button (click)="createSnapshot()" title="Create Snapshot">Snapshot</button>
-        <button (click)="enableFilesView()" title="Files view">Files</button>
-        <button (click)="enableVideosView()" title="Videos view">Videos</button>
-        <button (click)="enableImagesView()" title="Images view">Images</button>
-        <span>Nav:</span>
-        <button (click)="navigateBackward()" title="Backward">
+        <button (click)="enableFilesView()" [class.active-view]="isFilesView" title="Files view">Files</button>
+        <button (click)="enableVideosView()" [class.active-view]="isVideosView" title="Videos view">Videos</button>
+        <button (click)="enableImagesView()" [class.active-view]="isImagesView" title="Images view">Images</button>
+        <span class="nav-label">Nav:</span>
+        <button (click)="navigateBackward()" [disabled]="!canNavigateBackward" title="Backward">
           <mat-icon>arrow_back</mat-icon>
         </button>
-        <button (click)="navigateForward()" title="Forward">
+        <button (click)="navigateForward()" [disabled]="!canNavigateForward" title="Forward">
           <mat-icon>arrow_forward</mat-icon>
         </button>
         <button (click)="navigateToPath(selectedFolder.parentFolderPath)" [disabled]="!selectedFolder.hasParent" title="Upward">
           <mat-icon>arrow_upward</mat-icon>
         </button>
       </div>
+      <div class="current-folder">
+        <mat-icon class="folder-icon">folder</mat-icon>
+        <span class="folder-name">{{selectedFolder.name}}</span>
+        <input
+          #pathBox
+          class="path"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          [value]="selectedFolder.fullPath"
+          (keydown.enter)="onPathSubmit(pathBox.value)"
+          (keydown.escape)="pathBox.value = selectedFolder.fullPath"
+          title="Type a path and press Enter to open it (Esc to reset)" />
+      </div>
     </div>
   }
 
-  <div class="folder-details-panel">
-    @if (selectedFolder) {
-      <table mat-table [dataSource]="folderData" matSort (matSortChange)="announceSortChange($event)" class="mat-elevation-z8">
-        <ng-container matColumnDef="Name">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Name">Name</th>
-          <td mat-cell *matCellDef="let element">
-            @if (isImageFile(element)) {
-              <img [src]="element.fullPath" [alt]="element.name" class="thumbnail-image">
-            }
-            @if (isVideoFile(element)) {
-              <video width="320" height="240" controls>
-                <source [src]="getVideoFileUri(element)" [type]="getVideoMimeType(element)">
-                Your browser does not support the video tag.
-              </video>
-            }
-            @if (!element.isFile) {
-              <mat-icon class="mat-icon-rtl-mirror" [ngStyle]="element.isHidden ? { color: 'grey' } : { color: 'black' }">folder</mat-icon>
-            }
-            @if (element.isFile && isFilesView) {
-              <mat-icon class="mat-icon-rtl-mirror" [ngStyle]="element.isHidden ? { color: 'grey' } : { color: 'black' }">description</mat-icon>
-            }
-            {{element.name}}
-          </td>
-        </ng-container>
-        <ng-container matColumnDef="Extension">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Extension">Ext</th>
-          <td mat-cell *matCellDef="let element">{{element.fileExtension}}</td>
-        </ng-container>
-        <ng-container matColumnDef="Size">
-          <th mat-header-cell *matHeaderCellDef mat-sort-header sortActionDescription="Sort by Size">Size</th>
-          <td mat-cell *matCellDef="let element">{{element?.size}}</td>
-        </ng-container>
-        <tr mat-header-row *matHeaderRowDef="displayedColumns; sticky: true"></tr>
-        <tr mat-row *matRowDef="let row; columns: displayedColumns;" (dblclick)="onRowDoubleClick(row)"></tr>
-      </table>
-    }
-  </div>
+  @if (selectedFolder) {
+    <app-folder-details
+      [folderData]="folderData"
+      [isFilesView]="isFilesView"
+      [isVideosView]="isVideosView"
+      [isImagesView]="isImagesView"
+      (rowDoubleClick)="onRowDoubleClick($event)">
+    </app-folder-details>
+  }
 </div>

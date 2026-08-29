@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService, LoginRequest } from '../../services/auth.service';
+import { environment } from '../../../environments/environment';
 import { CommonModule } from '@angular/common';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -38,8 +39,8 @@ export class LoginComponent implements OnInit {
 
   ngOnInit() {
     this.form = this.formBuilder.group({
-      username: ['', Validators.required],
-      password: ['', Validators.required]
+      username: [environment.devLogin.username, Validators.required],
+      password: [environment.devLogin.password, Validators.required]
     });
   }
 

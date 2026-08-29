@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Ufo.Abstractions.Database;
@@ -23,13 +23,11 @@ public class SearchRepository : ISearchRepository
     {
         _logger.LogInformation("SearchAsync - Query: {Query}, UserId: {UserId}", searchRequest.Query, userId);
 
-        //var response = new SearchResponse();
-        if (string.IsNullOrWhiteSpace(searchRequest.Query))
+        if (!searchRequest.HasAnyCriteria)
         {
             return ([], []);
         }
 
-        var rawQuery = searchRequest.Query.Trim();
         var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
 
         try
@@ -38,12 +36,12 @@ public class SearchRepository : ISearchRepository
             var folders = new List<FolderEntity>();
             if (searchRequest.IncludeFiles)
             {
-                files = await PerformFileSearchAsync(sqLiteConnection, rawQuery, userId);
+                files = await PerformFileSearchAsync(sqLiteConnection, searchRequest, userId);
             }
 
             if (searchRequest.IncludeFolders)
             {
-                folders = await PerformFolderSearchAsync(sqLiteConnection, rawQuery, userId);
+                folders = await PerformFolderSearchAsync(sqLiteConnection, searchRequest, userId);
             }
 
             return (folders, files);
@@ -55,12 +53,79 @@ public class SearchRepository : ISearchRepository
         }
     }
 
-    private async Task<List<FileEntity>> PerformFileSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
+    /// <summary>
+    /// Composes the WHERE clause and parameters for the current filters.
+    /// <paramref name="itemAlias"/> is "f" for files, "fo" for folders.
+    /// </summary>
+    private static (string Conditions, DynamicParameters Parameters) BuildFilter(SearchRequest request, Ulid userId, string itemAlias, bool isFileSearch)
+    {
+        var conditions = new List<string> { $"{itemAlias}.UserId = @UserId" };
+        var parameters = new DynamicParameters();
+        parameters.Add("UserId", userId);
+
+        if (request.Query.Length > 0)
+        {
+            conditions.Add($"{itemAlias}.Name LIKE '%' || @Query || '%'");
+            parameters.Add("Query", request.Query);
+        }
+
+        if (isFileSearch && !string.IsNullOrWhiteSpace(request.Extension))
+        {
+            conditions.Add("LOWER(f.FileExtension) = LOWER(@Extension)");
+            var extension = request.Extension.Trim();
+            parameters.Add("Extension", extension.StartsWith('.') ? extension : "." + extension);
+        }
+
+        if (request.MinSize.HasValue)
+        {
+            conditions.Add($"{itemAlias}.Size >= @MinSize");
+            parameters.Add("MinSize", request.MinSize.Value);
+        }
+
+        if (request.MaxSize.HasValue)
+        {
+            conditions.Add($"{itemAlias}.Size <= @MaxSize");
+            parameters.Add("MaxSize", request.MaxSize.Value);
+        }
+
+        // Timestamps are stored as ISO-8601 ("O") text, so range comparisons work lexicographically.
+        if (request.DateFrom.HasValue)
+        {
+            conditions.Add("s.Timestamp >= @DateFrom");
+            parameters.Add("DateFrom", request.DateFrom.Value);
+        }
+
+        if (request.DateTo.HasValue)
+        {
+            conditions.Add("s.Timestamp <= @DateTo");
+            parameters.Add("DateTo", request.DateTo.Value);
+        }
+
+        // Dapper does not run type handlers on IN-list elements, so bind the
+        // Ulids as the 26-char strings they are stored as.
+        if (request.SnapshotIds.Count > 0)
+        {
+            conditions.Add("s.Id IN @SnapshotIds");
+            parameters.Add("SnapshotIds", request.SnapshotIds.Select(id => id.ToString()).ToList());
+        }
+
+        if (request.LabelIds.Count > 0)
+        {
+            conditions.Add("lts.LabelId IN @LabelIds");
+            parameters.Add("LabelIds", request.LabelIds.Select(id => id.ToString()).ToList());
+        }
+
+        return (string.Join(" AND ", conditions), parameters);
+    }
+
+    private async Task<List<FileEntity>> PerformFileSearchAsync(SqliteConnection sqLiteConnection, SearchRequest request, Ulid userId)
     {
         var fileDictionary = new Dictionary<Ulid, FileEntity>();
+        var (conditions, parameters) = BuildFilter(request, userId, "f", isFileSearch: true);
+        var sql = string.Format(SqlScripts.SearchFilesBaseSql, conditions);
 
         await sqLiteConnection.QueryAsync<FileEntity, SnapshotEntity, LabelEntity, FileEntity>(
-            SqlScripts.SearchFilesByNameSql,
+            sql,
             (file, snapshot, label) =>
             {
                 if (!fileDictionary.TryGetValue(file.Id, out var fileEntry))
@@ -85,18 +150,20 @@ public class SearchRepository : ISearchRepository
 
                 return fileEntry;
             },
-            new { Query = query, UserId = userId },
+            parameters,
             splitOn: "Id,Id");
 
         return [.. fileDictionary.Values];
     }
 
-    private async Task<List<FolderEntity>> PerformFolderSearchAsync(SqliteConnection sqLiteConnection, string query, Ulid userId)
+    private async Task<List<FolderEntity>> PerformFolderSearchAsync(SqliteConnection sqLiteConnection, SearchRequest request, Ulid userId)
     {
         var folderDictionary = new Dictionary<Ulid, FolderEntity>();
+        var (conditions, parameters) = BuildFilter(request, userId, "fo", isFileSearch: false);
+        var sql = string.Format(SqlScripts.SearchFoldersBaseSql, conditions);
 
         await sqLiteConnection.QueryAsync<FolderEntity, SnapshotEntity, LabelEntity, FolderEntity>(
-            SqlScripts.SearchFoldersByNameSql,
+            sql,
             (folder, snapshot, label) =>
             {
                 if (!folderDictionary.TryGetValue(folder.Id, out var folderEntry))
@@ -119,9 +186,9 @@ public class SearchRepository : ISearchRepository
 
                 return folderEntry;
             },
-            new { Query = query, UserId = userId },
+            parameters,
             splitOn: "Id,Id");
 
         return [.. folderDictionary.Values];
-    }       
+    }
 }

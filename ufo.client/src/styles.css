@@ -1,5 +1,5 @@
 html {
-  background-color: aquamarine;
+  /* background-color: aquamarine; */
 }
 
 .mat-tooltip-storage-drive {
@@ -35,6 +35,13 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+}
+
+/* Dark surface for dialogs opened with panelClass: 'dark-dialog-panel'. */
+.dark-dialog-panel .mat-mdc-dialog-surface {
+  background-color: #2e2e2e;
+  color: #e0e0e0;
+  border: 1px solid #4d4d4d;
 }
 
 app-root {

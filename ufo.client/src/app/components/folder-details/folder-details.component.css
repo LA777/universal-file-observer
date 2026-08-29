@@ -1,0 +1,70 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  /* The app shell sets text-align: center; grid content must be left-aligned. */
+  text-align: left;
+}
+
+/* The grid virtualizes its own rows; it just needs a bounded height. */
+.folder-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  /* Dark scrollbars to match the grid theme; inherits into the grid's
+     scroll containers. Chrome/Edge/Firefox. */
+  scrollbar-color: #6b6b6b #2e2e2e;
+}
+
+/* Fallback for browsers without scrollbar-color support (e.g. Safari). */
+:host ::ng-deep .folder-grid ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+:host ::ng-deep .folder-grid ::-webkit-scrollbar-track {
+  background: #2e2e2e;
+}
+
+:host ::ng-deep .folder-grid ::-webkit-scrollbar-thumb {
+  background: #6b6b6b;
+  border-radius: 6px;
+}
+
+:host ::ng-deep .folder-grid ::-webkit-scrollbar-thumb:hover {
+  background: #8a8a8a;
+}
+
+/*
+ * Cell content is built with document.createElement in the cell renderer, so it
+ * never receives Angular's scoping attributes — these rules must pierce the
+ * emulated encapsulation via ::ng-deep to reach it.
+ */
+:host ::ng-deep .name-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  overflow: hidden;
+}
+
+:host ::ng-deep .name-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+:host ::ng-deep .name-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:host ::ng-deep .thumbnail-image {
+  width: 300px;
+  height: 300px;
+  object-fit: contain;
+}

@@ -416,3 +416,7 @@ FodyWeavers.xsd
 # AI generated documents
 AI_*.md
 AI_*.txt
+_docs/
+
+# Claude Code local settings
+.claude/settings.local.json

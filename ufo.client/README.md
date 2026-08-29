@@ -1,27 +1,74 @@
-# UfoClient
+# UfoClient — UFO Front-end
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 17.3.6.
+Angular **21** single-page application for UFO (Universal File Observer). Built with Angular Material + CDK, it provides login/registration and a tabbed dashboard for browsing the file system, creating and inspecting snapshots, and managing labels.
+
+## How it's wired
+
+- **Bootstrap:** standalone components via `src/main.ts` (`bootstrapApplication`). The legacy `app.module.ts` / `app-routing.module.ts` files are **not** the active bootstrap path — routes, providers, and the HTTP interceptor are configured in `main.ts`.
+- **Auth:** JWT stored in `localStorage` (`auth_token`); `JwtInterceptor` attaches `Authorization: Bearer <token>` to every request; `AuthGuard` protects `/dashboard`.
+- **API:** all calls use relative `/api/...` paths. In development, `src/proxy.conf.js` proxies them to the .NET back-end (`https://localhost:7150` by default). In production the app is served by `Ufo.Server` from the same origin.
+
+## Routes
+
+| Path | Component | Guard |
+|---|---|---|
+| `/login` | LoginComponent | — |
+| `/register` | RegisterComponent | — |
+| `/dashboard` | DashboardComponent | AuthGuard |
+| `/` | redirect to `/login` | — |
+
+## Structure (`src/app/`)
+
+- `components/` — `dashboard` (tab host), `files` + `file-panel` (dual-pane file browser), `folder-details`, `folder-tree`, `snapshot`, `snapshots`, `login`, `register`, `dialog`, `forecast` (scaffold demo)
+- `services/` — `AuthService` (`/api/auth`, `/api/user`), `FileService` (`/api/filesystem`), `SnapshotService` (`/api/snapshot`), `TabChangeService`, `AuthInitService`
+- `guards/` — `AuthGuard`
+- `interceptors/` — `JwtInterceptor` (active), `AuthInterceptor` (legacy, only referenced by the inactive NgModule)
+- `models/models.ts` — shared interfaces (FsItem, Folder, File, Snapshot, Label, Pc, StorageDrive, Volume, …)
+
+## Environment setup
+
+`src/environments/environment.ts` is **gitignored**. On a fresh clone, copy the template first:
+
+```
+copy src\environments\environment.example.ts src\environments\environment.ts
+```
+
+Optionally fill `devLogin` to prefill the login form during development.
 
 ## Development server
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+```
+npm install
+```
 
-## Code scaffolding
+```
+npm start
+```
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+`npm start` runs `ng serve --ssl` on `https://127.0.0.1:4200` with the API proxy. Start the .NET back-end (`dotnet run --project ..\Ufo.Server --launch-profile https`) so `/api` calls succeed.
 
-## Build
+## Build & deploy into the .NET server
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
+```
+npm run build
+```
 
-## Running unit tests
+Output goes to `dist/ufo.client`. To deploy into `Ufo.Server/wwwroot` (so the back-end serves the SPA), run the root-level script instead:
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+```
+powershell -File ..\build-frontend.ps1
+```
 
-## Running end-to-end tests
+Verify the result with `..\check-wwwroot.bat`.
 
-Run `ng e2e` to execute the end-to-end tests via a platform of your choice. To use this command, you need to first add a package that implements end-to-end testing capabilities.
+## Tests
 
-## Further help
+```
+npm test
+```
 
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+Karma + Jasmine (Chrome, coverage report enabled). Only a couple of spec files exist so far (`app.component.spec.ts`, `forecast.component.spec.ts`).
+
+## Scaffolding
+
+Standard Angular CLI applies, e.g. `ng generate component components/my-component`. New components should be **standalone** and registered via routes/imports in `main.ts` — do not add them to the legacy `app.module.ts`.

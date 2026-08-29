@@ -20,48 +20,88 @@
     height: 40px;
     padding: 0 16px;
     box-sizing: border-box;
-    background-color: #333;
-    color: white;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-
+    background-color: #1c1c1c;
+    color: #e0e0e0;
+    border-bottom: 1px solid #4d4d4d;
 }
 
+.app-title {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+}
+
+/* Wordmark: indigo gradient fill with a faint glow. */
 .app-header h1 {
     margin: 0;
-    font-size: 24px;
+    font-size: 20px;
     line-height: 1;
-    font-family: monospace;
+    font-family: Consolas, 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: 6px;
+    background: linear-gradient(135deg, #c5cae9 0%, #7986cb 55%, #5c6bc0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 6px rgba(92, 107, 192, 0.35));
+}
+
+.app-subtitle {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #757575;
 }
 
 .user-info {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
 }
 
+/* Username as a subtle chip, same family as the panel-header buttons. */
 .user-name {
-    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px;
+    font-size: 12px;
+    color: #e0e0e0;
+    background-color: #3a3a3a;
+    border: 1px solid #555;
+    border-radius: 12px;
+}
+
+.user-name .mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #9e9e9e;
+}
+
+.app-header .mat-mdc-icon-button {
+    --mdc-icon-button-icon-color: #9e9e9e;
+    width: 32px;
+    height: 32px;
+    padding: 4px;
+    transition: color 0.12s ease-in-out;
+}
+
+.app-header .mat-mdc-icon-button .mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+}
+
+/* Logout is destructive — warm up on hover. */
+.app-header .mat-mdc-icon-button:hover {
+    --mdc-icon-button-icon-color: #ef9a9a;
 }
 
 .dashboard-content {
     flex: 1;
     overflow: auto;
 }
-
-tr:nth-child(even) {
-    background: #dd7a7a;
-}
-
-tr:nth-child(odd) {
-    background-color: #5a2727;
-}
-
-th, td {
-    padding-left: 1rem;
-    padding-right: 1rem;
-}
-
-table {
-    margin: 0 auto;
-}
-

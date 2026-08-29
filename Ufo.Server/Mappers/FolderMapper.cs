@@ -15,6 +15,7 @@ public static class FolderMapper
         var dto = new FolderDto
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Name = entity.Name,
             Size = entity.Size,
             Sha256Hash = entity.Sha256Hash,
@@ -61,6 +62,7 @@ public static class FolderMapper
         var dto = new FolderDto
         {
             Id = entity.Id,
+            UserId = entity.UserId,
             Name = entity.Name,
             Size = entity.Size,
             Sha256Hash = entity.Sha256Hash,

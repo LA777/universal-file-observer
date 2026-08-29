@@ -1,7 +1,10 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Moq;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Options;
 using Ufo.Server.Services;
@@ -10,6 +13,8 @@ namespace Ufo.UnitTests.Server.Services;
 
 public class JwtTokenServiceTests : BaseTest
 {
+    private const string SigningKey = "this-is-a-very-secret-key-that-must-be-at-least-32-characters-long";
+
     private readonly Mock<IOptionsMonitor<JwtOptions>> _optionsMonitorMock;
     private readonly JwtOptions _validJwtOptions;
     private readonly JwtTokenService _sut;
@@ -19,7 +24,7 @@ public class JwtTokenServiceTests : BaseTest
         _optionsMonitorMock = new Mock<IOptionsMonitor<JwtOptions>>();
         _validJwtOptions = new JwtOptions
         {
-            Key = "this-is-a-very-secret-key-that-must-be-at-least-32-characters-long",
+            Key = SigningKey,
             Issuer = "TestIssuer",
             Audience = "TestAudience"
         };
@@ -28,133 +33,77 @@ public class JwtTokenServiceTests : BaseTest
         _sut = new JwtTokenService(_optionsMonitorMock.Object);
     }
 
+    private static UserEntity CreateUser(string name = "testuser") => new()
+    {
+        Id = Ulid.NewUlid(),
+        Name = name,
+        PasswordHash = "hashedpassword"
+    };
+
+    private static JwtSecurityToken Read(string token) => new JwtSecurityTokenHandler().ReadJwtToken(token);
+
+    private ClaimsPrincipal Validate(string token, string signingKey) =>
+        new JwtSecurityTokenHandler().ValidateToken(token, new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = _validJwtOptions.Issuer,
+            ValidateAudience = true,
+            ValidAudience = _validJwtOptions.Audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        }, out _);
+
     #region CreateToken Tests
 
     [Fact]
-    public void CreateToken_WithValidUser_ReturnsValidJwtToken()
+    public void CreateToken_WithValidUser_ReturnsWellFormedJwt()
     {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
         // Act
-        var token = _sut.CreateToken(user);
+        var token = _sut.CreateToken(CreateUser());
 
-        // Assert
+        // Assert - a JWT is three base64url segments and must be readable by the handler.
         token.Should().NotBeNullOrEmpty();
-        token.Should().BeOfType<string>();
-    }
-
-    [Fact]
-    public void CreateToken_WithValidUser_TokenCanBeReadByJwtSecurityTokenHandler()
-    {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
-        // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var canRead = handler.CanReadToken(token);
-
-        // Assert
-        canRead.Should().BeTrue();
+        token.Split('.').Should().HaveCount(3);
+        new JwtSecurityTokenHandler().CanReadToken(token).Should().BeTrue();
     }
 
     [Fact]
     public void CreateToken_WithValidUser_ContainsCorrectNameIdentifierClaim()
     {
         // Arrange
-        var userId = Ulid.NewUlid();
-        var user = new UserEntity
-        {
-            Id = userId,
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
+        var user = CreateUser();
 
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(user));
 
-        // Assert
-        // JWT uses short claim type name "nameid"
+        // Assert - JWT uses short claim type name "nameid"
         var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "nameid");
         userIdClaim.Should().NotBeNull();
-        userIdClaim!.Value.Should().Be(userId.ToString());
+        userIdClaim!.Value.Should().Be(user.Id.ToString());
     }
 
     [Fact]
     public void CreateToken_WithValidUser_ContainsCorrectNameClaim()
     {
         // Arrange
-        var username = "uniqueusername";
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = username,
-            PasswordHash = "hashedpassword"
-        };
+        var user = CreateUser("uniqueusername");
 
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(user));
 
-        // Assert
-        // JWT uses short claim type name "unique_name"
+        // Assert - JWT uses short claim type name "unique_name"
         var nameClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name");
         nameClaim.Should().NotBeNull();
-        nameClaim!.Value.Should().Be(username);
-    }
-
-    [Fact]
-    public void CreateToken_WithValidUser_ContainsCorrectNumberOfClaims()
-    {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
-        // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-
-        // Assert
-        // Should have at least nameid and unique_name claims
-        jwtToken.Claims.Should().HaveCountGreaterThanOrEqualTo(2);
-        jwtToken.Claims.Should().Contain(c => c.Type == "nameid");
-        jwtToken.Claims.Should().Contain(c => c.Type == "unique_name");
+        nameClaim!.Value.Should().Be(user.Name);
     }
 
     [Fact]
     public void CreateToken_WithValidUser_TokenHasCorrectIssuer()
     {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
         // Assert
         jwtToken.Issuer.Should().Be(_validJwtOptions.Issuer);
@@ -163,18 +112,8 @@ public class JwtTokenServiceTests : BaseTest
     [Fact]
     public void CreateToken_WithValidUser_TokenHasCorrectAudience()
     {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
         // Assert
         jwtToken.Audiences.Should().Contain(_validJwtOptions.Audience);
@@ -184,79 +123,58 @@ public class JwtTokenServiceTests : BaseTest
     public void CreateToken_WithValidUser_TokenExpiresIn7Days()
     {
         // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
         var beforeCreation = DateTime.UtcNow;
 
         // Act
-        var token = _sut.CreateToken(user);
-        var afterCreation = DateTime.UtcNow;
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
-        // Assert
-        var expirationTime = jwtToken.ValidTo;
-        var expectedExpiration = beforeCreation.AddDays(7);
-        
-        // Allow a small time window (within 5 seconds) for test execution
-        expirationTime.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(5));
+        // Assert - allow a small time window for test execution.
+        jwtToken.ValidTo.Should().BeCloseTo(beforeCreation.AddDays(7), TimeSpan.FromSeconds(5));
     }
 
     [Fact]
     public void CreateToken_WithDifferentUsers_GeneratesDifferentTokens()
     {
-        // Arrange
-        var user1 = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "user1",
-            PasswordHash = "hash1"
-        };
-        var user2 = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "user2",
-            PasswordHash = "hash2"
-        };
-
         // Act
-        var token1 = _sut.CreateToken(user1);
-        var token2 = _sut.CreateToken(user2);
+        var token1 = _sut.CreateToken(CreateUser("user1"));
+        var token2 = _sut.CreateToken(CreateUser("user2"));
 
         // Assert
         token1.Should().NotBe(token2);
     }
 
+    #endregion
+
+    #region Signature Validation Tests
+
     [Fact]
-    public void CreateToken_WithSameUser_GeneratesTokenWithValidClaims()
+    public void CreateToken_SignatureValidatesWithConfiguredKey()
     {
         // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
+        var user = CreateUser();
 
         // Act
         var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var principal = Validate(token, SigningKey);
 
-        // Assert
-        // JWT uses short claim type names: "nameid" and "unique_name"
-        var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "nameid");
-        var nameClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name");
+        // Assert - full validation (issuer, audience, lifetime, signature) succeeds
+        // and the identity round-trips.
+        principal.Should().NotBeNull();
+        principal.FindFirst(ClaimTypes.NameIdentifier)!.Value.Should().Be(user.Id.ToString());
+    }
 
-        userIdClaim.Should().NotBeNull();
-        userIdClaim!.Value.Should().Be(user.Id.ToString());
-        nameClaim.Should().NotBeNull();
-        nameClaim!.Value.Should().Be(user.Name);
-    }    
+    [Fact]
+    public void CreateToken_SignatureFailsValidationWithDifferentKey()
+    {
+        // Arrange
+        var token = _sut.CreateToken(CreateUser());
+
+        // Act
+        var validateWithWrongKey = () => Validate(token, "a-completely-different-signing-key-32-characters!!");
+
+        // Assert - a token signed with one key must never validate against another.
+        validateWithWrongKey.Should().Throw<SecurityTokenException>();
+    }
 
     #endregion
 
@@ -265,7 +183,6 @@ public class JwtTokenServiceTests : BaseTest
     [Fact]
     public void Constructor_WithNullOptionsMonitor_ThrowsArgumentNullException()
     {
-        // Arrange & Act & Assert
         Assert.Throws<ArgumentNullException>(() => new JwtTokenService(null!));
     }
 
@@ -281,30 +198,24 @@ public class JwtTokenServiceTests : BaseTest
     }
 
     [Fact]
-    public void CreateToken_WithUserHavingEmptyName_GeneratesToken()
+    public void CreateToken_WithUserHavingEmptyName_GeneratesTokenWithUserIdClaim()
     {
         // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = string.Empty,
-            PasswordHash = "hashedpassword"
-        };
+        var user = CreateUser(string.Empty);
 
         // Act
         var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(token);
 
         // Assert
         token.Should().NotBeNullOrEmpty();
-        
-        // The nameid claim should still be present
+
+        // The nameid claim must still be present.
         var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "nameid");
         userIdClaim.Should().NotBeNull();
         userIdClaim!.Value.Should().Be(user.Id.ToString());
-        
-        // The unique_name claim may be null or empty, both are acceptable for empty input
+
+        // The unique_name claim may be dropped or empty; both are acceptable for empty input.
         var nameClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name");
         if (nameClaim != null)
         {
@@ -313,21 +224,14 @@ public class JwtTokenServiceTests : BaseTest
     }
 
     [Fact]
-    public void CreateToken_WithUserHavingSpecialCharactersInName_GeneratesToken()
+    public void CreateToken_WithUserHavingSpecialCharactersInName_PreservesName()
     {
         // Arrange
         var specialName = "user@example.com!#$%";
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = specialName,
-            PasswordHash = "hashedpassword"
-        };
+        var user = CreateUser(specialName);
 
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(user));
 
         // Assert
         var nameClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "unique_name");
@@ -340,27 +244,10 @@ public class JwtTokenServiceTests : BaseTest
     {
         // Arrange
         var customIssuer = "CustomIssuerName";
-        var customOptions = new JwtOptions
-        {
-            Key = "this-is-a-very-secret-key-that-must-be-at-least-32-characters-long",
-            Issuer = customIssuer,
-            Audience = "TestAudience"
-        };
-        var customOptionsMonitorMock = new Mock<IOptionsMonitor<JwtOptions>>();
-        customOptionsMonitorMock.Setup(x => x.CurrentValue).Returns(customOptions);
-        var customService = new JwtTokenService(customOptionsMonitorMock.Object);
-
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
+        var customService = CreateServiceWithOptions(issuer: customIssuer);
 
         // Act
-        var token = customService.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(customService.CreateToken(CreateUser()));
 
         // Assert
         jwtToken.Issuer.Should().Be(customIssuer);
@@ -371,30 +258,21 @@ public class JwtTokenServiceTests : BaseTest
     {
         // Arrange
         var customAudience = "CustomAudienceName";
-        var customOptions = new JwtOptions
-        {
-            Key = "this-is-a-very-secret-key-that-must-be-at-least-32-characters-long",
-            Issuer = "TestIssuer",
-            Audience = customAudience
-        };
-        var customOptionsMonitorMock = new Mock<IOptionsMonitor<JwtOptions>>();
-        customOptionsMonitorMock.Setup(x => x.CurrentValue).Returns(customOptions);
-        var customService = new JwtTokenService(customOptionsMonitorMock.Object);
-
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
+        var customService = CreateServiceWithOptions(audience: customAudience);
 
         // Act
-        var token = customService.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(customService.CreateToken(CreateUser()));
 
         // Assert
         jwtToken.Audiences.Should().Contain(customAudience);
+    }
+
+    private static JwtTokenService CreateServiceWithOptions(string issuer = "TestIssuer", string audience = "TestAudience")
+    {
+        var options = new JwtOptions { Key = SigningKey, Issuer = issuer, Audience = audience };
+        var monitorMock = new Mock<IOptionsMonitor<JwtOptions>>();
+        monitorMock.Setup(x => x.CurrentValue).Returns(options);
+        return new JwtTokenService(monitorMock.Object);
     }
 
     #endregion
@@ -402,41 +280,21 @@ public class JwtTokenServiceTests : BaseTest
     #region Token Validation Tests
 
     [Fact]
-    public void CreateToken_TokenIsValidBefore7Days()
+    public void CreateToken_TokenIsValidNowAndNotExpired()
     {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
         // Assert
-        (jwtToken.ValidFrom <= DateTime.UtcNow).Should().BeTrue();
-        (jwtToken.ValidTo > DateTime.UtcNow).Should().BeTrue();
+        jwtToken.ValidFrom.Should().BeOnOrBefore(DateTime.UtcNow);
+        jwtToken.ValidTo.Should().BeAfter(DateTime.UtcNow);
     }
 
     [Fact]
     public void CreateToken_TokenContainsNoEmptyClaims()
     {
-        // Arrange
-        var user = new UserEntity
-        {
-            Id = Ulid.NewUlid(),
-            Name = "testuser",
-            PasswordHash = "hashedpassword"
-        };
-
         // Act
-        var token = _sut.CreateToken(user);
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+        var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
         // Assert
         foreach (var claim in jwtToken.Claims)
@@ -448,4 +306,3 @@ public class JwtTokenServiceTests : BaseTest
 
     #endregion
 }
-

@@ -471,10 +471,10 @@ public class SearchController_ResultTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Search_OnlyFilesRequested_Returns204WhenNoFolders()
+    public async Task Search_OnlyFilesRequested_ReturnsMatchingFilesWithoutFolders()
     {
-        // IncludeFolders = false → Folders list stays empty.
-        // Controller returns 204 because Files.Count > 0 && Folders.Count > 0 is false.
+        // IncludeFolders = false → Folders list stays empty, but matching files
+        // must still be returned with 200 OK.
         var snapshotId = await SearchSeeder.SeedSnapshotAsync(_db, _userId);
         var folderId = await SearchSeeder.SeedFolderAsync(_db, _userId, "container");
         await SearchSeeder.LinkFolderToSnapshotAsync(_db, folderId, snapshotId);
@@ -486,13 +486,18 @@ public class SearchController_ResultTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync(SearchTestConstants.ApiBase,
             new SearchRequest { Query = "standalone", IncludeFolders = false });
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await SearchJsonHelper.ReadAsync<SearchResponse>(response);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Files);
+        Assert.Empty(result.Folders);
     }
 
     [Fact]
-    public async Task Search_OnlyFoldersRequested_Returns204WhenNoFiles()
+    public async Task Search_OnlyFoldersRequested_ReturnsMatchingFoldersWithoutFiles()
     {
-        // IncludeFiles = false → Files list stays empty → 204.
+        // IncludeFiles = false → Files list stays empty, but matching folders
+        // must still be returned with 200 OK.
         var snapshotId = await SearchSeeder.SeedSnapshotAsync(_db, _userId);
         var folderId = await SearchSeeder.SeedFolderAsync(_db, _userId, "orphan_folder");
         await SearchSeeder.LinkFolderToSnapshotAsync(_db, folderId, snapshotId);
@@ -501,7 +506,11 @@ public class SearchController_ResultTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync(SearchTestConstants.ApiBase,
             new SearchRequest { Query = "orphan", IncludeFiles = false });
 
-        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await SearchJsonHelper.ReadAsync<SearchResponse>(response);
+        Assert.NotNull(result);
+        Assert.NotEmpty(result.Folders);
+        Assert.Empty(result.Files);
     }
 
     [Fact]

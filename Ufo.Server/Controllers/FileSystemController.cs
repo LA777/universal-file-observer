@@ -112,6 +112,128 @@ public class FileSystemController : ControllerBase
         return folderEntity;
     }
 
+    [HttpPost("search")]
+    [ProducesResponseType(typeof(List<FsSearchResult>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult SearchFileSystem([FromBody] FileSystemSearchRequest request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("SearchFileSystem - Path: {Path}, Query: {Query}", request.Path, request.Query);
+
+        if (string.IsNullOrWhiteSpace(request.Path) || !Directory.Exists(request.Path))
+        {
+            return BadRequest("A valid root path is required.");
+        }
+
+        var maxResults = Math.Clamp(request.MaxResults, 1, 2000);
+        var query = request.Query.Trim();
+        var extension = string.IsNullOrWhiteSpace(request.Extension)
+            ? null
+            : (request.Extension.Trim().StartsWith('.') ? request.Extension.Trim() : "." + request.Extension.Trim());
+
+        bool MatchesName(string name) =>
+            query.Length == 0 || name.Contains(query, StringComparison.OrdinalIgnoreCase);
+
+        bool MatchesDate(DateTimeOffset modified) =>
+            (!request.DateFrom.HasValue || modified >= request.DateFrom.Value)
+            && (!request.DateTo.HasValue || modified <= request.DateTo.Value);
+
+        var results = new List<FsSearchResult>();
+        var pending = new Stack<string>();
+        pending.Push(request.Path);
+
+        while (pending.Count > 0 && results.Count < maxResults && !cancellationToken.IsCancellationRequested)
+        {
+            var currentDir = pending.Pop();
+
+            try
+            {
+                foreach (var subDir in Directory.EnumerateDirectories(currentDir))
+                {
+                    pending.Push(subDir);
+
+                    if (!request.IncludeFolders || results.Count >= maxResults)
+                    {
+                        continue;
+                    }
+
+                    var dirInfo = new DirectoryInfo(subDir);
+                    if (MatchesName(dirInfo.Name) && MatchesDate(dirInfo.LastWriteTime))
+                    {
+                        results.Add(new FsSearchResult
+                        {
+                            Name = dirInfo.Name,
+                            FullPath = subDir,
+                            IsFile = false,
+                            Size = null,
+                            ModifiedAt = dirInfo.LastWriteTime,
+                            IsHidden = dirInfo.Attributes.HasFlag(FileAttributes.Hidden)
+                        });
+                    }
+                }
+
+                if (!request.IncludeFiles)
+                {
+                    continue;
+                }
+
+                foreach (var filePath in Directory.EnumerateFiles(currentDir))
+                {
+                    if (results.Count >= maxResults)
+                    {
+                        break;
+                    }
+
+                    var fileInfo = new FileInfo(filePath);
+                    if (!MatchesName(Path.GetFileNameWithoutExtension(fileInfo.Name)))
+                    {
+                        continue;
+                    }
+
+                    if (extension is not null && !string.Equals(fileInfo.Extension, extension, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (request.MinSize.HasValue && fileInfo.Length < request.MinSize.Value)
+                    {
+                        continue;
+                    }
+
+                    if (request.MaxSize.HasValue && fileInfo.Length > request.MaxSize.Value)
+                    {
+                        continue;
+                    }
+
+                    if (!MatchesDate(fileInfo.LastWriteTime))
+                    {
+                        continue;
+                    }
+
+                    results.Add(new FsSearchResult
+                    {
+                        Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
+                        FullPath = filePath,
+                        IsFile = true,
+                        Size = fileInfo.Length,
+                        FileExtension = fileInfo.Extension,
+                        ModifiedAt = fileInfo.LastWriteTime,
+                        IsHidden = fileInfo.Attributes.HasFlag(FileAttributes.Hidden)
+                    });
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Skip folders we cannot read.
+            }
+            catch (IOException)
+            {
+                // Skip folders that disappear or error mid-walk.
+            }
+        }
+
+        return Ok(results);
+    }
+
     [HttpPost("parent")]
     [ProducesResponseType(typeof(FsFolder), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
