@@ -609,8 +609,8 @@ public class SearchController_UserIsolationTests : IAsyncLifetime
             new { Id = otherUserId.ToString(), Name = $"otheruser-{otherUserId}", PasswordHash = "hash" });
 
         // Both users have data matching the same query term.
-        await SearchSeeder.SeedFullAsync(_db, _userId, "shared_term");
-        await SearchSeeder.SeedFullAsync(_db, otherUserId, "shared_term");
+        var ownSeed = await SearchSeeder.SeedFullAsync(_db, _userId, "shared_term");
+        var otherUserSeed = await SearchSeeder.SeedFullAsync(_db, otherUserId, "shared_term");
 
         var response = await _client.PostAsJsonAsync(SearchTestConstants.ApiBase,
             new SearchRequest { Query = "shared_term" });
@@ -620,9 +620,14 @@ public class SearchController_UserIsolationTests : IAsyncLifetime
         var result = await SearchJsonHelper.ReadAsync<SearchResponse>(response);
         Assert.NotNull(result);
 
-        // All returned items must belong to the authenticated user only.
-        Assert.All(result.Files, f => Assert.Equal(_userId, f.UserId));
-        Assert.All(result.Folders, f => Assert.Equal(_userId, f.UserId));
+        // Isolation is asserted by identity and by exact count, so an empty or
+        // truncated result fails here instead of passing vacuously.
+        Assert.Equal(ownSeed.FileId, Assert.Single(result.Files).Id);
+        Assert.Equal(ownSeed.FolderId, Assert.Single(result.Folders).Id);
+
+        // The other user's rows must not leak into this response.
+        Assert.DoesNotContain(result.Files, file => file.Id == otherUserSeed.FileId);
+        Assert.DoesNotContain(result.Folders, folder => folder.Id == otherUserSeed.FolderId);
     }
 }
 

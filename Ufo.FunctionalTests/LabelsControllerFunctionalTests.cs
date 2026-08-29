@@ -457,10 +457,9 @@ public class LabelController_GetAllLabelsTests : IAsyncLifetime
 {
     private readonly LabelApiFactory _factory = new();
     private HttpClient _client = null!;
-    private Ulid _userId;
 
     public async Task InitializeAsync() =>
-        (_client, _userId) = await _factory.CreateAuthenticatedClientAsync();
+        (_client, _) = await _factory.CreateAuthenticatedClientAsync();
 
     public Task DisposeAsync()
     {
@@ -494,19 +493,29 @@ public class LabelController_GetAllLabelsTests : IAsyncLifetime
     public async Task GetAllLabels_OnlyReturnsOwnUsersLabels()
     {
         // User 1 adds a label.
-        await _client.PostAsJsonAsync(TestConstants.ApiBase, RequestFactory.NewLabel("User1Label"));
+        var ownLabel = RequestFactory.NewLabel("User1Label");
+        await _client.PostAsJsonAsync(TestConstants.ApiBase, ownLabel);
 
         // User 2 adds a different label.
         var (client2, _) = await _factory.CreateAuthenticatedClientAsync();
-        await client2.PostAsJsonAsync(TestConstants.ApiBase, RequestFactory.NewLabel("User2Label"));
+        var otherUserLabel = RequestFactory.NewLabel("User2Label");
+        await client2.PostAsJsonAsync(TestConstants.ApiBase, otherUserLabel);
 
         // User 1 should only see their own label.
         var response = await _client.GetAsync(TestConstants.ApiBase);
         var labels = await Json.ReadAsync<List<LabelDto>>(response);
 
         Assert.NotNull(labels);
-        Assert.All(labels, l => Assert.Equal(_userId, l.UserId));
-        Assert.DoesNotContain(labels, l => l.Name == "User2Label");
+
+        // Isolation is asserted by identity and by exact count, so an empty
+        // result fails here instead of passing vacuously.
+        var returnedLabel = Assert.Single(labels);
+        Assert.Equal(ownLabel.Id, returnedLabel.Id);
+        Assert.Equal("User1Label", returnedLabel.Name);
+
+        // The other user's label must not leak into this response.
+        Assert.DoesNotContain(labels, label => label.Id == otherUserLabel.Id);
+        Assert.DoesNotContain(labels, label => label.Name == "User2Label");
 
         client2.Dispose();
     }
