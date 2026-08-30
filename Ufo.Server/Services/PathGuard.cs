@@ -24,13 +24,40 @@ public interface IPathGuard
 
     /// <summary>
     /// Canonicalises <paramref name="path"/> (resolving relative segments and
-    /// symbolic links) and reports whether it is readable.
+    /// symbolic links) and reports whether it is readable. A rejection is logged
+    /// as a warning, so this is the check for a path a caller asked for by name.
     /// </summary>
     /// <param name="resolvedPath">
     /// The canonical path to use for all subsequent file-system access. Callers
     /// must use this rather than the original input.
     /// </param>
     bool TryResolve(string? path, out string resolvedPath);
+
+    /// <summary>
+    /// As <see cref="TryResolve"/>, but a rejection is an expected outcome rather
+    /// than a warning.
+    /// </summary>
+    /// <remarks>
+    /// For paths the application reached by itself - entries returned by
+    /// enumeration, or a parent folder being tested before it is offered as
+    /// somewhere to navigate to. Logging those at warning level turns one ordinary
+    /// listing into a burst of alarming lines, which is how a log stops being
+    /// read.
+    /// </remarks>
+    bool TryResolveQuietly(string? path, out string resolvedPath);
+
+    /// <summary>
+    /// Whether an entry just enumerated from a directory that has <b>already</b>
+    /// been resolved and allowed may itself be read.
+    /// </summary>
+    /// <remarks>
+    /// The cheap form of the same question. Because the containing directory is
+    /// known to resolve inside an allowed root, an entry that is not itself a
+    /// symbolic link cannot lead out of one, and the ancestor chain does not need
+    /// walking again - which matters, because the callers run this over every
+    /// entry of a tree.
+    /// </remarks>
+    bool IsAllowedChild(string childPath);
 }
 
 public class PathGuard : IPathGuard
@@ -73,7 +100,29 @@ public class PathGuard : IPathGuard
 
     public bool IsRestricted => _allowedRoots.Length > 0;
 
-    public bool TryResolve(string? path, out string resolvedPath)
+    public bool TryResolve(string? path, out string resolvedPath) =>
+        TryResolve(path, out resolvedPath, logRejectionAsWarning: true);
+
+    public bool TryResolveQuietly(string? path, out string resolvedPath) =>
+        TryResolve(path, out resolvedPath, logRejectionAsWarning: false);
+
+    public bool IsAllowedChild(string childPath)
+    {
+        if (!IsRestricted)
+        {
+            return true;
+        }
+
+        // One directory-entry read, against the whole ancestor walk TryResolve does.
+        if (ReadLinkTarget(childPath) is null)
+        {
+            return true;
+        }
+
+        return TryResolveQuietly(childPath, out _);
+    }
+
+    private bool TryResolve(string? path, out string resolvedPath, bool logRejectionAsWarning)
     {
         resolvedPath = string.Empty;
 
@@ -95,7 +144,7 @@ public class PathGuard : IPathGuard
 
         if (!TryResolveRealPath(canonicalPath, out var realPath))
         {
-            _logger.LogWarning("Rejected path {Path} - symbolic links could not be resolved.", canonicalPath);
+            LogRejection(logRejectionAsWarning, "Rejected path {Path} - symbolic links could not be resolved.", canonicalPath);
             return false;
         }
 
@@ -108,12 +157,24 @@ public class PathGuard : IPathGuard
         var isAllowed = _allowedRoots.Any(allowedRoot => IsWithin(realPath, allowedRoot));
         if (!isAllowed)
         {
-            _logger.LogWarning("Rejected path {Path} - outside the configured allowed roots.", realPath);
+            LogRejection(logRejectionAsWarning, "Rejected path {Path} - outside the configured allowed roots.", realPath);
             return false;
         }
 
         resolvedPath = realPath;
         return true;
+    }
+
+    private void LogRejection(bool logRejectionAsWarning, string messageTemplate, string path)
+    {
+        if (logRejectionAsWarning)
+        {
+            _logger.LogWarning(messageTemplate, path);
+        }
+        else
+        {
+            _logger.LogDebug(messageTemplate, path);
+        }
     }
 
     /// <summary>

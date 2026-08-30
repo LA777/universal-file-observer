@@ -43,10 +43,11 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     private const int FileReadBufferSize = 4096;
 
     private readonly ILogger<FolderTreeBuilder> _logger;
+    private readonly IPathGuard _pathGuard;
     private readonly int _degreeOfParallelism;
 
-    public FolderTreeBuilder(ILogger<FolderTreeBuilder> logger)
-        : this(logger, DefaultDegreeOfParallelism)
+    public FolderTreeBuilder(ILogger<FolderTreeBuilder> logger, IPathGuard pathGuard)
+        : this(logger, pathGuard, DefaultDegreeOfParallelism)
     {
     }
 
@@ -54,9 +55,10 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     /// The degree of parallelism is only pinned explicitly by tests that need the
     /// ordering to be reproducible.
     /// </summary>
-    public FolderTreeBuilder(ILogger<FolderTreeBuilder> logger, int degreeOfParallelism)
+    public FolderTreeBuilder(ILogger<FolderTreeBuilder> logger, IPathGuard pathGuard, int degreeOfParallelism)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
 
         if (degreeOfParallelism < 1)
         {
@@ -102,18 +104,18 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     /// </summary>
     private List<PendingFile> EnumerateTree(FolderEntity rootFolder, string rootPath, SnapshotEntity snapshotEntity, UserEntity userEntity, CancellationToken cancellationToken)
     {
-        var pendingFiles = new ConcurrentBag<PendingFile>();
         var parallelOptions = new ParallelOptions
         {
             MaxDegreeOfParallelism = _degreeOfParallelism,
             CancellationToken = cancellationToken
         };
 
+        var walkContext = new WalkContext(snapshotEntity, userEntity);
+
         // Directory enumeration follows symbolic links and junctions, so a link that
         // points back up its own tree would otherwise be walked forever. Recording where
         // each directory really lives, after links are resolved, bounds the walk.
-        var visitedDirectories = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
-        visitedDirectories.TryAdd(ResolveCanonicalPath(rootPath), 0);
+        walkContext.VisitedDirectories.TryAdd(ResolveCanonicalPath(rootPath), 0);
 
         var currentLevel = new List<PendingFolder> { new(rootFolder, rootPath) };
 
@@ -123,13 +125,21 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
             Parallel.ForEach(currentLevel, parallelOptions, pendingFolder =>
             {
-                PopulateFolder(pendingFolder, snapshotEntity, userEntity, pendingFiles, nextLevel, visitedDirectories);
+                PopulateFolder(pendingFolder, walkContext, nextLevel);
             });
 
             currentLevel = [.. nextLevel];
         }
 
-        return [.. pendingFiles];
+        if (walkContext.ExcludedEntryCount > 0)
+        {
+            _logger.LogWarning(
+                "Excluded {ExcludedEntryCount} entries under {RootPath} from the snapshot: they resolve outside the allowed roots.",
+                walkContext.ExcludedEntryCount,
+                rootPath);
+        }
+
+        return [.. walkContext.PendingFiles];
     }
 
     /// <summary>
@@ -137,25 +147,34 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     /// file nodes for this one. Hashes are deliberately left empty here - files are
     /// hashed in the pass that follows, folders in the pass after that.
     /// </summary>
-    private static void PopulateFolder(
+    private void PopulateFolder(
         PendingFolder pendingFolder,
-        SnapshotEntity snapshotEntity,
-        UserEntity userEntity,
-        ConcurrentBag<PendingFile> pendingFiles,
-        ConcurrentBag<PendingFolder> nextLevel,
-        ConcurrentDictionary<string, byte> visitedDirectories)
+        WalkContext walkContext,
+        ConcurrentBag<PendingFolder> nextLevel)
     {
         var (folder, path) = pendingFolder;
 
         foreach (var subFolderPath in Directory.EnumerateDirectories(path))
         {
-            var subFolder = CreateFolderEntity(new DirectoryInfo(subFolderPath), snapshotEntity, folder, userEntity);
+            // Guarding only the path the snapshot was requested for is not enough. This
+            // walk descends into whatever it enumerates, and enumeration follows
+            // symbolic links and junctions, so one link inside an allowed root leads out
+            // of it - and the snapshot would then record the name, size and SHA-256 of
+            // every file below wherever it points. Rejected entries are left out of the
+            // tree entirely rather than merely not descended into, because the folder
+            // name alone is already more than the caller is allowed to see.
+            if (!IsReadable(subFolderPath, walkContext))
+            {
+                continue;
+            }
+
+            var subFolder = CreateFolderEntity(new DirectoryInfo(subFolderPath), walkContext.Snapshot, folder, walkContext.User);
             folder.ChildFolders.Add(subFolder);
 
             // A directory already reached by another route - a link or junction pointing
             // back up its own tree - is still part of the tree and stays in it, but
             // descending into it a second time would never terminate.
-            if (visitedDirectories.TryAdd(ResolveCanonicalPath(subFolderPath), 0))
+            if (walkContext.VisitedDirectories.TryAdd(ResolveCanonicalPath(subFolderPath), 0))
             {
                 nextLevel.Add(new PendingFolder(subFolder, subFolderPath));
             }
@@ -163,6 +182,13 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
         foreach (var filePath in Directory.EnumerateFiles(path))
         {
+            // A symbolic link to a file outside the allowed roots is the same escape as
+            // the directory case above, one file at a time.
+            if (!IsReadable(filePath, walkContext))
+            {
+                continue;
+            }
+
             var fileInfo = new FileInfo(filePath);
             var file = new FileEntity
             {
@@ -172,18 +198,18 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                 Size = fileInfo.Length,
                 Sha256Hash = string.Empty,
                 FileExtension = fileInfo.Extension,
-                User = userEntity,
-                UserId = userEntity.Id,
+                User = walkContext.User,
+                UserId = walkContext.User.Id,
                 CreatedAt = fileInfo.CreationTimeUtc.ToString("o"),
                 UpdatedAt = fileInfo.LastWriteTimeUtc.ToString("o"),
                 IsHidden = (fileInfo.Attributes & FileAttributes.Hidden) != 0
             };
 
-            file.Snapshots.Add(snapshotEntity);
+            file.Snapshots.Add(walkContext.Snapshot);
             file.ParentFolders.Add(folder);
             folder.Files.Add(file);
 
-            pendingFiles.Add(new PendingFile(file, filePath));
+            walkContext.PendingFiles.Add(new PendingFile(file, filePath));
         }
     }
 
@@ -264,6 +290,30 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         var sizeInBytes = fileStream.Length;
 
         return (Convert.ToHexStringLower(SHA256.HashData(fileStream)), sizeInBytes);
+    }
+
+    /// <summary>
+    /// Whether the snapshot is allowed to record <paramref name="entryPath"/>, which
+    /// this walk enumerated from a directory it had already resolved and allowed.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately the child form of the check rather than a full resolution of every
+    /// entry. This walk is the one place in the application that visits every file on a
+    /// library, and re-resolving each entry's whole ancestor chain would add syscalls
+    /// proportional to depth to all of them - undoing the parallelisation the walk was
+    /// built for. The containing directory is already known to sit inside an allowed
+    /// root, so only an entry that is itself a link can lead out of one.
+    /// </remarks>
+    private bool IsReadable(string entryPath, WalkContext walkContext)
+    {
+        if (_pathGuard.IsAllowedChild(entryPath))
+        {
+            return true;
+        }
+
+        walkContext.RecordExcludedEntry();
+
+        return false;
     }
 
     /// <summary>
@@ -384,4 +434,27 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     private readonly record struct PendingFolder(FolderEntity Entity, string Path);
 
     private readonly record struct PendingFile(FileEntity Entity, string Path);
+
+    /// <summary>
+    /// The state one walk shares across its levels and its worker threads. The builder
+    /// itself is a singleton and so cannot hold any of this in a field.
+    /// </summary>
+    private sealed class WalkContext(SnapshotEntity snapshot, UserEntity user)
+    {
+        private int _excludedEntryCount;
+
+        public SnapshotEntity Snapshot { get; } = snapshot;
+
+        public UserEntity User { get; } = user;
+
+        public ConcurrentBag<PendingFile> PendingFiles { get; } = [];
+
+        /// <summary>Resolved physical paths of the directories already descended into.</summary>
+        public ConcurrentDictionary<string, byte> VisitedDirectories { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>Entries left out because they resolve outside the allowed roots.</summary>
+        public int ExcludedEntryCount => Volatile.Read(ref _excludedEntryCount);
+
+        public void RecordExcludedEntry() => Interlocked.Increment(ref _excludedEntryCount);
+    }
 }

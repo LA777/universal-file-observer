@@ -1,9 +1,11 @@
 ﻿using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using System.Security.Cryptography;
 using System.Text;
 using Ufo.Abstractions.Database.Entities;
+using Ufo.Abstractions.Options;
 using Ufo.Extensions;
 using Ufo.Server.Services;
 
@@ -12,6 +14,13 @@ namespace Ufo.UnitTests.Server.Services;
 public class FolderTreeBuilderTests : BaseTest, IDisposable
 {
     private readonly Mock<ILogger<FolderTreeBuilder>> _loggerMock = new();
+
+    /// <summary>
+    /// These tests are about the walk itself, so they use a guard with no allow-list -
+    /// the desktop configuration, which admits everything.
+    /// </summary>
+    private static PathGuard UnrestrictedPathGuard =>
+        new(new Mock<ILogger<PathGuard>>().Object, Options.Create(new UfoHostOptions()));
     private readonly string _rootPath;
     private readonly UserEntity _user;
     private readonly SnapshotEntity _snapshot;
@@ -30,7 +39,13 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
     /// deliberately leaves it at the default instead.
     /// </summary>
     private FolderTreeBuilder CreateSut(int degreeOfParallelism = 4) =>
-        new(_loggerMock.Object, degreeOfParallelism);
+        new(_loggerMock.Object, UnrestrictedPathGuard, degreeOfParallelism);
+
+    /// <summary>A builder configured the way a container runs: with an allow-list.</summary>
+    private FolderTreeBuilder CreateRestrictedSut(params string[] allowedRoots) =>
+        new(_loggerMock.Object,
+            new PathGuard(new Mock<ILogger<PathGuard>>().Object, Options.Create(new UfoHostOptions { AllowedRoots = allowedRoots })),
+            degreeOfParallelism: 4);
 
     private string WriteFile(string relativePath, string content)
     {
@@ -204,7 +219,7 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
             }
         }
 
-        var sut = new FolderTreeBuilder(_loggerMock.Object);
+        var sut = new FolderTreeBuilder(_loggerMock.Object, UnrestrictedPathGuard);
 
         var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
 
@@ -276,6 +291,96 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
         var loop = real.ChildFolders.Single(folder => folder.Name == "loop");
         loop.ChildFolders.Should().BeEmpty();
         loop.Files.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task BuildAsync_ExcludesADirectorySymlinkOutOfTheAllowedRoot()
+    {
+        // The snapshot walk is the arbitrary-read hole with teeth: it descends into
+        // whatever enumeration hands it, hashes every file, and persists the names and
+        // sizes. Guarding only the path the snapshot was requested for leaves one link
+        // inside the root enough to index the whole machine.
+        var forbiddenRoot = Path.Combine(Path.GetDirectoryName(_rootPath)!, $"ufo-forbidden-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(forbiddenRoot);
+        File.WriteAllText(Path.Combine(forbiddenRoot, "secret.txt"), "secret");
+
+        WriteFile("inside.txt", "inside");
+        if (!TryCreateDirectorySymbolicLink(Path.Combine(_rootPath, "escape"), forbiddenRoot))
+        {
+            return;
+        }
+
+        var sut = CreateRestrictedSut(_rootPath);
+
+        var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
+
+        rootFolder.ChildFolders.Should().NotContain(folder => folder.Name == "escape");
+        AllFolders(rootFolder).SelectMany(folder => folder.Files)
+            .Should().NotContain(file => file.Name == "secret");
+        rootFolder.Files.Single().Name.Should().Be("inside");
+
+        Directory.Delete(forbiddenRoot, recursive: true);
+    }
+
+    [Fact]
+    public async Task BuildAsync_ExcludesAFileSymlinkOutOfTheAllowedRoot()
+    {
+        var forbiddenRoot = Path.Combine(Path.GetDirectoryName(_rootPath)!, $"ufo-forbidden-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(forbiddenRoot);
+        var secretFilePath = Path.Combine(forbiddenRoot, "secret.txt");
+        File.WriteAllText(secretFilePath, "secret");
+
+        try
+        {
+            File.CreateSymbolicLink(Path.Combine(_rootPath, "leak.txt"), secretFilePath);
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var sut = CreateRestrictedSut(_rootPath);
+
+        var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
+
+        // Without the check the link is hashed, and the digest of a file outside the
+        // allowed roots is itself the leak - it confirms the contents to anyone holding
+        // a candidate copy.
+        rootFolder.Files.Should().NotContain(file => file.Name == "leak");
+
+        Directory.Delete(forbiddenRoot, recursive: true);
+    }
+
+    [Fact]
+    public async Task BuildAsync_KeepsASymlinkThatStaysInsideTheAllowedRoot()
+    {
+        WriteFile("real/inner.txt", "inner");
+        if (!TryCreateDirectorySymbolicLink(Path.Combine(_rootPath, "link"), Path.Combine(_rootPath, "real")))
+        {
+            return;
+        }
+
+        var sut = CreateRestrictedSut(_rootPath);
+
+        var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
+
+        // The allow-list must not cost a restricted host the links it legitimately has
+        // inside its own library.
+        rootFolder.ChildFolders.Should().Contain(folder => folder.Name == "link");
+    }
+
+    private static bool TryCreateDirectorySymbolicLink(string linkPath, string targetPath)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(linkPath, targetPath);
+            return true;
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+        {
+            // Unprivileged Windows without developer mode.
+            return false;
+        }
     }
 
     [Fact]

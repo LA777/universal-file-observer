@@ -229,6 +229,95 @@ public class PathGuardTests : BaseTest, IDisposable
         resolvedPath.Should().Be(Path.Combine(realRoot, "child.txt"));
     }
 
+    [Fact]
+    public void IsAllowedChild_AllowsAnOrdinaryEntryWithoutWalkingItsAncestors()
+    {
+        var childPath = Path.Combine(_allowedRoot, "child.txt");
+        File.WriteAllText(childPath, "child");
+        var sut = CreateSut(_allowedRoot);
+
+        // The cheap path: not a link, so the caller's guarantee about the parent
+        // settles it.
+        sut.IsAllowedChild(childPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsAllowedChild_RejectsASymlinkOutOfTheRoot()
+    {
+        var linkPath = Path.Combine(_allowedRoot, "link");
+        if (!TryCreateDirectorySymbolicLink(linkPath, _forbiddenRoot))
+        {
+            return;
+        }
+
+        var sut = CreateSut(_allowedRoot);
+
+        sut.IsAllowedChild(linkPath).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsAllowedChild_AllowsASymlinkThatStaysInsideTheRoot()
+    {
+        var targetPath = Path.Combine(_allowedRoot, "real");
+        Directory.CreateDirectory(targetPath);
+        var linkPath = Path.Combine(_allowedRoot, "link");
+        if (!TryCreateDirectorySymbolicLink(linkPath, targetPath))
+        {
+            return;
+        }
+
+        var sut = CreateSut(_allowedRoot);
+
+        sut.IsAllowedChild(linkPath).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsAllowedChild_AllowsEverythingWhenUnrestricted()
+    {
+        var sut = CreateSut();
+
+        sut.IsAllowedChild(_forbiddenRoot).Should().BeTrue();
+    }
+
+    [Fact]
+    public void TryResolveQuietly_DoesNotLogARejectionAsAWarning()
+    {
+        var sut = CreateSut(_allowedRoot);
+
+        sut.TryResolveQuietly(_forbiddenRoot, out _).Should().BeFalse();
+
+        // The parent of an allowed root fails this check on every single folder
+        // listing, so a warning per rejection is how the log fills with noise that
+        // looks like an attack and is not.
+        _loggerMock.Verify(
+            logger => logger.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public void TryResolve_LogsARejectionAsAWarning()
+    {
+        var sut = CreateSut(_allowedRoot);
+
+        sut.TryResolve(_forbiddenRoot, out _).Should().BeFalse();
+
+        // A path the caller asked for by name is a different matter: that one is
+        // worth seeing.
+        _loggerMock.Verify(
+            logger => logger.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.IsAny<It.IsAnyType>(),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+    }
+
     public void Dispose()
     {
         var testRoot = Path.GetDirectoryName(_allowedRoot);

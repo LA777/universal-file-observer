@@ -41,7 +41,7 @@ public class FileSystemController : ControllerBase
             return NoContent();
         }
 
-        var folderEntity = GetFolder(new PathRequest { Path = startingFolderPath }, cancellationToken);
+        var folderEntity = GetFolder(startingFolderPath, cancellationToken);
         if (folderEntity == null)
         {
             return NoContent();
@@ -106,7 +106,7 @@ public class FileSystemController : ControllerBase
             return Forbid();
         }
 
-        var folderEntity = GetFolder(new PathRequest { Path = resolvedPath }, cancellationToken);
+        var folderEntity = GetFolder(resolvedPath, cancellationToken);
         if (folderEntity == null)
         {
             return NoContent();
@@ -115,17 +115,35 @@ public class FileSystemController : ControllerBase
         return Ok(folderEntity);
     }
 
-    private FsFolder? GetFolder(PathRequest folderPath, CancellationToken cancellationToken)
+    /// <summary>
+    /// Lists one folder's immediate contents.
+    /// </summary>
+    /// <param name="resolvedFolderPath">
+    /// A path that has already been through <see cref="IPathGuard.TryResolve"/>. Every
+    /// caller must resolve first - this method does not re-check the folder itself, only
+    /// the children it lists.
+    /// </param>
+    private FsFolder? GetFolder(string resolvedFolderPath, CancellationToken cancellationToken)
     {
         var folderEntity = new FsFolder();
-        var dirInfo = new DirectoryInfo(folderPath.Path);
+        var dirInfo = new DirectoryInfo(resolvedFolderPath);
 
-        foreach (var subfolderPath in Directory.EnumerateDirectories(folderPath.Path))
+        foreach (var subfolderPath in Directory.EnumerateDirectories(resolvedFolderPath))
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 return null;
             }
+
+            // Children are re-checked, not assumed to be inside the root because their
+            // parent is: enumeration returns symbolic links and junctions, and one of
+            // those pointing outside would otherwise be listed here - and then be
+            // offered to the user as somewhere to navigate to.
+            if (!_pathGuard.IsAllowedChild(subfolderPath))
+            {
+                continue;
+            }
+
             var subfolderEntity = new FsFolder();
             var directoryInfo = new DirectoryInfo(subfolderPath);
             subfolderEntity.Name = directoryInfo.Name;
@@ -136,11 +154,16 @@ public class FileSystemController : ControllerBase
             folderEntity.ChildFolders.Add(subfolderEntity);
         }
 
-        foreach (var filePath in Directory.EnumerateFiles(folderPath.Path))
+        foreach (var filePath in Directory.EnumerateFiles(resolvedFolderPath))
         {
             if (cancellationToken.IsCancellationRequested)
             {
                 return null;
+            }
+
+            if (!_pathGuard.IsAllowedChild(filePath))
+            {
+                continue;
             }
 
             var fileInfo = new FileInfo(filePath);
@@ -157,8 +180,16 @@ public class FileSystemController : ControllerBase
         }
 
         folderEntity.Name = dirInfo.Name;
-        folderEntity.FullPath = folderPath.Path;
-        folderEntity.ParentFolder = dirInfo.Parent == null ? null : new FsFolder() { FullPath = dirInfo.Parent?.FullName };
+        folderEntity.FullPath = resolvedFolderPath;
+
+        // Only advertise a parent the caller is actually allowed to open, so that a
+        // restricted host does not offer an "up" out of its own allowed root. Checked
+        // quietly: standing at an allowed root and having no parent to go to is the
+        // normal case, not something to warn about once per listing.
+        folderEntity.ParentFolder = dirInfo.Parent is { } parentDirectory
+            && _pathGuard.TryResolveQuietly(parentDirectory.FullName, out _)
+                ? new FsFolder { FullPath = parentDirectory.FullName }
+                : null;
 
         return folderEntity;
     }
@@ -221,7 +252,7 @@ public class FileSystemController : ControllerBase
             {
                 foreach (var subDir in Directory.EnumerateDirectories(currentDir))
                 {
-                    if (!_pathGuard.TryResolve(subDir, out var resolvedSubDir)
+                    if (!_pathGuard.TryResolveQuietly(subDir, out var resolvedSubDir)
                         || !visitedDirectories.Add(resolvedSubDir))
                     {
                         continue;
@@ -262,9 +293,9 @@ public class FileSystemController : ControllerBase
                     }
 
                     // A symbolic link to a file outside the allowed roots would
-                    // otherwise be listed here. Only worth the extra syscalls when
-                    // an allow-list is actually in force.
-                    if (_pathGuard.IsRestricted && !_pathGuard.TryResolve(filePath, out _))
+                    // otherwise be listed here. The containing directory was resolved
+                    // before it was queued, so only the entry itself needs checking.
+                    if (!_pathGuard.IsAllowedChild(filePath))
                     {
                         continue;
                     }
@@ -342,8 +373,6 @@ public class FileSystemController : ControllerBase
             return NotFound();
         }
 
-        var pathModel = new PathRequest { Path = parent };
-
-        return GetFolderInfo(pathModel, cancellationToken);
+        return GetFolderInfo(new PathRequest { Path = parent }, cancellationToken);
     }
 }

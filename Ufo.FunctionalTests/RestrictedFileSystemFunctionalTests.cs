@@ -382,6 +382,68 @@ public class RestrictedFileSystemFunctionalTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public async Task CreateSnapshot_DoesNotIndexThroughASymlinkOutOfTheAllowedRoot()
+    {
+        if (!_symbolicLinksSupported)
+        {
+            return;
+        }
+
+        // Forbidding the forbidden root outright is the easy half. This is the other
+        // half, and the damaging one: the snapshot walk descends into whatever it
+        // enumerates, so "escape" inside the allowed root led it out - recording the
+        // name, size and SHA-256 of every file below, and leaving all of it browsable
+        // through the snapshot endpoints long after the walk finished.
+        var createResponse = await _client.PostAsJsonAsync("/api/snapshot/create", new PathRequest { Path = _allowedRoot });
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var snapshotResponse = await _client.GetAsync("/api/snapshot/latest");
+        Assert.Equal(HttpStatusCode.OK, snapshotResponse.StatusCode);
+
+        var snapshotJson = await snapshotResponse.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("public-marker-secret", snapshotJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("public-marker-nested", snapshotJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("escape", snapshotJson, StringComparison.Ordinal);
+
+        // The allowed content is still indexed, so the guard is not simply refusing
+        // everything.
+        Assert.Contains("public-marker", snapshotJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GetFolderInfo_DoesNotListASymlinkOutOfTheAllowedRoot()
+    {
+        if (!_symbolicLinksSupported)
+        {
+            return;
+        }
+
+        var response = await _client.PostAsJsonAsync("/api/filesystem/folder", new PathRequest { Path = _allowedRoot });
+
+        var folder = await response.Content.ReadFromJsonAsync<FsFolder>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(folder);
+        Assert.DoesNotContain(folder!.ChildFolders, childFolder => childFolder.Name == "escape");
+        Assert.Contains(folder.Files, file => file.Name == "public-marker");
+    }
+
+    [Fact]
+    public async Task GetFolderInfo_AtTheAllowedRoot_OffersNoParentToNavigateTo()
+    {
+        var response = await _client.PostAsJsonAsync("/api/filesystem/folder", new PathRequest { Path = _allowedRoot });
+
+        var folder = await response.Content.ReadFromJsonAsync<FsFolder>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(folder);
+        // The parent of the allowed root is outside it, so advertising it would hand the
+        // UI a path that only ever answers 403.
+        Assert.Null(folder!.ParentFolder);
+    }
+
     private async Task RegisterTestUser()
     {
         const string sql = @"
