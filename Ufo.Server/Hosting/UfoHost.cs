@@ -1,4 +1,4 @@
-using Cysharp.Serialization.Json;
+﻿using Cysharp.Serialization.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.Data.Sqlite;
@@ -140,6 +140,8 @@ public static class UfoHost
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
+        // Stateless, so it is shared rather than rebuilt per request.
+        builder.Services.AddSingleton<IFolderTreeBuilder, FolderTreeBuilder>();
 
         builder.Services.AddScoped<IDbConnectionFactory, SqliteConnectionFactory>();
         builder.Services.AddTransient<ISystemInfoProvider, PosixSystemInfoProvider>();

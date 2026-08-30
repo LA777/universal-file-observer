@@ -303,6 +303,21 @@ public class SqlScripts
                                                     "WHERE SnapshotId = @SnapshotId  " +
                                                     "AND FolderId = @FolderId " +
                                                     "AND FileId = @FileId;";
+
+    // Used when a snapshot's folder tree is written. Only the existence lookups are
+    // batched: SnapshotRepository appends an IN list of content hashes and narrows the
+    // result in memory. Folding many rows into one INSERT was measured and is a
+    // pessimisation here - SQLite caches the prepared statement behind a fixed INSERT,
+    // and re-parsing a long VALUES list costs far more than the round trips it saves.
+    public const string SelectFoldersByHashesSqlPrefix = "SELECT Id, Name, Size, Sha256Hash FROM Folders " +
+                                                            "WHERE UserId = @UserId AND Sha256Hash IN ";
+    public const string SelectFilesByHashesSqlPrefix = "SELECT Id, Name, Size, FileExtension, Sha256Hash FROM Files " +
+                                                            "WHERE UserId = @UserId AND Sha256Hash IN ";
+    // The join tables' primary keys already state "this binding exists", so a repeat is
+    // a no-op and no preceding SELECT is needed to rule one out.
+    public const string InsertFoldersToFoldersIfMissingSql = InsertFoldersToFoldersSql + " ON CONFLICT DO NOTHING;";
+    public const string InsertFilesToFoldersIfMissingSql = InsertFilesToFoldersSql + " ON CONFLICT DO NOTHING;";
+
     public const string InsertPcsToStorageDrivesSql = "INSERT INTO PcsToStorageDrives " +
                                                         "(PcId, StorageDriveId, SnapshotId) " +
                                                         "VALUES " +

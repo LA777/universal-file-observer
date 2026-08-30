@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -9,10 +9,12 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Json;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
 using Ufo.Abstractions.Database;
+using Ufo.Abstractions.DataTransferObjects;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Options;
 using Ufo.Abstractions.Requests;
@@ -85,7 +87,15 @@ public class SnapshotApiFactory : WebApplicationFactory<Program>
         await _sqLiteConnection.OpenAsync();
         await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
 
-        return CreateClient();
+        var client = CreateClient();
+
+        // HttpClient's default 100 seconds is short enough that a request which is merely
+        // queued behind the rest of the assembly on a loaded machine gets reported as a
+        // failure rather than as slowness. The snapshot endpoint does real file-system
+        // work, so it is the one most exposed to that.
+        client.Timeout = TimeSpan.FromMinutes(10);
+
+        return client;
     }
 
     public override ValueTask DisposeAsync()
@@ -185,6 +195,7 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
     private SnapshotApiFactory _factory = null!;
     private HttpClient _client = null!;
     private SqliteConnection _connection = null!;
+    private string _snapshotRootPath = null!;
 
     public async Task InitializeAsync()
     {
@@ -192,6 +203,9 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
         _client = await _factory.CreateClientAsync();
         _connection = new SqliteConnection(_factory.ConnectionString);
         await _connection.OpenAsync();
+
+        _snapshotRootPath = Path.Combine(Path.GetTempPath(), $"ufo-snapshot-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_snapshotRootPath);
 
         // Register test users
         await RegisterTestUser(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName, SnapshotTestConstants.TestUserPasswordHash);
@@ -202,6 +216,11 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
     {
         _connection?.Dispose();
         await _factory.DisposeAsync();
+
+        if (_snapshotRootPath is not null && Directory.Exists(_snapshotRootPath))
+        {
+            Directory.Delete(_snapshotRootPath, recursive: true);
+        }
     }
 
     private async Task RegisterTestUser(Ulid userId, string userName, string passwordHash)
@@ -243,6 +262,154 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+
+    #region CreateSnapshot Tests
+
+    private string WriteSnapshotFile(string relativePath, string content)
+    {
+        var fullPath = Path.Combine(_snapshotRootPath, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        File.WriteAllText(fullPath, content);
+
+        return fullPath;
+    }
+
+    private async Task<HttpResponseMessage> PostCreateSnapshotAsync(Ulid userId, string userName)
+    {
+        _client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", GenerateToken(userId, userName));
+
+        return await _client.PostAsJsonAsync(
+            "api/snapshot/create",
+            SnapshotRequestFactory.CreatePathRequest(_snapshotRootPath));
+    }
+
+    private async Task<long> CountRowsAsync(string sql)
+    {
+        using var command = _connection.CreateCommand();
+        command.CommandText = sql;
+
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    private static IEnumerable<FolderDto> Flatten(FolderDto folder) =>
+        [folder, .. folder.ChildFolders.SelectMany(Flatten)];
+
+    [Fact]
+    public async Task CreateSnapshot_WithNestedTree_PersistsEveryFolderAndFile()
+    {
+        WriteSnapshotFile("top.txt", "top-level");
+        WriteSnapshotFile("documents/notes.md", "some notes");
+        WriteSnapshotFile("documents/archive/old.log", "old log line");
+
+        var createResponse = await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName);
+
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+        var latestResponse = await _client.GetAsync("api/snapshot/latest");
+        Assert.Equal(HttpStatusCode.OK, latestResponse.StatusCode);
+        var snapshot = await latestResponse.Content.ReadFromJsonAsync<SnapshotDto>();
+
+        var rootFolder = snapshot!.RootFolder;
+        Assert.NotNull(rootFolder);
+        Assert.Equal(Path.GetFileName(_snapshotRootPath), rootFolder.Name);
+
+        var allFolders = Flatten(rootFolder).ToList();
+        Assert.Equal(
+            [Path.GetFileName(_snapshotRootPath), "archive", "documents"],
+            allFolders.Select(folder => folder.Name).OrderBy(name => name != Path.GetFileName(_snapshotRootPath)).ThenBy(name => name).ToList());
+        Assert.Equal(
+            ["notes", "old", "top"],
+            allFolders.SelectMany(folder => folder.Files).Select(file => file.Name).Order().ToList());
+
+        // Every folder's own hash and its rolled-up size have to survive the round trip,
+        // not just the file rows.
+        Assert.All(allFolders, folder => Assert.NotEqual(string.Empty, folder.Sha256Hash));
+        Assert.Equal("top-level".Length + "some notes".Length + "old log line".Length, rootFolder.Size);
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_WithIdenticalFilesInDifferentFolders_StoresOneFileRow()
+    {
+        WriteSnapshotFile("left/same.txt", "identical content");
+        WriteSnapshotFile("right/same.txt", "identical content");
+
+        var createResponse = await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName);
+
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+        // De-duplication is by content, so the two copies share a single Files row and
+        // are told apart by their two bindings.
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_OverTheSameTreeTwice_ReusesTheExistingRows()
+    {
+        WriteSnapshotFile("data/one.txt", "one");
+        WriteSnapshotFile("data/two.txt", "two");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        var folderCountAfterFirst = await CountRowsAsync("SELECT COUNT(*) FROM Folders");
+        var fileCountAfterFirst = await CountRowsAsync("SELECT COUNT(*) FROM Files");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Nothing on disk changed, so the second snapshot is entirely new bindings over
+        // the rows the first one wrote.
+        Assert.Equal(folderCountAfterFirst, await CountRowsAsync("SELECT COUNT(*) FROM Folders"));
+        Assert.Equal(fileCountAfterFirst, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM Snapshots"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_WithMoreRowsThanFitInOneStatement_PersistsThemAll()
+    {
+        // Inserts are batched, so the interesting sizes are the ones that do not divide
+        // evenly into a batch. 250 distinct files spread over 40 folders crosses the
+        // boundary for both tables.
+        const int fileCount = 250;
+        const int folderCount = 40;
+
+        for (var fileIndex = 0; fileIndex < fileCount; fileIndex++)
+        {
+            WriteSnapshotFile($"folder-{fileIndex % folderCount}/file-{fileIndex}.txt", $"unique-content-{fileIndex}");
+        }
+
+        var createResponse = await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName);
+
+        Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+        Assert.Equal(fileCount, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(fileCount, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+        Assert.Equal(folderCount + 1, await CountRowsAsync("SELECT COUNT(*) FROM Folders"));
+        Assert.Equal(folderCount + 1, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders"));
+
+        var latestResponse = await _client.GetAsync("api/snapshot/latest");
+        var snapshot = await latestResponse.Content.ReadFromJsonAsync<SnapshotDto>();
+        Assert.Equal(fileCount, Flatten(snapshot!.RootFolder!).SelectMany(folder => folder.Files).Count());
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_WithoutAuth_ReturnUnauthorized()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+
+        var response = await _client.PostAsJsonAsync(
+            "api/snapshot/create",
+            SnapshotRequestFactory.CreatePathRequest(_snapshotRootPath));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    #endregion
 
     #region GetLatestSnapshot Tests
 

@@ -27,6 +27,7 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 
 TODO:
 + split Windows App and Docker
+- One behaviour I deliberately left alone: a file deleted between enumeration and hashing still fails the whole snapshot. That window grew with this change. Silently skipping would produce a snapshot claiming completeness it doesn't have, so throwing seemed the safer default — but say the word if you'd rather it skip and log.
 - split App into Client (thin) - Server (data)
 + migrate to Angular 22
 - _docs/AI_SOLUTION_REVIEW.md

@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System.Data;
 using System.Data.Common;
+using System.Text;
 using Ufo.Abstractions;
 using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
@@ -13,6 +14,14 @@ public class SnapshotRepository : ISnapshotRepository
 {
     private readonly ILogger<SnapshotRepository> _logger;
     private readonly IDbConnectionFactory _dbConnectionFactory;
+
+    /// <summary>
+    /// How many content hashes go into one existence lookup. Chosen by measurement
+    /// rather than by the parameter limit: the cost of preparing the IN list grows
+    /// faster than the round trips it saves, so throughput peaks well short of what
+    /// SQLite would allow and falls back to per-row speed by around 900.
+    /// </summary>
+    private const int HashesPerLookupStatement = 100;
 
     public SnapshotRepository(IDbConnectionFactory dbConnectionFactory, ILogger<SnapshotRepository>? logger)
     {
@@ -599,7 +608,7 @@ public class SnapshotRepository : ISnapshotRepository
             await sqLiteConnection.ExecuteAsync(SqlScripts.InsertVolumeInfoSql, snapshotEntity.VolumeInfo, transaction);
 
             // add Folder Tree to DB
-            await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, userId, snapshotEntity.RootFolder!, null, snapshotEntity, transaction);
+            await AddFolderTreeAsync(sqLiteConnection, userId, snapshotEntity.RootFolder!, snapshotEntity, transaction);
 
             // Add Labels and associations
             await AddLabelsAndAssighnToSnapshotAsync(sqLiteConnection, userId, snapshotEntity, transaction);
@@ -616,101 +625,338 @@ public class SnapshotRepository : ISnapshotRepository
         return 1;
     }
 
-    private async Task AddFolderWithFilesRecursivelyAsync(IDbConnection sqLiteConnection, Ulid userId, FolderEntity folderEntity, FolderEntity? parentFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    /// <summary>
+    /// Writes a snapshot's folder tree. The tree is flattened first and then written a
+    /// table at a time rather than a node at a time, which is what lets the existence
+    /// lookups be answered in hash batches and the bindings be written without a lookup
+    /// at all: four statements per file become one insert, one binding, and a hundredth
+    /// of a lookup.
+    /// </summary>
+    private async Task AddFolderTreeAsync(IDbConnection sqLiteConnection, Ulid userId, FolderEntity rootFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
         try
-        { // check if Folder in DB
-            var folderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FolderEntity>(SqlScripts.SelectFolderByNameAndParentFolderPathAndStorageDriveIdSql,
-                new { folderEntity.Name, folderEntity.Size, folderEntity.Sha256Hash, UserId = userId }, transaction);
+        {
+            var treeContents = FlattenFolderTree(rootFolderEntity);
 
-            if (folderInDb == null) // Folder does not exist in DB
+            _logger.LogInformation(
+                "AddFolderTreeAsync - {FolderCount} folders, {FileCount} files for SnapshotId: {SnapshotId}",
+                treeContents.Folders.Count,
+                treeContents.Files.Count,
+                snapshotEntity.Id);
+
+            // Rows before bindings: the join tables reference both sides by id, and the
+            // ids are only final once the de-duplication below has run.
+            await ResolveAndInsertFoldersAsync(sqLiteConnection, userId, treeContents.Folders, transaction);
+            await ResolveAndInsertFilesAsync(sqLiteConnection, userId, treeContents.Files, transaction);
+
+            await InsertFolderBindingsAsync(sqLiteConnection, treeContents.FolderBindings, snapshotEntity, transaction);
+            await InsertFileBindingsAsync(sqLiteConnection, treeContents.FileBindings, snapshotEntity, transaction);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogError(exception, "ERROR - AddFolderTreeAsync");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Flattens the tree into the four lists the write path needs. Breadth-first and
+    /// iterative rather than recursive, so a deep tree is not limited by the stack.
+    /// </summary>
+    private static FolderTreeContents FlattenFolderTree(FolderEntity rootFolderEntity)
+    {
+        var folders = new List<FolderEntity>();
+        var files = new List<FileEntity>();
+        var folderBindings = new List<FolderBinding>();
+        var fileBindings = new List<FileBinding>();
+
+        var expandedFolders = new HashSet<FolderEntity>(ReferenceEqualityComparer.Instance);
+        var seenFiles = new HashSet<FileEntity>(ReferenceEqualityComparer.Instance);
+
+        var queue = new Queue<FolderBinding>();
+        queue.Enqueue(new FolderBinding(null, rootFolderEntity));
+
+        while (queue.Count > 0)
+        {
+            var folderBinding = queue.Dequeue();
+            folderBindings.Add(folderBinding);
+
+            var folderEntity = folderBinding.ChildFolder;
+
+            // A folder reachable through more than one parent still needs a binding per
+            // parent, but its contents only have to be walked once.
+            if (!expandedFolders.Add(folderEntity))
             {
-                _logger.LogInformation($"InsertFolderSql: {folderEntity.Id}");
-                // add new Folder to DB
-                await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFolderSql, folderEntity, transaction);
+                continue;
             }
-            else // Folder exists in DB
+
+            folders.Add(folderEntity);
+
+            foreach (var childFolderEntity in folderEntity.ChildFolders)
             {
-                folderEntity.Id = folderInDb.Id;
+                queue.Enqueue(new FolderBinding(folderEntity, childFolderEntity));
             }
 
-            await BindFolderWithFolderAndSnapshotAsync(sqLiteConnection, userId, parentFolderEntity, folderEntity, snapshotEntity, transaction);
-
-            // add child Folders (sorted by name)
-            //var sortedChildFolders = folderEntity.ChildFolders.OrderBy(f => f.Name).ToList();
-            foreach (var childFolder in folderEntity.ChildFolders)
-            {
-                await AddFolderWithFilesRecursivelyAsync(sqLiteConnection, userId, childFolder, folderEntity, snapshotEntity, transaction);
-            }
-
-            // add Files (sorted by name)
-            //var sortedFiles = folderEntity.Files.OrderBy(f => f.Name).ToList();
             foreach (var fileEntity in folderEntity.Files)
-            { // check if File in DB
-                var fileInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FileEntity>(SqlScripts.SelectFileByNameAndParentFolderPathAndStorageDriveIdSql,
-                    new { fileEntity.Name, fileEntity.Size, fileEntity.FileExtension, fileEntity.Sha256Hash, UserId = userId }, transaction);
+            {
+                fileBindings.Add(new FileBinding(folderEntity, fileEntity));
 
-                if (fileInDb == null) // File does not exist in DB
+                if (seenFiles.Add(fileEntity))
                 {
-                    _logger.LogInformation($"InsertFileSql: {fileEntity.Id}");
-                    // add new File to DB
-                    await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFileSql, fileEntity, transaction);
+                    files.Add(fileEntity);
                 }
-                else
-                {
-                    fileEntity.Id = fileInDb.Id;
-                }
-
-                await BindFileWithFolderAndSnapshotAsync(sqLiteConnection, folderEntity, fileEntity, snapshotEntity, transaction);
             }
         }
-        catch (Exception exception)
+
+        return new FolderTreeContents(folders, folderBindings, files, fileBindings);
+    }
+
+    /// <summary>
+    /// Points every folder that already exists for this user at the row that is already
+    /// there, and inserts the rest.
+    /// </summary>
+    private async Task ResolveAndInsertFoldersAsync(IDbConnection sqLiteConnection, Ulid userId, IReadOnlyList<FolderEntity> folderEntities, DbTransaction transaction)
+    {
+        if (folderEntities.Count == 0)
         {
-            _logger.LogError(exception, "ERROR - AddFolderWithFilesRecursivelyAsync");
-            throw;
+            return;
+        }
+
+        var existingRows = await SelectByHashesAsync<FolderLookupRow>(
+            sqLiteConnection,
+            transaction,
+            SqlScripts.SelectFoldersByHashesSqlPrefix,
+            userId,
+            [.. folderEntities.Select(folderEntity => folderEntity.Sha256Hash).Distinct()]);
+
+        var knownFolderIds = new Dictionary<FolderDedupeKey, Ulid>();
+        foreach (var existingRow in existingRows)
+        {
+            if (existingRow.Size is null)
+            {
+                continue;
+            }
+
+            knownFolderIds.TryAdd(new FolderDedupeKey(existingRow.Name, existingRow.Size.Value, existingRow.Sha256Hash), existingRow.Id);
+        }
+
+        var foldersToInsert = new List<FolderEntity>();
+
+        foreach (var folderEntity in folderEntities)
+        {
+            // A null size can never match: SQL does not report NULL = NULL, so the
+            // statement-per-folder version always inserted these too.
+            if (folderEntity.Size is null)
+            {
+                foldersToInsert.Add(folderEntity);
+                continue;
+            }
+
+            var dedupeKey = new FolderDedupeKey(folderEntity.Name, folderEntity.Size.Value, folderEntity.Sha256Hash);
+
+            if (knownFolderIds.TryGetValue(dedupeKey, out var existingFolderId))
+            {
+                folderEntity.Id = existingFolderId;
+                continue;
+            }
+
+            // Registering it before it is written is what makes an identical folder
+            // later in the same tree reuse this row - the statement-per-folder version
+            // got that for free by re-reading the transaction after every insert.
+            knownFolderIds[dedupeKey] = folderEntity.Id;
+            foldersToInsert.Add(folderEntity);
+        }
+
+        _logger.LogInformation("Inserting {NewFolderCount} new folders out of {FolderCount}", foldersToInsert.Count, folderEntities.Count);
+
+        // One fixed statement for the whole list: Dapper rebinds and re-executes the
+        // prepared command per row, which is what SQLite is fastest at.
+        if (foldersToInsert.Count > 0)
+        {
+            await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFolderSql, foldersToInsert, transaction);
         }
     }
 
-    private async Task BindFolderWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, Ulid userId, FolderEntity? parentFolderEntity, FolderEntity childFolderEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    /// <summary>
+    /// The file counterpart of <see cref="ResolveAndInsertFoldersAsync"/>; a file is the
+    /// same file if its name, size, extension and hash all match.
+    /// </summary>
+    private async Task ResolveAndInsertFilesAsync(IDbConnection sqLiteConnection, Ulid userId, IReadOnlyList<FileEntity> fileEntities, DbTransaction transaction)
     {
-        try
+        if (fileEntities.Count == 0)
         {
-            // SelectFoldersToFoldersSql
-            var folderToFolderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FilesToFoldersEntity>(SqlScripts.SelectFoldersToFoldersSql,
-                new { SnapshotId = snapshotEntity.Id, ParentFolderId = parentFolderEntity?.Id, ChildFolderId = childFolderEntity.Id }, transaction);
-
-            if (folderToFolderInDb == null) // Item does not exist in DB
-            {
-                _logger.LogInformation($"BindFolderWithFolderAndSnapshotAsync: {parentFolderEntity?.Id}, {childFolderEntity.Id}, {snapshotEntity.Id}");
-                await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFoldersToFoldersSql, new { ParentFolderId = parentFolderEntity?.Id, ChildFolderId = childFolderEntity.Id, SnapshotId = snapshotEntity.Id }, transaction);
-            }
+            return;
         }
-        catch (Exception exception)
+
+        var existingRows = await SelectByHashesAsync<FileLookupRow>(
+            sqLiteConnection,
+            transaction,
+            SqlScripts.SelectFilesByHashesSqlPrefix,
+            userId,
+            [.. fileEntities.Select(fileEntity => fileEntity.Sha256Hash).Distinct()]);
+
+        var knownFileIds = new Dictionary<FileDedupeKey, Ulid>();
+        foreach (var existingRow in existingRows)
         {
-            _logger.LogError(exception, "ERROR - BindFolderWithFolderAndSnapshotAsync");
-            throw;
+            if (existingRow.Size is null)
+            {
+                continue;
+            }
+
+            knownFileIds.TryAdd(new FileDedupeKey(existingRow.Name, existingRow.Size.Value, existingRow.FileExtension, existingRow.Sha256Hash), existingRow.Id);
+        }
+
+        var filesToInsert = new List<FileEntity>();
+
+        foreach (var fileEntity in fileEntities)
+        {
+            if (fileEntity.Size is null)
+            {
+                filesToInsert.Add(fileEntity);
+                continue;
+            }
+
+            var dedupeKey = new FileDedupeKey(fileEntity.Name, fileEntity.Size.Value, fileEntity.FileExtension, fileEntity.Sha256Hash);
+
+            if (knownFileIds.TryGetValue(dedupeKey, out var existingFileId))
+            {
+                fileEntity.Id = existingFileId;
+                continue;
+            }
+
+            knownFileIds[dedupeKey] = fileEntity.Id;
+            filesToInsert.Add(fileEntity);
+        }
+
+        _logger.LogInformation("Inserting {NewFileCount} new files out of {FileCount}", filesToInsert.Count, fileEntities.Count);
+
+        if (filesToInsert.Count > 0)
+        {
+            await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFileSql, filesToInsert, transaction);
         }
     }
 
-    private async Task BindFileWithFolderAndSnapshotAsync(IDbConnection sqLiteConnection, FolderEntity folderEntity, FileEntity fileEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    /// <summary>
+    /// Writes the parent-to-child bindings. Where the recursive version asked whether
+    /// each binding was already there and then inserted it, the primary key answers that
+    /// on its own, so this is one statement per binding instead of two.
+    /// </summary>
+    private static async Task InsertFolderBindingsAsync(IDbConnection sqLiteConnection, IReadOnlyList<FolderBinding> folderBindings, SnapshotEntity snapshotEntity, DbTransaction transaction)
     {
-        try
+        if (folderBindings.Count == 0)
         {
-            // SelectFilesToFoldersSql
-            var fileToFolderInDb = await sqLiteConnection.QuerySingleOrDefaultAsync<FilesToFoldersEntity>(SqlScripts.SelectFilesToFoldersSql,
-                new { SnapshotId = snapshotEntity.Id, FolderId = folderEntity.Id, FileId = fileEntity.Id }, transaction);
+            return;
+        }
 
-            if (fileToFolderInDb == null) // Item does not exist in DB
+        var bindingRows = folderBindings
+            .Select(folderBinding => new
             {
-                _logger.LogInformation($"BindFileWithFolderAndSnapshotAsync: {folderEntity.Id}, {folderEntity.Name}, {fileEntity.Id}, {fileEntity.Name}, {snapshotEntity.Id}");
-                await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFilesToFoldersSql, new { FolderId = folderEntity.Id, FileId = fileEntity.Id, SnapshotId = snapshotEntity.Id }, transaction);
-            }
-        }
-        catch (Exception exception)
+                // Null for the root folder, which is how the read side finds it.
+                ParentFolderId = folderBinding.ParentFolder?.Id,
+                ChildFolderId = folderBinding.ChildFolder.Id,
+                SnapshotId = snapshotEntity.Id
+            })
+            .ToList();
+
+        await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFoldersToFoldersIfMissingSql, bindingRows, transaction);
+    }
+
+    private static async Task InsertFileBindingsAsync(IDbConnection sqLiteConnection, IReadOnlyList<FileBinding> fileBindings, SnapshotEntity snapshotEntity, DbTransaction transaction)
+    {
+        if (fileBindings.Count == 0)
         {
-            _logger.LogError(exception, "ERROR - BindFileWithFolderAndSnapshotAsync");
-            throw;
+            return;
         }
+
+        var bindingRows = fileBindings
+            .Select(fileBinding => new
+            {
+                FolderId = fileBinding.ParentFolder.Id,
+                FileId = fileBinding.File.Id,
+                SnapshotId = snapshotEntity.Id
+            })
+            .ToList();
+
+        await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFilesToFoldersIfMissingSql, bindingRows, transaction);
+    }
+
+    /// <summary>
+    /// Reads back the rows that could match any of <paramref name="hashes"/>, a batch of
+    /// hashes at a time. Both callers then narrow the result in memory, on the columns
+    /// the hash alone does not cover.
+    /// </summary>
+    private static async Task<List<TRow>> SelectByHashesAsync<TRow>(
+        IDbConnection sqLiteConnection,
+        DbTransaction transaction,
+        string selectSqlPrefix,
+        Ulid userId,
+        IReadOnlyList<string> hashes)
+    {
+        var rows = new List<TRow>();
+
+        for (var batchStart = 0; batchStart < hashes.Count; batchStart += HashesPerLookupStatement)
+        {
+            var batchLength = Math.Min(HashesPerLookupStatement, hashes.Count - batchStart);
+            var parameters = new DynamicParameters();
+            parameters.Add("UserId", userId);
+
+            var placeholders = new StringBuilder("(");
+            for (var rowIndex = 0; rowIndex < batchLength; rowIndex++)
+            {
+                if (rowIndex > 0)
+                {
+                    placeholders.Append(',');
+                }
+
+                placeholders.Append("@Hash").Append(rowIndex);
+                parameters.Add($"Hash{rowIndex}", hashes[batchStart + rowIndex]);
+            }
+
+            placeholders.Append(");");
+
+            var batchRows = await sqLiteConnection.QueryAsync<TRow>(selectSqlPrefix + placeholders, parameters, transaction);
+            rows.AddRange(batchRows);
+        }
+
+        return rows;
+    }
+
+    private readonly record struct FolderBinding(FolderEntity? ParentFolder, FolderEntity ChildFolder);
+
+    private readonly record struct FileBinding(FolderEntity ParentFolder, FileEntity File);
+
+    private readonly record struct FolderDedupeKey(string Name, long Size, string Sha256Hash);
+
+    private readonly record struct FileDedupeKey(string Name, long Size, string FileExtension, string Sha256Hash);
+
+    private sealed record FolderTreeContents(
+        IReadOnlyList<FolderEntity> Folders,
+        IReadOnlyList<FolderBinding> FolderBindings,
+        IReadOnlyList<FileEntity> Files,
+        IReadOnlyList<FileBinding> FileBindings);
+
+    private sealed class FolderLookupRow
+    {
+        public Ulid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public long? Size { get; set; }
+
+        public string Sha256Hash { get; set; } = string.Empty;
+    }
+
+    private sealed class FileLookupRow
+    {
+        public Ulid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public long? Size { get; set; }
+
+        public string FileExtension { get; set; } = string.Empty;
+
+        public string Sha256Hash { get; set; } = string.Empty;
     }
 
     private async Task BindPcWithStorageDriveAndSnapshotAsync(IDbConnection sqLiteConnection, PcEntity pcEntity, StorageDriveEntity storageDriveEntity, SnapshotEntity snapshotEntity, DbTransaction transaction)

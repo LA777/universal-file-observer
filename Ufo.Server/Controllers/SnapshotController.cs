@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
 using Ufo.Abstractions.DataProviders;
@@ -19,25 +18,27 @@ namespace Ufo.Server.Controllers;
 public class SnapshotController : ControllerBase
 {
     // TODO LA - Add pagination for GetAllSnapshotsSummaryAsync method.
-    // TODO LA - Consider adding SnapshotService to handle business logic in SnapshotController and cover it with Unit tests.
     private readonly ILogger<SnapshotController> _logger;
     private readonly ISnapshotRepository _repository;
     private readonly IUserRepository _userRepository;
     private readonly ISystemInfoProvider _systemInfoProvider;
     private readonly IPathGuard _pathGuard;
+    private readonly IFolderTreeBuilder _folderTreeBuilder;
 
     public SnapshotController(
         ILogger<SnapshotController> logger,
         ISnapshotRepository repository,
         ISystemInfoProvider systemInfoProvider,
         IUserRepository userRepository,
-        IPathGuard pathGuard)
+        IPathGuard pathGuard,
+        IFolderTreeBuilder folderTreeBuilder)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _systemInfoProvider = systemInfoProvider ?? throw new ArgumentNullException(nameof(systemInfoProvider));
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
+        _folderTreeBuilder = folderTreeBuilder ?? throw new ArgumentNullException(nameof(folderTreeBuilder));
     }
 
     [HttpGet("latest")]
@@ -106,7 +107,7 @@ public class SnapshotController : ControllerBase
 
         var user = await _userRepository.GetUserByIdAsync(userId);
         var snapshot = _systemInfoProvider.GetSystemInformation(snapshotRootPath, user);
-        var folderTree = CreateFolderTree(snapshotRootPath, snapshot, null, user);
+        var folderTree = await _folderTreeBuilder.BuildAsync(snapshotRootPath, snapshot, user, cancellationToken);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
         await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);
@@ -133,101 +134,5 @@ public class SnapshotController : ControllerBase
             default:
                 return BadRequest();
         }
-    }
-
-    private FolderEntity CreateFolderTree(string path, SnapshotEntity snapshot, FolderEntity? parentFolder, UserEntity user)
-    {// TODO LA - move to a separate service
-        _logger.LogInformation($"Indexing {path}");
-        var directoryInfo = new DirectoryInfo(path);
-
-        var folder = new FolderEntity
-        {
-            Name = directoryInfo.Name,
-            Sha256Hash = string.Empty,
-            User = user,
-            UserId = user.Id,
-            CreatedAt = directoryInfo.CreationTimeUtc.ToString("o"), // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
-            UpdatedAt = directoryInfo.CreationTimeUtc.ToString("o"),  // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
-            IsHidden = (directoryInfo.Attributes & FileAttributes.Hidden) != 0 // TODO LA - Cover with Unit tests.
-        };
-        folder.Snapshots.Add(snapshot);
-        if (parentFolder is not null)
-        {
-            folder.ParentFolders.Add(parentFolder);
-        }
-
-        foreach (var subFolderPath in Directory.EnumerateDirectories(path))
-        {
-            var subFolder = CreateFolderTree(subFolderPath, snapshot, folder, user);
-            folder.ChildFolders.Add(subFolder);
-        }
-
-        foreach (var filePath in Directory.EnumerateFiles(path))
-        {
-            var fileInfo = new FileInfo(filePath);
-            var file = new FileEntity
-            {
-                Name = Path.GetFileNameWithoutExtension(fileInfo.Name),
-                Size = fileInfo.Length,
-                Sha256Hash = fileInfo.GetFileHashSha256(),
-                FileExtension = fileInfo.Extension,
-                User = user,
-                UserId = user.Id,
-                CreatedAt = fileInfo.CreationTimeUtc.ToString("o"), // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
-                UpdatedAt = fileInfo.LastWriteTimeUtc.ToString("o"),  // TODO LA - consider using DateTimeOffset instead of string for CreatedAt and UpdatedAt. Cover with Unit tests.
-                IsHidden = (fileInfo.Attributes & FileAttributes.Hidden) != 0 // TODO LA - Cover with Unit tests.
-            };
-            file.Snapshots.Add(snapshot);
-            file.ParentFolders.Add(folder);
-            folder.Files.Add(file);
-        }
-
-        folder.Sha256Hash = GetFolderSha256Hash(folder);
-        folder.Size = folder.Files.Sum(x => x.Size) + folder.ChildFolders.Sum(y => y.Size);
-
-        return folder;
-    }
-
-    private static string GetFolderSha256Hash(FolderEntity folder)
-    {
-        var sb = new StringBuilder();
-        var orderedFiles = folder.Files.OrderBy(x => x.Name);
-
-        foreach (var file in orderedFiles)
-        {
-            var fileNameWithExtension = $"{file.Name}.{file.FileExtension}"; ;
-            if (string.IsNullOrWhiteSpace(fileNameWithExtension))
-            {
-                throw new ArgumentException(nameof(fileNameWithExtension));
-            }
-
-            if (string.IsNullOrWhiteSpace(file.Sha256Hash))
-            {
-                throw new ArgumentException(nameof(file.Sha256Hash));
-            }
-
-            sb.AppendLine($"{fileNameWithExtension},{file.Sha256Hash}");
-        }
-
-        var orderedSubfolders = folder.ChildFolders.OrderBy(x => x.Name);
-        foreach (var subfolder in orderedSubfolders)
-        {
-            if (string.IsNullOrWhiteSpace(subfolder.Name))
-            {
-                throw new ArgumentException(nameof(subfolder.Name));
-            }
-
-            if (string.IsNullOrWhiteSpace(subfolder.Sha256Hash))
-            {
-                throw new ArgumentException(nameof(subfolder.Sha256Hash));
-            }
-
-            sb.AppendLine($"{subfolder.Name},{subfolder.Sha256Hash}");
-        }
-
-        var dataString = sb.ToString();
-        var hash = dataString.GetHashSha256();
-
-        return hash;
     }
 }
