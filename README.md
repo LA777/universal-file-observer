@@ -94,8 +94,15 @@ cd c:\GitHub\LA777\universal-file-observer
 .\publish-desktop.ps1
 ```
 
-The database, logs and generated machine id live in `%LOCALAPPDATA%\UFO`, not beside the
-executable.
+The database, logs, generated machine id and generated JWT signing key live in
+`%LOCALAPPDATA%\UFO`, not beside the executable.
+
+No signing key ships in the executable: one baked in would be shared by every
+installation, so a single extracted copy could forge tokens against all of them. On first
+run each installation generates its own into `%LOCALAPPDATA%\UFO\jwt-signing-key` and
+reuses it afterwards, which is what keeps users signed in across restarts and upgrades.
+Deleting that file signs everyone out and a new key is generated. Setting `JWT__Key` (or a
+`JWT:Key` in `appsettings.json`) takes precedence and disables the generation.
 
 ### Run in a container
 

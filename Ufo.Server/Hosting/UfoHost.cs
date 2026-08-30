@@ -46,6 +46,13 @@ public static class UfoHost
     private const int MinimumJwtKeyLengthInBytes = 32;
 
     /// <summary>
+    /// File in <see cref="UfoHostOptions.DataDirectory"/> holding the signing key
+    /// generated for this installation. Sits beside the database and the machine
+    /// id so that a backup of the data directory keeps sessions valid.
+    /// </summary>
+    private const string JwtSigningKeyFileName = "jwt-signing-key";
+
+    /// <summary>
     /// Signing keys that were once committed to this repository, plus the
     /// placeholders someone might paste in their place. They are public
     /// knowledge, so a host configured with any of them would accept forged
@@ -129,6 +136,21 @@ public static class UfoHost
         if (jwtOptions == null)
         {
             throw new ArgumentNullException(nameof(JwtOptions), "JwtOptions is null.");
+        }
+
+        if (hostOptions.GenerateJwtKeyWhenMissing
+            && !isFunctionalTesting
+            && string.IsNullOrWhiteSpace(jwtOptions.Key))
+        {
+            jwtOptions.Key = ResolveInstallationJwtSigningKey(hostOptions.DataDirectory);
+
+            // Added as its own source rather than assigned on the local object:
+            // JwtTokenService resolves the key through IOptionsMonitor<JwtOptions>,
+            // which binds from configuration, so signing and validation would
+            // otherwise disagree. Registering last is safe here precisely because
+            // this branch only runs when nothing else supplied a key.
+            builder.Configuration.AddInMemoryCollection(
+                new Dictionary<string, string?> { ["JWT:Key"] = jwtOptions.Key });
         }
 
         if (isFunctionalTesting && string.IsNullOrWhiteSpace(jwtOptions.Key))
@@ -337,6 +359,69 @@ public static class UfoHost
         }
 
         BrowserLauncher.TryOpen(ResolveApplicationUrl(app.Configuration), app.Logger);
+    }
+
+    /// <summary>
+    /// Returns this installation's signing key, generating and persisting one on
+    /// first run. Keeping it in the data directory rather than in the shipped
+    /// configuration means each installation signs with its own secret, and that
+    /// users stay logged in across restarts and upgrades.
+    /// </summary>
+    private static string ResolveInstallationJwtSigningKey(string dataDirectory)
+    {
+        var signingKeyFilePath = Path.Combine(dataDirectory, JwtSigningKeyFileName);
+
+        try
+        {
+            if (File.Exists(signingKeyFilePath))
+            {
+                var persistedSigningKey = File.ReadAllText(signingKeyFilePath).Trim();
+                if (persistedSigningKey.Length >= MinimumJwtKeyLengthInBytes)
+                {
+                    return persistedSigningKey;
+                }
+
+                Log.Warning(
+                    "Ignoring the signing key in {SigningKeyFilePath}: it is too short to be usable. Generating a replacement.",
+                    signingKeyFilePath);
+            }
+        }
+        catch (Exception exception)
+        {
+            Log.Warning(
+                exception,
+                "Could not read the signing key from {SigningKeyFilePath}. Generating a replacement.",
+                signingKeyFilePath);
+        }
+
+        var generatedSigningKey = Convert.ToHexString(RandomNumberGenerator.GetBytes(MinimumJwtKeyLengthInBytes));
+
+        try
+        {
+            File.WriteAllText(signingKeyFilePath, generatedSigningKey);
+
+            if (!OperatingSystem.IsWindows())
+            {
+                // The Windows data directory is already under the user's profile;
+                // elsewhere the file would otherwise be world-readable.
+                File.SetUnixFileMode(signingKeyFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+
+            Log.Information(
+                "Generated a JWT signing key for this installation and persisted it to {SigningKeyFilePath}.",
+                signingKeyFilePath);
+        }
+        catch (Exception exception)
+        {
+            // Starting with an in-memory key beats refusing to start; the cost is
+            // that everyone is signed out again on the next restart.
+            Log.Warning(
+                exception,
+                "Could not persist a JWT signing key to {SigningKeyFilePath}. Using a key that lasts only for this run, so existing sessions will not survive a restart.",
+                signingKeyFilePath);
+        }
+
+        return generatedSigningKey;
     }
 
     /// <summary>

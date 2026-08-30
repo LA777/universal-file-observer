@@ -82,6 +82,20 @@ public class UfoHostOptions
     public string MachineId { get; set; } = string.Empty;
 
     /// <summary>
+    /// Generates a JWT signing key on first run and persists it in
+    /// <see cref="DataDirectory"/> when <c>JWT:Key</c> is not configured.
+    /// </summary>
+    /// <remarks>
+    /// An installed desktop application has nobody to set a secret for it, and a
+    /// key shipped inside the executable would be shared by every installation -
+    /// one extracted copy would forge tokens against all of them. A container is
+    /// deliberately excluded: it is network-reachable and its data directory is a
+    /// volume, so a key must be supplied through <c>JWT__Key</c> and the host
+    /// should fail loudly rather than invent one.
+    /// </remarks>
+    public bool GenerateJwtKeyWhenMissing { get; set; }
+
+    /// <summary>
     /// Defaults for the Windows desktop tray application: interactive, trusted
     /// with the whole machine, and serving HTTPS itself.
     /// </summary>
@@ -90,6 +104,7 @@ public class UfoHostOptions
         OpenBrowserOnStartup = true,
         EnableHttpsRedirection = true,
         EnableFileLogging = true,
+        GenerateJwtKeyWhenMissing = true,
         AllowedRoots = []
     };
 
@@ -103,6 +118,7 @@ public class UfoHostOptions
         OpenBrowserOnStartup = false,
         EnableHttpsRedirection = false,
         EnableFileLogging = false,
+        GenerateJwtKeyWhenMissing = false,
         DataDirectory = "/data",
         // Left empty here and defaulted after configuration binding - see
         // RequireAllowedRoots.
