@@ -119,6 +119,12 @@ internal static class Program
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "UFO");
 
+        // Opted into here rather than in ForDesktop, so that only an installation
+        // with the per-user data directory set above generates its own signing
+        // key. Nobody is around to set a secret for a tray application, and a key
+        // shipped in the executable would be shared by every installation.
+        hostOptions.GenerateJwtKeyWhenMissing = true;
+
         return hostOptions;
     }
 

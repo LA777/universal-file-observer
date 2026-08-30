@@ -26,7 +26,7 @@ UFO (Universal File Observer): ASP.NET Core Web API (**.NET 10**) + **Angular 22
 - UI is Angular Material (prebuilt `deeppurple-amber` theme); global layout tweaks in `src/styles.css`.
 
 ## Common Commands
-- Backend run: `dotnet run --project Ufo.Server --launch-profile https` (Swagger at `https://localhost:7150/swagger`)
+- Backend run: `dotnet run --project Ufo.Server --launch-profile https` (Swagger at `https://localhost:7150/swagger`). Requires `JWT:Key` in user-secrets — the host refuses to start without one and no key is committed.
 - All backend tests: `dotnet test Ufo.sln`
 - Frontend dev: `npm start` in `ufo.client/` (ng serve with SSL + proxy)
 - Frontend deploy into server: `build-frontend.ps1` at repo root (builds Angular, copies `ufo.client/dist/ufo.client` → `Ufo.Server/wwwroot`; verify with `check-wwwroot.bat`)

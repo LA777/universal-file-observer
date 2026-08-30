@@ -35,6 +35,13 @@ There is no background watcher — observation is explicit, point-in-time snapsh
 ### Prerequisites
 - .NET 10 SDK
 - Node.js `^22.22.3 || ^24.15.0 || >=26.0.0` — the range Angular CLI 22 enforces (odd-numbered releases such as 23.x and 25.x are rejected). CLI: `npm install -g @angular/cli`
+- A JWT signing key. None is committed, and the server refuses to start without one, so set it once per clone:
+
+```
+dotnet user-secrets set "JWT:Key" "$(openssl rand -hex 32)" --project Ufo.Server
+```
+
+On PowerShell, generate the value with `-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Max 256) })`.
 
 ### Run in development (two processes)
 
@@ -79,6 +86,12 @@ Then run the server — it serves the SPA and opens the browser at `https://loca
 ```
 dotnet run --project Ufo.Server
 ```
+
+This entry point never generates a signing key, whether it is a local run or a published
+headless deployment: it would have nowhere to put one that survives an upgrade, and a
+network-reachable host quietly inventing a key is worse than one that refuses to start.
+Set `JWT:Key` in user-secrets (see [Prerequisites](#prerequisites)) or supply `JWT__Key`.
+Only the installed desktop application generates its own.
 
 ### Run as a Windows desktop application (single `ufo.exe`)
 

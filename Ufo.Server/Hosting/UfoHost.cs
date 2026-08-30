@@ -371,26 +371,35 @@ public static class UfoHost
     {
         var signingKeyFilePath = Path.Combine(dataDirectory, JwtSigningKeyFileName);
 
-        try
+        if (File.Exists(signingKeyFilePath))
         {
-            if (File.Exists(signingKeyFilePath))
-            {
-                var persistedSigningKey = File.ReadAllText(signingKeyFilePath).Trim();
-                if (persistedSigningKey.Length >= MinimumJwtKeyLengthInBytes)
-                {
-                    return persistedSigningKey;
-                }
+            string persistedSigningKey;
 
-                Log.Warning(
-                    "Ignoring the signing key in {SigningKeyFilePath}: it is too short to be usable. Generating a replacement.",
-                    signingKeyFilePath);
+            try
+            {
+                persistedSigningKey = File.ReadAllText(signingKeyFilePath).Trim();
             }
-        }
-        catch (Exception exception)
-        {
+            catch (Exception exception)
+            {
+                // Deliberately not a warning-and-regenerate: a momentary lock from
+                // a backup or a virus scanner would otherwise overwrite a perfectly
+                // good key and sign every user out for good. Refusing to start is
+                // recoverable on the next attempt; destroying the key is not.
+                throw new InvalidOperationException(
+                    $"The signing key file '{signingKeyFilePath}' exists but could not be read, and replacing it "
+                    + "would invalidate every existing session. Start again once whatever holds the file has "
+                    + "released it, correct its permissions, or delete it to have a new key generated.",
+                    exception);
+            }
+
+            if (Encoding.UTF8.GetByteCount(persistedSigningKey) >= MinimumJwtKeyLengthInBytes)
+            {
+                return persistedSigningKey;
+            }
+
+            // Readable but unusable for signing, so there is no session to protect.
             Log.Warning(
-                exception,
-                "Could not read the signing key from {SigningKeyFilePath}. Generating a replacement.",
+                "Ignoring the signing key in {SigningKeyFilePath}: it is too short to sign with. Generating a replacement.",
                 signingKeyFilePath);
         }
 
@@ -399,17 +408,6 @@ public static class UfoHost
         try
         {
             File.WriteAllText(signingKeyFilePath, generatedSigningKey);
-
-            if (!OperatingSystem.IsWindows())
-            {
-                // The Windows data directory is already under the user's profile;
-                // elsewhere the file would otherwise be world-readable.
-                File.SetUnixFileMode(signingKeyFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
-            }
-
-            Log.Information(
-                "Generated a JWT signing key for this installation and persisted it to {SigningKeyFilePath}.",
-                signingKeyFilePath);
         }
         catch (Exception exception)
         {
@@ -419,7 +417,32 @@ public static class UfoHost
                 exception,
                 "Could not persist a JWT signing key to {SigningKeyFilePath}. Using a key that lasts only for this run, so existing sessions will not survive a restart.",
                 signingKeyFilePath);
+
+            return generatedSigningKey;
         }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            // Attempted separately from the write above: a mount without Unix
+            // modes fails here even though the key was persisted, which is a
+            // weaker file mode to report, not a key that has been lost.
+            // The Windows data directory is already under the user's profile.
+            try
+            {
+                File.SetUnixFileMode(signingKeyFilePath, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            catch (Exception exception)
+            {
+                Log.Warning(
+                    exception,
+                    "Persisted the JWT signing key to {SigningKeyFilePath} but could not restrict it to this user, so other users of this machine may be able to read it.",
+                    signingKeyFilePath);
+            }
+        }
+
+        Log.Information(
+            "Generated a JWT signing key for this installation and persisted it to {SigningKeyFilePath}.",
+            signingKeyFilePath);
 
         return generatedSigningKey;
     }

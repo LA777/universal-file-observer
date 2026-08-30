@@ -86,12 +86,19 @@ public class UfoHostOptions
     /// <see cref="DataDirectory"/> when <c>JWT:Key</c> is not configured.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// An installed desktop application has nobody to set a secret for it, and a
     /// key shipped inside the executable would be shared by every installation -
-    /// one extracted copy would forge tokens against all of them. A container is
-    /// deliberately excluded: it is network-reachable and its data directory is a
-    /// volume, so a key must be supplied through <c>JWT__Key</c> and the host
-    /// should fail loudly rather than invent one.
+    /// one extracted copy would forge tokens against all of them.
+    /// </para>
+    /// <para>
+    /// Off by default, and deliberately not set by <see cref="ForDesktop"/>: the
+    /// headless entry point falls back to those same defaults for anything that
+    /// is not a container, so enabling it there would let a published server
+    /// behind a reverse proxy quietly invent a key next to its binary - which an
+    /// upgrade would then replace, signing out every user. Only the installed
+    /// tray application, which owns a per-user writable data directory, opts in.
+    /// </para>
     /// </remarks>
     public bool GenerateJwtKeyWhenMissing { get; set; }
 
@@ -104,7 +111,6 @@ public class UfoHostOptions
         OpenBrowserOnStartup = true,
         EnableHttpsRedirection = true,
         EnableFileLogging = true,
-        GenerateJwtKeyWhenMissing = true,
         AllowedRoots = []
     };
 
@@ -118,6 +124,8 @@ public class UfoHostOptions
         OpenBrowserOnStartup = false,
         EnableHttpsRedirection = false,
         EnableFileLogging = false,
+        // Network-reachable, and its data directory is a volume: JWT__Key must be
+        // supplied, and a missing one has to be fatal rather than invented.
         GenerateJwtKeyWhenMissing = false,
         DataDirectory = "/data",
         // Left empty here and defaulted after configuration binding - see
