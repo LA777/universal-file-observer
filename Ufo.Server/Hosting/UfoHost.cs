@@ -100,7 +100,7 @@ public static class UfoHost
             hostOptions.OpenBrowserOnStartup = false;
         }
 
-        ConfigureSerilog(hostOptions);
+        ConfigureSerilog(hostOptions, isFunctionalTesting);
         builder.Host.UseSerilog();
 
         var applicationSettings = builder.Configuration.Get<ApplicationSettings>();
@@ -380,11 +380,22 @@ public static class UfoHost
         return connectionStringBuilder.ToString();
     }
 
-    private static void ConfigureSerilog(UfoHostOptions hostOptions)
+    private static void ConfigureSerilog(UfoHostOptions hostOptions, bool isFunctionalTesting)
     {
-        var loggerConfiguration = new LoggerConfiguration()
-            .MinimumLevel.Information()
-            .WriteTo.Console();
+        var loggerConfiguration = new LoggerConfiguration();
+
+        // A functional test assembly boots one of these hosts per test - well over a
+        // hundred of them, several at a time - and every one of them logs through the
+        // same process-wide console. At Information level that is several lines per
+        // request behind a single lock, which starved the hosts of the very threads they
+        // needed to answer: request times ran into minutes and tests failed on their
+        // client timeouts. Warnings and errors still come through, so a genuinely broken
+        // test still says why.
+        loggerConfiguration = isFunctionalTesting
+            ? loggerConfiguration.MinimumLevel.Warning()
+            : loggerConfiguration.MinimumLevel.Information();
+
+        loggerConfiguration = loggerConfiguration.WriteTo.Console();
 
         if (hostOptions.EnableFileLogging)
         {

@@ -87,15 +87,7 @@ public class SnapshotApiFactory : WebApplicationFactory<Program>
         await _sqLiteConnection.OpenAsync();
         await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
 
-        var client = CreateClient();
-
-        // HttpClient's default 100 seconds is short enough that a request which is merely
-        // queued behind the rest of the assembly on a loaded machine gets reported as a
-        // failure rather than as slowness. The snapshot endpoint does real file-system
-        // work, so it is the one most exposed to that.
-        client.Timeout = TimeSpan.FromMinutes(10);
-
-        return client;
+        return CreateClient();
     }
 
     public override ValueTask DisposeAsync()
