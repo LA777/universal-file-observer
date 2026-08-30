@@ -28,6 +28,7 @@ https://github.com/vtsiris/material-tree-tutorial/tree/master/src/app
 TODO:
 + split Windows App and Docker
 - One behaviour I deliberately left alone: a file deleted between enumeration and hashing still fails the whole snapshot. That window grew with this change. Silently skipping would produce a snapshot claiming completeness it doesn't have, so throwing seemed the safer default — but say the word if you'd rather it skip and log.
+Log.Logger is still a global static that each host boot overwrites, leaking the previous logger and its sinks. It isn't what caused the starvation and fixing it means reworking host logging ownership, so I left it. Worth a look if you ever see cross-test log bleed.
 - split App into Client (thin) - Server (data)
 + migrate to Angular 22
 - _docs/AI_SOLUTION_REVIEW.md
@@ -53,7 +54,7 @@ TODO:
 + Add Indexes to DB
 - Delete All Snapshots. Labels shall preserve
 - Split Entites (UI)
-- add Encryption for all fields in DB
+- add Encryption for all fields in DB (SQLCipher Community Edition)
 + [UI] Remove Forecast Controller and UI tab
 + [UI] Create navigation for Forward and Backward
 - [UI] Ability to edit text files
