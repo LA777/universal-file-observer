@@ -12,10 +12,9 @@ services:
       # container (Ufo__EnableHttpsRedirection stays false).
       - "8080:8080"
     environment:
-      # Required. Generate your own and keep them out of source control:
+      # Required. Generate your own and keep it out of source control:
       #   openssl rand -hex 32
       JWT__Key: "${UFO_JWT_KEY:?set UFO_JWT_KEY in .env}"
-      ApplicationSettings__HashSalt: "${UFO_HASH_SALT:?set UFO_HASH_SALT in .env}"
       # Every folder listed here must also be mounted below, and vice versa.
       Ufo__AllowedRoots__0: /library
       # Identity recorded against each snapshot. Set it to something stable for

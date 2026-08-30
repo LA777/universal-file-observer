@@ -124,9 +124,9 @@ public class RestrictedFileSystemApiFactory : WebApplicationFactory<Program>
 
 public static class RestrictedFileSystemTestConstants
 {
-    public const string JwtKey = "78D97475131A633F6975CA554DCEDDCBDC0EBE456EA270F5A7EA1C604787258A";
-    public const string JwtIssuer = "UFO";
-    public const string JwtAudience = "UFO";
+    public const string JwtKey = "super-secret-test-key-that-is-long-enough-256bits!!";
+    public const string JwtIssuer = "ufo-test-issuer";
+    public const string JwtAudience = "ufo-test-audience";
 
     public static readonly Ulid TestUserId = Ulid.NewUlid();
     public const string TestUserName = "restricteduser";

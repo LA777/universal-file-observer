@@ -419,5 +419,5 @@ _docs/
 # Default bind-mount source for docker-compose (override with UFO_LIBRARY_PATH).
 /library/
 
-# Local docker-compose secrets (UFO_JWT_KEY, UFO_HASH_SALT, UFO_LIBRARY_PATH).
+# Local docker-compose secrets (UFO_JWT_KEY, UFO_LIBRARY_PATH).
 .env

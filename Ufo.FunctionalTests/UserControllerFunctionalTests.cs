@@ -43,9 +43,7 @@ public class UserApiFactory : WebApplicationFactory<Program>
                 ["JWT:Key"] = UserTestConstants.JwtKey,
                 ["JWT:Issuer"] = UserTestConstants.JwtIssuer,
                 ["JWT:Audience"] = UserTestConstants.JwtAudience,
-                ["Kestrel:Endpoints:App:Url"] = "http://localhost:0",
-                // ApplicationSettings must be present or the app throws on startup
-                ["ApplicationSettings:SomeValue"] = "test"
+                ["Kestrel:Endpoints:App:Url"] = "http://localhost:0"
             });
         });
 

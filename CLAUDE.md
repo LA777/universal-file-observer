@@ -17,7 +17,7 @@ UFO (Universal File Observer): ASP.NET Core Web API (**.NET 10**) + **Angular 22
 - **IDs are Ulid everywhere**: Dapper type handlers (`SqlUlidTypeHandler`), `UlidJsonConverter` for JSON, `UlidSchemaFilter` for OpenAPI. Never introduce int/Guid keys.
 - **All data is per-user**: every entity has `UserId`; every repository query must filter by it. Controllers get the user id from JWT via `[JwtClaimsRequired]` → `HttpContext.Items["UserId"]` (`HttpContextExtension.GetUserIdAsUlid`).
 - Layering: `Ufo.Abstractions` (contracts) ← `Ufo.Database` (Dapper repos) ← `Ufo.Server` (controllers/services/mappers). Entities never leave the server — map to DTOs via the static mappers in `Ufo.Server/Mappers/`.
-- Auth: JWT Bearer (HmacSha256, 7-day expiry, `ClockSkew = 0`); passwords hashed with BCrypt. Config keys: `JWT:{Key,Issuer,Audience}`, `ApplicationSettings:HashSalt`.
+- Auth: JWT Bearer (HmacSha256, 7-day expiry, `ClockSkew = 0`); passwords hashed with BCrypt (per-password salt, no application-wide pepper). Config keys: `JWT:{Key,Issuer,Audience}`. `JWT:Key` is a secret and is **never** committed: set it via user-secrets for development or `JWT__Key` for a deployment. `UfoHost.ValidateJwtSigningKey` refuses to start on a missing, short, placeholder, or previously-leaked key.
 
 ## Front-end Rules
 - **Bootstrap path is `ufo.client/src/main.ts`** (standalone `bootstrapApplication`). `app.module.ts` / `app-routing.module.ts` are legacy leftovers and NOT active — wire routes, providers, and interceptors in `main.ts`. The active HTTP interceptor is `JwtInterceptor` (not `AuthInterceptor`).

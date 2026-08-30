@@ -8,11 +8,13 @@
 		<DefaultItemExcludes>$(DefaultItemExcludes);$(SpaRoot)node_modules\**</DefaultItemExcludes>
 		<SpaProxyLaunchCommand>npm start</SpaProxyLaunchCommand>
 		<SpaProxyServerUrl>https://localhost:4200</SpaProxyServerUrl>
+		<!-- Holds JWT:Key for development. Never commit a signing key; see appsettings.json. -->
+		<UserSecretsId>0f5701f6-d9ae-4970-a752-29ff89266396</UserSecretsId>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<!-- Development configuration carries its own JWT key and salt; it has no
-		     business inside a published artifact. -->
+		<!-- Development-only overrides; they have no business inside a published
+		     artifact. The JWT signing key lives in user-secrets, not in either file. -->
 		<Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
 	</ItemGroup>
 

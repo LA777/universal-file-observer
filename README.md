@@ -114,12 +114,11 @@ Compose reads these from the environment or a local `.env` file:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `UFO_JWT_KEY` | yes | JWT signing key. Compose fails fast if unset — the value in `appsettings.json` is shared by every copy of the image. |
-| `UFO_HASH_SALT` | yes | Password hash salt. Same reasoning. |
+| `UFO_JWT_KEY` | yes | JWT signing key. Compose fails fast if unset, and so does the application: no key ships in `appsettings.json`, because one baked into the image would be shared by every copy of it. |
 | `UFO_LIBRARY_PATH` | no (`./library`) | Host folder to index. Mounted **read-only** at `/library`, which is the only path the browse, search and video endpoints will serve. |
 | `UFO_MACHINE_ID` | no | Identity recorded against each snapshot. Worth setting: a container's own `/etc/machine-id` is regenerated whenever the container is recreated, which fragments snapshot history. |
 
-Generate the two secrets with `openssl rand -hex 32`.
+Generate it with `openssl rand -hex 32`.
 
 Everything that differs between the two hosts is an explicit setting under the `Ufo`
 configuration section (`Ufo__DataDirectory`, `Ufo__AllowedRoots__0`,

@@ -82,8 +82,9 @@ ENV Ufo__AllowedRoots__0=/library
 # to the identity of the physical host to keep snapshot history attributable.
 # ENV Ufo__MachineId=
 
-# JWT__Key and ApplicationSettings__HashSalt MUST be supplied at run time - the
-# values baked into appsettings.json are shared by every copy of this image.
+# JWT__Key MUST be supplied at run time. No key is baked into appsettings.json,
+# and the host refuses to start without one rather than falling back to a shared
+# default. Generate one with: openssl rand -hex 32
 
 EXPOSE 8080
 USER $APP_UID

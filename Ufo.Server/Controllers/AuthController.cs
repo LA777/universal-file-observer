@@ -1,9 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Database.Repositories;
-using Ufo.Abstractions.Options;
 using Ufo.Abstractions.Requests;
 using Ufo.Server.Services;
 
@@ -15,13 +13,11 @@ public class AuthController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
     private readonly ILogger<AuthController> _logger;
-    private readonly ApplicationSettings _appSettings;
     private readonly IJwtTokenService _jwtTokenService;
 
-    public AuthController(IUserRepository userRepository, IOptionsMonitor<ApplicationSettings> optionsMonitor, ILogger<AuthController> logger, IJwtTokenService tokenService)
+    public AuthController(IUserRepository userRepository, ILogger<AuthController> logger, IJwtTokenService tokenService)
     {
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
-        _appSettings = optionsMonitor.CurrentValue ?? throw new ArgumentNullException(nameof(optionsMonitor));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _jwtTokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
     }

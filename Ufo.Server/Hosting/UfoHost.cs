@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Serilog;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -37,6 +38,27 @@ public static class UfoHost
 {
     public const string DefaultApplicationUrl = "https://localhost:55000";
     private const string ApplicationUrlConfigurationKey = "Kestrel:Endpoints:App:Url";
+
+    /// <summary>
+    /// HmacSha256 needs a 256-bit key. A shorter one survives startup and only
+    /// fails when the first token is signed, so the length is checked up front.
+    /// </summary>
+    private const int MinimumJwtKeyLengthInBytes = 32;
+
+    /// <summary>
+    /// Signing keys that were once committed to this repository, plus the
+    /// placeholders someone might paste in their place. They are public
+    /// knowledge, so a host configured with any of them would accept forged
+    /// tokens from anyone; refusing to start is the only safe response.
+    /// </summary>
+    private static readonly HashSet<string> BurnedOrPlaceholderJwtKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "78D97475131A633F6975CA554DCEDDCBDC0EBE456EA270F5A7EA1C604787258A",
+        "DEC1B33656A8AC7AF17822163FEFDA3E9A788EFFC71C27CAD8D2095A0B4EC579",
+        "CHANGEME",
+        "REPLACE_ME",
+        "your-secret-key"
+    };
 
     /// <summary>
     /// Builds the fully configured web application.
@@ -103,17 +125,23 @@ public static class UfoHost
         ConfigureSerilog(hostOptions, isFunctionalTesting);
         builder.Host.UseSerilog();
 
-        var applicationSettings = builder.Configuration.Get<ApplicationSettings>();
-        if (applicationSettings == null)
-        {
-            throw new ArgumentNullException(nameof(ApplicationSettings), "ApplicationSettings is null.");
-        }
-
         var jwtOptions = builder.Configuration.GetSection("JWT").Get<JwtOptions>();
         if (jwtOptions == null)
         {
             throw new ArgumentNullException(nameof(JwtOptions), "JwtOptions is null.");
         }
+
+        if (isFunctionalTesting && string.IsNullOrWhiteSpace(jwtOptions.Key))
+        {
+            // A functional test host supplies its own key through
+            // ConfigureAppConfiguration, which is applied after this point, and
+            // replaces the bearer validation parameters outright. It only needs a
+            // usable key here so that startup can complete, and an ephemeral one
+            // keeps a real key out of the test sources.
+            jwtOptions.Key = Convert.ToHexString(RandomNumberGenerator.GetBytes(MinimumJwtKeyLengthInBytes));
+        }
+
+        ValidateJwtSigningKey(jwtOptions.Key);
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrEmpty(connectionString))
@@ -127,7 +155,6 @@ public static class UfoHost
         {
             options.ConnectionString = connectionString;
         });
-        builder.Services.Configure<ApplicationSettings>(builder.Configuration.GetSection("ApplicationSettings"));
         builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("JWT"));
 
         // Registered as the already-merged instance rather than re-bound from
@@ -310,6 +337,41 @@ public static class UfoHost
         }
 
         BrowserLauncher.TryOpen(ResolveApplicationUrl(app.Configuration), app.Logger);
+    }
+
+    /// <summary>
+    /// Refuses to start unless the configured signing key is a unique secret of
+    /// usable length. Without this an absent, truncated or placeholder key either
+    /// fails deep inside the token handler or, worse, starts cleanly and leaves
+    /// every deployment sharing a key that anyone can look up.
+    /// </summary>
+    private static void ValidateJwtSigningKey(string? signingKey)
+    {
+        const string remedy =
+            "Supply JWT:Key as a unique secret of at least 32 bytes: "
+            + "`dotnet user-secrets set \"JWT:Key\" \"<value>\" --project Ufo.Server` for development, "
+            + "or the JWT__Key environment variable for a deployment. "
+            + "Generate one with `openssl rand -hex 32`.";
+
+        if (string.IsNullOrWhiteSpace(signingKey))
+        {
+            throw new InvalidOperationException($"JWT:Key is not configured. {remedy}");
+        }
+
+        if (BurnedOrPlaceholderJwtKeys.Contains(signingKey))
+        {
+            throw new InvalidOperationException(
+                $"JWT:Key is a placeholder or a key that was published in this repository's history, "
+                + $"so it cannot be trusted to sign tokens. {remedy}");
+        }
+
+        var signingKeyLengthInBytes = Encoding.UTF8.GetByteCount(signingKey);
+        if (signingKeyLengthInBytes < MinimumJwtKeyLengthInBytes)
+        {
+            throw new InvalidOperationException(
+                $"JWT:Key is {signingKeyLengthInBytes} bytes; HmacSha256 requires at least "
+                + $"{MinimumJwtKeyLengthInBytes}. {remedy}");
+        }
     }
 
     /// <summary>
