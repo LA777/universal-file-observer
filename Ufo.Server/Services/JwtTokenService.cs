@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Text;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Abstractions.Options;
+using Ufo.Server.Authorization;
 
 namespace Ufo.Server.Services;
 
@@ -33,7 +34,14 @@ public class JwtTokenService : IJwtTokenService
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Name)
+            new Claim(ClaimTypes.Name, user.Name),
+
+            // Carried so the client can decide whether to render the
+            // server-scoped parts of the Settings page. Never the basis for
+            // authorising a write: a token issued before a demotion stays valid
+            // for up to seven days, so ServerCertificateService re-reads the flag
+            // from the database instead.
+            new Claim(UfoClaimTypes.IsAdmin, user.IsAdmin ? "true" : "false")
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key));

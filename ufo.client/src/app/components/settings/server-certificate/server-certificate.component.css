@@ -1,0 +1,262 @@
+/* ---------------------------------------------------------------------------
+   Uses the shared --ufo-* variables only, so it follows the light theme without
+   a second set of rules.
+
+   The section heading styles are repeated from settings.component.css rather
+   than shared: emulated view encapsulation scopes a component's styles to its
+   own template, so the parent's rules do not reach this one's markup.
+   --------------------------------------------------------------------------- */
+
+.settings-section {
+  max-width: 640px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ufo-text-strong);
+}
+
+.section-hint {
+  margin: 4px 0 16px;
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+.certificate-card,
+.certificate-actions,
+.passphrase-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.certificate-card {
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--ufo-border-subtle);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-subtle);
+}
+
+.certificate-actions {
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.passphrase-field {
+  gap: 4px;
+  max-width: 320px;
+}
+
+.certificate-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.certificate-label,
+.passphrase-label {
+  color: var(--ufo-text-muted);
+}
+
+.certificate-label {
+  flex: 0 0 90px;
+}
+
+.passphrase-label {
+  font-size: 11px;
+}
+
+/* Subjects, fingerprints and file names are long and unbroken; wrapping beats
+   giving the card a scrollbar. */
+.certificate-value,
+.file-picker-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.certificate-value {
+  flex: 1 1 auto;
+  color: var(--ufo-text);
+}
+
+.certificate-value.expired {
+  color: var(--ufo-danger-text);
+  font-weight: 600;
+}
+
+.certificate-value.fingerprint,
+.file-picker-name {
+  color: var(--ufo-text-secondary);
+}
+
+.certificate-value.fingerprint {
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.file-picker-name {
+  font-size: 12px;
+}
+
+.certificate-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 10px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* An uploaded certificate is the deliberate choice, so it reads as the accented
+   one and self-signed keeps the neutral chip above. */
+.certificate-badge:not(.self-signed) {
+  border-color: var(--ufo-accent-tint);
+  background-color: var(--ufo-accent-tint-weak);
+  color: var(--ufo-accent-soft);
+}
+
+.certificate-note,
+.status-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.certificate-note {
+  align-items: flex-start;
+  margin-top: 12px;
+  border-color: var(--ufo-border-muted);
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-secondary);
+}
+
+.status-row {
+  align-items: center;
+  margin-top: 16px;
+  font-size: 12px;
+}
+
+.status-row.saved {
+  border-color: var(--ufo-accent-tint);
+  background-color: var(--ufo-accent-tint-weak);
+  color: var(--ufo-accent-soft);
+}
+
+.status-row.error {
+  border-color: var(--ufo-danger-border);
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
+}
+
+.certificate-note mat-icon,
+.status-row mat-icon,
+.file-picker-button mat-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.certificate-note mat-icon {
+  color: var(--ufo-accent);
+}
+
+/* The file picker's face is a button in everything but element type, so it
+   shares the secondary button's skin. */
+.file-picker-button,
+.primary-button,
+.secondary-button {
+  padding: 6px 14px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.file-picker,
+.file-picker-button {
+  display: inline-flex;
+  align-items: center;
+}
+
+.file-picker {
+  gap: 10px;
+  cursor: pointer;
+}
+
+.file-picker-button {
+  gap: 6px;
+}
+
+/* Hidden rather than removed: the label still drives it, so clicking and
+   keyboard focus keep working without rebuilding either. */
+.file-picker input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.certificate-buttons {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-picker:hover .file-picker-button,
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--ufo-border-control-hover);
+  background-color: var(--ufo-bg-control-hover);
+}
+
+.primary-button {
+  border-color: var(--ufo-accent-strong);
+  background-color: var(--ufo-accent-strong);
+  color: var(--ufo-text-on-accent);
+}
+
+.primary-button:hover:not(:disabled) {
+  background-color: var(--ufo-accent-deep);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.working-state {
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+.passphrase-field input {
+  padding: 6px 8px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text);
+  font-size: 12px;
+}
+
+.passphrase-field input:focus {
+  outline: none;
+  border-color: var(--ufo-accent);
+  box-shadow: 0 0 0 2px var(--ufo-accent-glow);
+}

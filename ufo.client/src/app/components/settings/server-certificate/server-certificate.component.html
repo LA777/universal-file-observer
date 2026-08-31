@@ -1,0 +1,116 @@
+<section class="settings-section">
+  <h2 class="section-title">Security</h2>
+  <p class="section-hint">
+    The TLS certificate this server presents. It belongs to the server rather than to your
+    account, so everyone connecting is served the same one.
+  </p>
+
+  <ng-container *ngIf="certificate as currentCertificate">
+    <div class="certificate-card" *ngIf="currentCertificate.isConfigured; else noCertificate">
+      <div class="certificate-row">
+        <span class="certificate-label">Issued to</span>
+        <span class="certificate-value">{{ currentCertificate.subject }}</span>
+      </div>
+      <div class="certificate-row">
+        <span class="certificate-label">Source</span>
+        <span class="certificate-value">
+          <span class="certificate-badge" [class.self-signed]="currentCertificate.source === 'self-signed'">
+            {{ currentCertificate.source === 'self-signed' ? 'Self-signed' : 'Uploaded' }}
+          </span>
+        </span>
+      </div>
+      <div class="certificate-row">
+        <span class="certificate-label">Valid until</span>
+        <span class="certificate-value" [class.expired]="currentCertificate.isExpired">
+          {{ currentCertificate.notAfter | date: 'medium' }}
+          <span *ngIf="currentCertificate.isExpired"> — expired</span>
+        </span>
+      </div>
+      <div class="certificate-row">
+        <span class="certificate-label">Fingerprint</span>
+        <span class="certificate-value fingerprint">{{ currentCertificate.thumbprint }}</span>
+      </div>
+    </div>
+
+    <ng-template #noCertificate>
+      <p class="section-hint">
+        This server is not serving HTTPS itself. Either TLS is terminated by a reverse proxy in
+        front of it, or <code>Ufo__EnableHttps</code> is switched off.
+      </p>
+    </ng-template>
+
+    <div class="certificate-note" *ngIf="currentCertificate.source === 'self-signed'">
+      <mat-icon>info_outline</mat-icon>
+      <span>
+        A self-signed certificate encrypts the connection but is not vouched for by anyone, so
+        browsers warn about it until it is trusted on each device.
+      </span>
+    </div>
+
+    <div class="certificate-actions" *ngIf="currentCertificate.canManage; else notAdministrator">
+      <label class="file-picker">
+        <input
+          #certificateFileInput
+          type="file"
+          accept=".pfx,.p12,application/x-pkcs12"
+          [disabled]="isWorking"
+          (change)="onFileSelected($event)" />
+        <span class="file-picker-button">
+          <mat-icon>upload_file</mat-icon>
+          Choose certificate…
+        </span>
+        <span class="file-picker-name" *ngIf="certificateFileName">{{ certificateFileName }}</span>
+      </label>
+
+      <label class="passphrase-field">
+        <span class="passphrase-label">Passphrase (leave blank if none)</span>
+        <input
+          type="password"
+          autocomplete="new-password"
+          [(ngModel)]="certificatePassphrase"
+          [disabled]="isWorking" />
+      </label>
+
+      <div class="certificate-buttons">
+        <button
+          type="button"
+          class="primary-button"
+          [disabled]="!certificateFileName || isWorking"
+          (click)="upload()">
+          Install certificate
+        </button>
+        <button
+          type="button"
+          class="secondary-button"
+          [disabled]="isWorking"
+          matTooltip="Replaces the current certificate with a newly generated self-signed one"
+          (click)="generateSelfSigned()">
+          Generate self-signed
+        </button>
+        <span class="working-state" *ngIf="isWorking">Working…</span>
+      </div>
+
+      <p class="section-hint">
+        Upload a PKCS#12 archive (<code>.pfx</code> or <code>.p12</code>) containing the
+        certificate and its private key. The key is encrypted before it is stored, and the
+        passphrase you type here is not kept.
+      </p>
+    </div>
+
+    <ng-template #notAdministrator>
+      <p class="section-hint">Only an administrator can change the server certificate.</p>
+    </ng-template>
+  </ng-container>
+
+  <!-- Outside the ng-container above: a failed load leaves `certificate` null,
+       and an error the user cannot see is worse than no error at all. -->
+  <div class="status-row saved" *ngIf="message">
+    <mat-icon>check_circle</mat-icon>
+    <span>{{ message }}</span>
+  </div>
+
+  <div class="status-row error" *ngIf="errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+</section>

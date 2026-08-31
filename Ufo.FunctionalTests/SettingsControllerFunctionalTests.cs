@@ -108,7 +108,7 @@ public class SettingsApiFactory : WebApplicationFactory<Program>
         var userName = $"testuser-{userId}";
         await _sqLiteConnection.ExecuteAsync(
             SqlScripts.InsertUserSql,
-            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash" });
+            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash", IsAdmin = false });
 
         var client = CreateClient();
         client.DefaultRequestHeaders.Authorization =

@@ -50,7 +50,9 @@ COPY --from=spa /src/ufo.client/dist/ufo.client/browser/ /app/publish/wwwroot/
 # ---------------------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
-# /data holds the SQLite database, the rolling logs and the generated machine id;
+# /data holds the SQLite database, the rolling logs, the generated machine id and
+# the key the stored TLS certificate is encrypted with (losing it costs the
+# certificate, which is then regenerated self-signed);
 # /library is where the folders to be indexed are mounted. Mount volumes over
 # both - anything written to the image layer is lost when the container is
 # recreated, and a churning machine id fragments snapshot history across runs.
@@ -67,6 +69,19 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true
 # endpoint declared in appsettings.json has to be overridden here. Binding to
 # localhost would leave the port unreachable from outside the container.
 ENV Kestrel__Endpoints__App__Url=http://0.0.0.0:8080
+
+# TLS is deliberately NOT declared here, unlike the HTTP endpoint above. Kestrel
+# refuses to start an https:// endpoint it has no certificate for, so an endpoint
+# baked into the image would turn Ufo__EnableHttps=false - the documented way to
+# run behind a TLS-terminating proxy - into a crash loop. The port is the
+# deployment's decision: docker-compose.yml sets
+#
+#   Kestrel__Endpoints__Https__Url=https://0.0.0.0:8443
+#
+# and a bare `docker run` passes the same variable to serve TLS. The certificate
+# itself is never baked in or mounted: the application stores one in its database,
+# generating a self-signed certificate on first run and serving whatever an
+# administrator later uploads on the Settings page.
 
 ENV Ufo__DataDirectory=/data
 ENV ConnectionStrings__DefaultConnection="Data Source=/data/ufo.db;Foreign Keys=True"
@@ -86,7 +101,7 @@ ENV Ufo__AllowedRoots__0=/library
 # and the host refuses to start without one rather than falling back to a shared
 # default. Generate one with: openssl rand -hex 32
 
-EXPOSE 8080
+EXPOSE 8080 8443
 USER $APP_UID
 
 # Probes /api/user/is-created using the runtime that is already in the image, so

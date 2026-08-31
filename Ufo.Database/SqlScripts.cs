@@ -7,7 +7,12 @@ public class SqlScripts
             Id           TEXT NOT NULL UNIQUE  CONSTRAINT PK_Users PRIMARY KEY,
             Name         TEXT NOT NULL UNIQUE,
             PasswordHash TEXT NOT NULL,
-            CreatedAt    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            CreatedAt    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            -- Grants access to server-scoped settings (the TLS certificate).
+            -- Databases created before this column existed are upgraded by
+            -- DapperDataContext.EnsureColumnAsync, because CREATE TABLE IF NOT
+            -- EXISTS cannot add a column to a table that is already there.
+            IsAdmin      INTEGER NOT NULL DEFAULT 0
         ); 
 
         CREATE TABLE IF NOT EXISTS Pcs (
@@ -167,6 +172,35 @@ public class SqlScripts
             UserId                    TEXT NOT NULL UNIQUE,
 
             CONSTRAINT FK_UserSettings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
+        -- Server-scoped configuration: exactly one row for the whole installation.
+        -- Deliberately the only table without a UserId. A TLS certificate belongs
+        -- to the listener, not to a user: Kestrel presents one certificate to
+        -- everybody, so a per-user row would mean one user's upload silently
+        -- changing the identity every other user is served.
+        --
+        -- SingletonGuard is always 1, UNIQUE and CHECKed. The UNIQUE is what lets
+        -- UpsertServerSettingsSql resolve a concurrent first-write with ON CONFLICT
+        -- instead of a read-then-insert race, exactly as UserSettings.UserId does;
+        -- the CHECK makes a second row impossible rather than merely unexpected.
+        --
+        -- CertificatePfx holds a PKCS#12 blob already encrypted by the server's
+        -- certificate protector. This database is not encrypted, so a raw private
+        -- key must never be written here.
+        CREATE TABLE IF NOT EXISTS ServerSettings (
+            Id                    TEXT NOT NULL UNIQUE CONSTRAINT PK_ServerSettings PRIMARY KEY,
+            CertificatePfx        BLOB,
+            CertificateThumbprint TEXT NOT NULL DEFAULT '',
+            CertificateSubject    TEXT NOT NULL DEFAULT '',
+            CertificateNotBefore  TEXT NOT NULL DEFAULT '',
+            CertificateNotAfter   TEXT NOT NULL DEFAULT '',
+            CertificateSource     TEXT NOT NULL DEFAULT '',
+            UpdatedAt             TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UpdatedByUserId       TEXT,
+            SingletonGuard        INTEGER NOT NULL DEFAULT 1 UNIQUE CHECK (SingletonGuard = 1),
+
+            CONSTRAINT FK_ServerSettings_Users_UpdatedByUserId FOREIGN KEY (UpdatedByUserId) REFERENCES Users (Id) ON DELETE SET NULL
         );
 
         -- ============================================================================
@@ -397,6 +431,24 @@ public class SqlScripts
     public const string DeleteLabelsToSnapshotsByLabelIdSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId;";
 
     // User Settings SQL Scripts
+    // Server Settings SQL Scripts. Keyed on the SingletonGuard rather than on Id:
+    // there is only ever one row, and the caller does not know its id.
+    public const string SelectServerSettingsSql = "SELECT * FROM ServerSettings WHERE SingletonGuard = 1;";
+    public const string UpsertServerSettingsSql =
+        "INSERT INTO ServerSettings (Id, CertificatePfx, CertificateThumbprint, CertificateSubject, " +
+            "CertificateNotBefore, CertificateNotAfter, CertificateSource, UpdatedAt, UpdatedByUserId, SingletonGuard) " +
+        "VALUES (@Id, @CertificatePfx, @CertificateThumbprint, @CertificateSubject, " +
+            "@CertificateNotBefore, @CertificateNotAfter, @CertificateSource, @UpdatedAt, @UpdatedByUserId, 1) " +
+        "ON CONFLICT (SingletonGuard) DO UPDATE SET " +
+            "CertificatePfx = excluded.CertificatePfx, " +
+            "CertificateThumbprint = excluded.CertificateThumbprint, " +
+            "CertificateSubject = excluded.CertificateSubject, " +
+            "CertificateNotBefore = excluded.CertificateNotBefore, " +
+            "CertificateNotAfter = excluded.CertificateNotAfter, " +
+            "CertificateSource = excluded.CertificateSource, " +
+            "UpdatedAt = excluded.UpdatedAt, " +
+            "UpdatedByUserId = excluded.UpdatedByUserId;";
+
     public const string SelectUserSettingsSql = "SELECT * FROM UserSettings WHERE UserId = @UserId;";
     public const string UpsertUserSettingsSql = "INSERT INTO UserSettings (Id, Theme, UserId) " +
                                                     "VALUES (@Id, @Theme, @UserId) " +
@@ -406,8 +458,8 @@ public class SqlScripts
     public const string SelectUserByIdSql = "SELECT * FROM Users WHERE Id = @UserId;";
     public const string SelectUserByNameSql = "SELECT * FROM Users WHERE Name = @Username;";
     public const string SelectSameUserByNameSql = "SELECT COUNT(1) FROM Users WHERE Name = @Username;";
-    public const string InsertUserSql = "INSERT INTO Users (Id, Name, PasswordHash) " +
-                                            "VALUES (@Id, @Name, @PasswordHash);";
+    public const string InsertUserSql = "INSERT INTO Users (Id, Name, PasswordHash, IsAdmin) " +
+                                            "VALUES (@Id, @Name, @PasswordHash, @IsAdmin);";
     public const string SelectUserCountSql = "SELECT COUNT(1) FROM Users;";
 
     // Search SQL Scripts

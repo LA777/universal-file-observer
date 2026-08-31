@@ -88,7 +88,7 @@ public class UserApiFactory : WebApplicationFactory<Program>
         var userName = name ?? $"testuser-{userId}";
         await _sqLiteConnection!.ExecuteAsync(
             SqlScripts.InsertUserSql,
-            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash" });
+            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash", IsAdmin = false });
     }
 
     protected override void Dispose(bool disposing)

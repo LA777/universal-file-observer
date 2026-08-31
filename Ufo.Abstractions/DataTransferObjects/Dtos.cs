@@ -72,6 +72,52 @@ public class UserSettingsDto : DtoWithUserIdAndIdBase
     public string Theme { get; set; } = UiThemes.Default;
 }
 
+/// <summary>
+/// The TLS certificate the server is currently presenting, as shown on the
+/// Settings page. Describes the certificate only - the private key, protected or
+/// otherwise, never leaves the server.
+/// </summary>
+public class ServerCertificateDto
+{
+    /// <summary>False on a host that is not serving HTTPS, so the client can say so.</summary>
+    [JsonPropertyOrder(1)]
+    public bool IsConfigured { get; set; }
+
+    [JsonPropertyOrder(2)]
+    public string Subject { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(3)]
+    public string Thumbprint { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(4)]
+    public string NotBefore { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(5)]
+    public string NotAfter { get; set; } = string.Empty;
+
+    /// <summary>One of <see cref="CertificateSources.All"/>.</summary>
+    [JsonPropertyOrder(6)]
+    public string Source { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True once <see cref="NotAfter"/> is in the past. Computed server-side so
+    /// the client does not have to reason about the browser's clock or timezone.
+    /// </summary>
+    [JsonPropertyOrder(7)]
+    public bool IsExpired { get; set; }
+
+    [JsonPropertyOrder(8)]
+    public string UpdatedAt { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether the caller may replace the certificate. Drives whether the
+    /// Settings page renders the upload control; the server enforces it
+    /// independently on every write.
+    /// </summary>
+    [JsonPropertyOrder(9)]
+    public bool CanManage { get; set; }
+}
+
 public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(14)]

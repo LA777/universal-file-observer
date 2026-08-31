@@ -1,0 +1,20 @@
+# Overlay for deployments where a reverse proxy in front of UFO terminates TLS.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.no-tls.yml up -d
+#
+# Kestrel refuses to start an https:// endpoint it has no certificate for, and an
+# endpoint declared with an empty Url is just as fatal - it fails with "missing
+# the required 'Url' parameter". The variable therefore has to be absent, not
+# blank, and a null value here is the only way Compose can express that: it means
+# "pass through from the host environment", which omits the variable entirely
+# when it is not set there.
+services:
+  ufo:
+    environment:
+      Ufo__EnableHttps: "false"
+      Kestrel__Endpoints__Https__Url:
+    # Compose appends list fields rather than replacing them, so without
+    # !override the base file's 8443 mapping would survive and publish a host
+    # port with nothing behind it.
+    ports: !override
+      - "8080:8080"

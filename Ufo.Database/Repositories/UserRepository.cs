@@ -63,7 +63,8 @@ public class UserRepository : IUserRepository
             {
                 Id = user.Id.ToString(),
                 user.Name,
-                user.PasswordHash
+                user.PasswordHash,
+                user.IsAdmin
             }, transaction);
 
             await transaction.CommitAsync();

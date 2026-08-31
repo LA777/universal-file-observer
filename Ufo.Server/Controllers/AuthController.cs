@@ -36,12 +36,22 @@ public class AuthController : ControllerBase
                 return BadRequest("Username is already taken.");
             }
 
-            // 2. Create Entity and Hash Password
+            // 2. Create Entity and Hash Password.
+            // The first account to register administers the installation - it
+            // belongs to whoever is standing the server up - and is the only one
+            // that may change the TLS certificate. Every later account is a plain
+            // user. Two signups racing on a brand-new database could in principle
+            // both read a count of zero and both become administrators; that
+            // needs the installer to be racing themselves on an empty install, so
+            // it is left uncontested rather than serialised behind a lock.
+            var isFirstUser = await _userRepository.GetUserCountAsync() == 0;
+
             var newUser = new UserEntity
             {
                 Id = Ulid.NewUlid(),
                 Name = request.Username,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password)
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                IsAdmin = isFirstUser
             };
 
             // 3. Save to Database

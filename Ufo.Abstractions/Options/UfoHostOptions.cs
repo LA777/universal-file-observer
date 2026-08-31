@@ -57,6 +57,47 @@ public class UfoHostOptions
     public bool EnableFileLogging { get; set; }
 
     /// <summary>
+    /// Serves TLS using the certificate stored in the database, generating a
+    /// self-signed one on first run when none has been uploaded.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Independent of <see cref="EnableHttpsRedirection"/>: this decides whether
+    /// the server holds a certificate at all, that decides what happens to plain
+    /// HTTP requests. A deployment behind a reverse proxy that terminates TLS
+    /// upstream should turn this off, so no certificate is generated or stored
+    /// for a listener that will only ever see decrypted traffic.
+    /// </para>
+    /// <para>
+    /// Turning it off does not close an HTTPS endpoint declared under
+    /// <c>Kestrel:Endpoints</c>; it only stops this application supplying the
+    /// certificate for one, which would leave Kestrel to fall back to its own
+    /// configuration.
+    /// </para>
+    /// </remarks>
+    public bool EnableHttps { get; set; }
+
+    /// <summary>
+    /// Extra host names and IP addresses to name in the generated self-signed
+    /// certificate, on top of the ones the machine can see for itself.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Needed in a container, which cannot enumerate the host's addresses: it
+    /// sees only its own loopback, its container id and its bridge address, so a
+    /// certificate generated purely from what it can observe would not name the
+    /// LAN address people actually browse to, and every client would report a
+    /// host-name mismatch rather than a merely untrusted issuer.
+    /// </para>
+    /// <para>
+    /// Entries that parse as an IP address are recorded as such; everything else
+    /// is recorded as a DNS name. Only affects certificates this application
+    /// generates - an uploaded one is used exactly as supplied.
+    /// </para>
+    /// </remarks>
+    public IList<string> CertificateSubjectAlternativeNames { get; set; } = [];
+
+    /// <summary>
     /// Refuses to run unrestricted: when <see cref="AllowedRoots"/> is still empty
     /// after configuration is applied, it falls back to
     /// <see cref="ContainerLibraryRoot"/> rather than allowing the whole file
@@ -111,19 +152,28 @@ public class UfoHostOptions
         OpenBrowserOnStartup = true,
         EnableHttpsRedirection = true,
         EnableFileLogging = true,
+        // Serves https://localhost:55000 with a certificate of its own rather
+        // than the ASP.NET Core development certificate, which an installed
+        // application has no reason to expect on the machine.
+        EnableHttps = true,
         AllowedRoots = []
     };
 
     /// <summary>
-    /// Defaults for the container image: headless, logs to stdout, TLS terminated
-    /// upstream, and restricted to whatever is mounted in and listed in
-    /// <c>Ufo__AllowedRoots</c>.
+    /// Defaults for the container image: headless, logs to stdout, serving TLS
+    /// from its own stored certificate, and restricted to whatever is mounted in
+    /// and listed in <c>Ufo__AllowedRoots</c>. A deployment that terminates TLS
+    /// upstream instead should set <c>Ufo__EnableHttps=false</c>.
     /// </summary>
     public static UfoHostOptions ForContainer() => new()
     {
         OpenBrowserOnStartup = false,
+        // Left off even though the container serves TLS: the HTTP endpoint stays
+        // open for a reverse proxy or a health probe, and redirecting it would
+        // break both.
         EnableHttpsRedirection = false,
         EnableFileLogging = false,
+        EnableHttps = true,
         // Network-reachable, and its data directory is a volume: JWT__Key must be
         // supplied, and a missing one has to be fatal rather than invented.
         GenerateJwtKeyWhenMissing = false,

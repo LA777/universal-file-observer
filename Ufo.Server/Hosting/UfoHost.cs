@@ -20,6 +20,7 @@ using Ufo.Database.Contexts;
 using Ufo.Database.Repositories;
 using Ufo.DataProviders;
 using Ufo.Server.Extensions;
+using Ufo.Server.Security;
 using Ufo.Server.Services;
 
 namespace Ufo.Server.Hosting;
@@ -200,6 +201,15 @@ public static class UfoHost
         builder.Services.AddScoped<ISearchRepository, SearchRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
+        builder.Services.AddScoped<IServerSettingsRepository, ServerSettingsRepository>();
+
+        // TLS certificate. The provider is a singleton because Kestrel reads it
+        // on every handshake and it outlives any request scope; everything that
+        // touches the database around it stays scoped.
+        builder.Services.AddSingleton<IServerCertificateProvider, ServerCertificateProvider>();
+        builder.Services.AddSingleton<ICertificateProtector, CertificateProtector>();
+        builder.Services.AddSingleton<ISelfSignedCertificateFactory, SelfSignedCertificateFactory>();
+        builder.Services.AddScoped<IServerCertificateService, ServerCertificateService>();
 
         // TODO LA - Get sqliteConnection and Init Database (refactor)
         if (!isFunctionalTesting)
@@ -298,9 +308,50 @@ public static class UfoHost
             });
         });
 
+        if (!hostOptions.EnableHttps && !isFunctionalTesting)
+        {
+            // Kestrel fails an https:// endpoint that has no certificate, with an
+            // error that says nothing about which of these two settings is wrong.
+            GuardAgainstHttpsEndpointWithoutTls(builder.Configuration);
+        }
+
+        // Captured by the certificate selector below and assigned once the
+        // container has been built. Safe to leave null until then: the selector
+        // only runs on an accepted connection, which cannot happen before this
+        // method has returned and the caller has started the host.
+        IServerCertificateProvider? certificateProvider = null;
+
+        if (hostOptions.EnableHttps && !isFunctionalTesting)
+        {
+            // Applies to every HTTPS endpoint Kestrel ends up with, whichever
+            // configuration declared it - the desktop host's App endpoint and the
+            // container's separate HTTPS one are both covered by this one hook.
+            builder.WebHost.ConfigureKestrel(kestrelOptions =>
+                kestrelOptions.ConfigureHttpsDefaults(httpsOptions =>
+                {
+                    // A selector rather than a fixed ServerCertificate: it is
+                    // consulted per connection, so a certificate uploaded on the
+                    // Settings page is served from the next connection onwards
+                    // instead of after a restart.
+                    httpsOptions.ServerCertificateSelector = (_, _) =>
+                        certificateProvider?.Current;
+                }));
+        }
+
         configureServices?.Invoke(builder.Services);
 
         var app = builder.Build();
+
+        if (hostOptions.EnableHttps && !isFunctionalTesting)
+        {
+            // Resolved after Build so the selector closure above has something to
+            // read, and done here rather than in a hosted service: the certificate
+            // has to be in place before Kestrel accepts its first connection, and
+            // hosted services start after the server is already listening.
+            certificateProvider = app.Services.GetRequiredService<IServerCertificateProvider>();
+
+            InitialiseServerCertificate(app);
+        }
 
         // HSTS belongs ahead of the endpoints, and is pointless where TLS is
         // terminated upstream.
@@ -369,6 +420,73 @@ public static class UfoHost
     /// configuration means each installation signs with its own secret, and that
     /// users stay logged in across restarts and upgrades.
     /// </summary>
+    /// <summary>
+    /// Refuses to start when TLS is switched off but an HTTPS endpoint is still
+    /// configured, naming both settings.
+    /// </summary>
+    /// <remarks>
+    /// Nothing supplies a certificate with <c>Ufo:EnableHttps</c> off, so Kestrel
+    /// would fail to bind such an endpoint anyway - but it reports only that it
+    /// could not configure HTTPS, which sends people looking for a missing
+    /// certificate file that was never meant to exist. Failing here says which
+    /// pair of settings disagree.
+    /// </remarks>
+    private static void GuardAgainstHttpsEndpointWithoutTls(IConfiguration configuration)
+    {
+        // A blank Url counts as well as an https one. Blanking the variable is the
+        // obvious way to try to switch the endpoint off, and it does not work:
+        // the endpoint section still exists, and Kestrel rejects it for having no
+        // Url. The variable has to be absent entirely.
+        var unstartableEndpointNames = configuration.GetSection("Kestrel:Endpoints")
+            .GetChildren()
+            .Where(endpoint =>
+                endpoint["Url"]?.StartsWith("https://", StringComparison.OrdinalIgnoreCase) == true
+                || string.IsNullOrWhiteSpace(endpoint["Url"]))
+            .Select(endpoint => endpoint.Key)
+            .ToList();
+
+        if (unstartableEndpointNames.Count == 0)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Ufo:EnableHttps is false, but the Kestrel endpoint(s) {string.Join(", ", unstartableEndpointNames)} "
+            + "still ask for https or have no Url. Nothing supplies a certificate with TLS switched off, so Kestrel "
+            + "cannot start them. The endpoint has to be removed rather than blanked - blanking it leaves the "
+            + "section in place with no Url, which fails the same way. With the container image, run it with the "
+            + "supplied overlay: docker compose -f docker-compose.yml -f docker-compose.no-tls.yml up -d");
+    }
+
+    /// <summary>
+    /// Publishes the stored TLS certificate before the host starts listening,
+    /// generating and storing a self-signed one when there is nothing usable.
+    /// </summary>
+    /// <remarks>
+    /// Blocking rather than async because <see cref="Build"/> is synchronous and
+    /// its callers start the host immediately afterwards. A failure here is
+    /// logged and swallowed: the HTTP endpoint and everything behind it still
+    /// work, and taking the whole application down over TLS would turn a
+    /// degraded deployment into an unreachable one.
+    /// </remarks>
+    private static void InitialiseServerCertificate(WebApplication app)
+    {
+        try
+        {
+            using var scope = app.Services.CreateScope();
+            var certificateService = scope.ServiceProvider.GetRequiredService<IServerCertificateService>();
+
+            certificateService.EnsureCertificateAsync(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            Log.Error(
+                exception,
+                "Could not prepare a TLS certificate. HTTPS endpoints will fail their handshake until this is resolved; "
+                + "any plain HTTP endpoint is unaffected.");
+        }
+    }
+
     private static string ResolveInstallationJwtSigningKey(string dataDirectory)
     {
         var signingKeyFilePath = Path.Combine(dataDirectory, JwtSigningKeyFileName);

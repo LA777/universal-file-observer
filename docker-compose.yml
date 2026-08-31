@@ -7,10 +7,14 @@ services:
     container_name: ufo
     restart: unless-stopped
     ports:
-      # Host port : container port. TLS is expected to be terminated by a reverse
-      # proxy in front of this; the application does not serve HTTPS in a
-      # container (Ufo__EnableHttpsRedirection stays false).
+      # Host port : container port, bound on every host interface so the app is
+      # reachable from the LAN.
       - "8080:8080"
+      # HTTPS, served by the application itself from the certificate in its
+      # database - self-signed on first run, replaceable on the Settings page.
+      # Both endpoints stay open: the health check and any reverse proxy use the
+      # plain one, which is why Ufo__EnableHttpsRedirection stays false.
+      - "8443:8443"
     environment:
       # Required. Generate your own and keep it out of source control:
       #   openssl rand -hex 32
@@ -21,8 +25,25 @@ services:
       # this deployment, otherwise the container's regenerated /etc/machine-id is
       # used and snapshot history fragments whenever the container is recreated.
       Ufo__MachineId: "${UFO_MACHINE_ID:-}"
+      # Set to false when a reverse proxy in front of this terminates TLS: the
+      # application then neither generates nor stores a certificate.
+      Ufo__EnableHttps: "${UFO_ENABLE_HTTPS:-true}"
+      # The address or host name people browse to. It has to be named here
+      # because the container cannot discover it: from inside, the only visible
+      # addresses are loopback, the container id and the docker bridge, so a
+      # generated certificate would not cover the LAN address and every client
+      # would report a host-name mismatch. Add more as __1, __2 and so on.
+      Ufo__CertificateSubjectAlternativeNames__0: "${UFO_CERTIFICATE_HOST:-}"
+      # The TLS port, declared by the deployment rather than baked into the
+      # image: Kestrel refuses to start an https:// endpoint it has no
+      # certificate for, so an image-level default would make
+      # UFO_ENABLE_HTTPS=false a crash loop. Behind a TLS-terminating proxy, set
+      # UFO_ENABLE_HTTPS=false and UFO_HTTPS_URL= (empty) together.
+      Kestrel__Endpoints__Https__Url: "${UFO_HTTPS_URL-https://0.0.0.0:8443}"
     volumes:
-      # Database, rolling logs and the generated machine id.
+      # Database, rolling logs, generated machine id, and the key that the stored
+      # TLS certificate is encrypted with. Losing this volume loses the
+      # certificate along with everything else.
       - ufo-data:/data
       # The folders to index. Read-only: UFO only ever reads what it indexes.
       - "${UFO_LIBRARY_PATH:-./library}:/library:ro"

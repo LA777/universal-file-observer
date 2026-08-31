@@ -91,7 +91,7 @@ public class SearchApiFactory : WebApplicationFactory<Program>
         var userName = $"testuser-{userId}";
         await _sqLiteConnection.ExecuteAsync(
             SqlScripts.InsertUserSql,
-            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash" });
+            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash", IsAdmin = false });
 
         var token = SearchJwtHelper.GenerateToken(userId, userName);
         var client = CreateClient();
@@ -598,7 +598,7 @@ public class SearchController_UserIsolationTests : IAsyncLifetime
         var otherUserId = Ulid.NewUlid();
         await _db.ExecuteAsync(
             SqlScripts.InsertUserSql,
-            new { Id = otherUserId.ToString(), Name = $"otheruser-{otherUserId}", PasswordHash = "hash" });
+            new { Id = otherUserId.ToString(), Name = $"otheruser-{otherUserId}", PasswordHash = "hash", IsAdmin = false });
 
         await SearchSeeder.SeedFullAsync(_db, otherUserId, "confidential_data");
 
@@ -615,7 +615,7 @@ public class SearchController_UserIsolationTests : IAsyncLifetime
         var otherUserId = Ulid.NewUlid();
         await _db.ExecuteAsync(
             SqlScripts.InsertUserSql,
-            new { Id = otherUserId.ToString(), Name = $"otheruser-{otherUserId}", PasswordHash = "hash" });
+            new { Id = otherUserId.ToString(), Name = $"otheruser-{otherUserId}", PasswordHash = "hash", IsAdmin = false });
 
         // Both users have data matching the same query term.
         var ownSeed = await SearchSeeder.SeedFullAsync(_db, _userId, "shared_term");

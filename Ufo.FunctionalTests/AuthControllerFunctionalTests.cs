@@ -221,6 +221,70 @@ public class AuthController_SignupTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Signup_FirstAccount_BecomesTheAdministrator()
+    {
+        var request = AuthRequestFactory.NewRegister("founder", AuthTestConstants.ValidPassword);
+
+        var response = await _client.PostAsJsonAsync($"{AuthTestConstants.ApiBase}/signup", request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        // The account that stands the installation up is the one that can change
+        // the server certificate; nothing else in the product grants it.
+        Assert.True(await IsAdministratorAsync("founder"));
+    }
+
+    [Fact]
+    public async Task Signup_LaterAccounts_AreNotAdministrators()
+    {
+        await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup",
+            AuthRequestFactory.NewRegister("founder", AuthTestConstants.ValidPassword));
+
+        await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup",
+            AuthRequestFactory.NewRegister("latecomer", AuthTestConstants.ValidPassword));
+
+        Assert.True(await IsAdministratorAsync("founder"));
+        // Otherwise anyone who can register could replace the TLS identity every
+        // other user is served.
+        Assert.False(await IsAdministratorAsync("latecomer"));
+    }
+
+    [Fact]
+    public async Task Signup_AfterAFailedAttempt_StillGrantsAdministratorToTheFirstRealAccount()
+    {
+        // A rejected signup must not consume the administrator slot.
+        var rejected = await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup",
+            AuthRequestFactory.NewRegister("weakling", AuthTestConstants.WeakPassword));
+        Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+
+        await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup",
+            AuthRequestFactory.NewRegister("founder", AuthTestConstants.ValidPassword));
+
+        Assert.True(await IsAdministratorAsync("founder"));
+    }
+
+    /// <summary>
+    /// Read straight from the database: the flag is deliberately not exposed on
+    /// any response, so there is no endpoint to assert against.
+    /// </summary>
+    private async Task<bool> IsAdministratorAsync(string userName)
+    {
+        await using var connection = new SqliteConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT IsAdmin FROM Users WHERE Name = $name;";
+        command.Parameters.AddWithValue("$name", userName);
+
+        var isAdmin = await command.ExecuteScalarAsync();
+
+        return Convert.ToInt64(isAdmin) == 1;
+    }
+
+    [Fact]
     public async Task Signup_WeakPassword_Returns400()
     {
         var request = AuthRequestFactory.NewRegister("weakpassworduser", AuthTestConstants.WeakPassword);

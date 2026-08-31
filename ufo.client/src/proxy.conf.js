@@ -13,7 +13,8 @@ const PROXY_CONFIG = [
       "/api/filesystem",
       "/api/label",
       "/api/labels",
-      "/api/search"
+      "/api/search",
+      "/api/settings"
     ],
     target,
     secure: false

@@ -38,6 +38,30 @@ export interface UserSettings {
   theme: Theme;
 }
 
+/** Mirrors Ufo.Abstractions.CertificateSources. */
+export type CertificateSource = 'self-signed' | 'user-supplied';
+
+/**
+ * The TLS certificate the server is presenting. Server-wide rather than
+ * per-user: one certificate is served to everybody, so only an administrator
+ * (`canManage`) may replace it.
+ */
+export interface ServerCertificate {
+  /** False on a deployment that terminates TLS upstream and serves plain HTTP. */
+  isConfigured: boolean;
+  subject: string;
+  thumbprint: string;
+  /** Round-trip formatted UTC instants, or empty when nothing is configured. */
+  notBefore: string;
+  notAfter: string;
+  source: CertificateSource | '';
+  /** Computed on the server, so it does not depend on the browser's clock. */
+  isExpired: boolean;
+  updatedAt: string;
+  /** Whether this user may replace the certificate. Re-checked server-side. */
+  canManage: boolean;
+}
+
 export interface Label {
   id: string;
   name: string;
