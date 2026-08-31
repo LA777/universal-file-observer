@@ -118,6 +118,33 @@ public class SettingsApiFactory : WebApplicationFactory<Program>
         return (client, userId);
     }
 
+    /// <summary>
+    /// The same as <see cref="CreateAuthenticatedClientAsync"/>, but the seeded
+    /// user administers the installation.
+    /// </summary>
+    public async Task<(HttpClient Client, Ulid UserId)> CreateAdministratorClientAsync()
+    {
+        _sqLiteConnection ??= new SqliteConnection(ConnectionString);
+        if (_sqLiteConnection.State != System.Data.ConnectionState.Open)
+        {
+            await _sqLiteConnection.OpenAsync();
+            await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
+        }
+
+        var userId = Ulid.NewUlid();
+        var userName = $"admin-{userId}";
+        await _sqLiteConnection.ExecuteAsync(
+            SqlScripts.InsertUserSql,
+            new { Id = userId.ToString(), Name = userName, PasswordHash = "hash", IsAdmin = true });
+
+        var client = CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue(
+                "Bearer", JwtTestHelper.GenerateToken(userId, userName));
+
+        return (client, userId);
+    }
+
     /// <summary>Returns an HTTP client with NO authorization header.</summary>
     public HttpClient CreateUnauthenticatedClient() => CreateClient();
 
@@ -360,6 +387,75 @@ public class SettingsControllerFunctionalTests
             await secondClient.GetAsync(TestConstants.ApiBase));
 
         Assert.Equal(UiThemes.Default, secondUserSettings!.Theme);
+    }
+
+    #endregion
+
+    #region Server certificate - administrators only
+
+    private const string CertificateEndpoint = TestConstants.ApiBase + "/certificate";
+    private const string SelfSignedEndpoint = CertificateEndpoint + "/self-signed";
+
+    [Fact]
+    public async Task GetCertificate_AsAPlainUser_IsForbidden()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync(CertificateEndpoint);
+
+        // Hiding the section in the UI is not the enforcement; this is. A plain
+        // user calling the endpoint directly gets nothing back.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCertificate_AsAnAdministrator_IsAllowed()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAdministratorClientAsync();
+
+        var response = await client.GetAsync(CertificateEndpoint);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCertificate_WithoutAToken_IsUnauthorized()
+    {
+        using var factory = new SettingsApiFactory();
+        var client = factory.CreateUnauthenticatedClient();
+
+        var response = await client.GetAsync(CertificateEndpoint);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GenerateSelfSignedCertificate_AsAPlainUser_IsRefused()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.PostAsync(SelfSignedEndpoint, content: null);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("administrator", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task PutCertificate_AsAPlainUser_IsRefused()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.PutAsJsonAsync(
+            CertificateEndpoint,
+            new ServerCertificateRequest { PfxBase64 = "not-a-real-archive" });
+
+        // Refused for who they are, before anything looks at what they sent.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("administrator", await response.Content.ReadAsStringAsync());
     }
 
     #endregion

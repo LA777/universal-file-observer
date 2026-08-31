@@ -140,7 +140,7 @@ public class ServerCertificateServiceTests : BaseTest
     }
 
     [Fact]
-    public async Task GetCertificateAsync_WhenTheCallerNoLongerExists_ReportsTheyCannotManageIt()
+    public async Task GetCertificateAsync_WhenTheCallerNoLongerExists_IsRefused()
     {
         _userServiceMock
             .Setup(service => service.GetUserByIdAsync(_userId, It.IsAny<CancellationToken>()))
@@ -149,8 +149,9 @@ public class ServerCertificateServiceTests : BaseTest
 
         var certificate = await CreateSut().GetCertificateAsync(_userId, CancellationToken.None);
 
-        // The Settings page has to render something rather than error out.
-        certificate.CanManage.Should().BeFalse();
+        // Null is what the controller turns into a 403. Failing closed here too,
+        // rather than handing back a description of the server's certificate.
+        certificate.Should().BeNull();
     }
 
     #endregion
@@ -330,19 +331,27 @@ public class ServerCertificateServiceTests : BaseTest
         var certificate = await CreateSut().GetCertificateAsync(_userId, CancellationToken.None);
 
         // A host behind a TLS-terminating proxy is a valid deployment, not a fault.
-        certificate.IsConfigured.Should().BeFalse();
-        certificate.CanManage.Should().BeTrue();
+        certificate.Should().NotBeNull();
+        certificate!.IsConfigured.Should().BeFalse();
     }
 
     [Fact]
-    public async Task GetCertificateAsync_ForANonAdministrator_SaysTheyCannotManageIt()
+    public async Task GetCertificateAsync_ForANonAdministrator_IsRefused()
     {
         SetupCaller(isAdmin: false);
-        SetupStoredSettings(null);
+        SetupStoredSettings(new ServerSettingsEntity
+        {
+            CertificateThumbprint = "ABC123",
+            CertificateSubject = "CN=secret-host",
+            CertificateNotAfter = DateTimeOffset.UtcNow.AddYears(1).ToString("o"),
+            CertificateSource = CertificateSources.SelfSigned
+        });
 
         var certificate = await CreateSut().GetCertificateAsync(_userId, CancellationToken.None);
 
-        certificate.CanManage.Should().BeFalse();
+        // Hidden in the UI is not the same as unreachable. This is the half that
+        // holds when someone calls the endpoint directly.
+        certificate.Should().BeNull();
     }
 
     [Fact]
@@ -360,7 +369,8 @@ public class ServerCertificateServiceTests : BaseTest
         var certificate = await CreateSut().GetCertificateAsync(_userId, CancellationToken.None);
 
         // Computed on the server so it does not depend on the browser's clock.
-        certificate.IsConfigured.Should().BeTrue();
+        certificate.Should().NotBeNull();
+        certificate!.IsConfigured.Should().BeTrue();
         certificate.IsExpired.Should().BeTrue();
     }
 
@@ -380,7 +390,8 @@ public class ServerCertificateServiceTests : BaseTest
 
         // The DTO has no field for it, which is the point; this guards against
         // one being added carelessly later.
-        certificate.GetType().GetProperties()
+        certificate.Should().NotBeNull();
+        certificate!.GetType().GetProperties()
             .Should().NotContain(property => property.PropertyType == typeof(byte[]));
     }
 
@@ -401,7 +412,8 @@ public class ServerCertificateServiceTests : BaseTest
 
         // What matters is whether this host presents a certificate, not whether a
         // row survives in its database.
-        certificate.IsConfigured.Should().BeFalse();
+        certificate.Should().NotBeNull();
+        certificate!.IsConfigured.Should().BeFalse();
     }
 
     [Fact]

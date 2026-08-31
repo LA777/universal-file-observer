@@ -78,6 +78,41 @@ export class AuthService {
     return localStorage.getItem(this.tokenKey);
   }
 
+  /**
+   * Whether the signed-in user administers this installation, read from the
+   * token's `ufo:is_admin` claim.
+   *
+   * Advisory only. It decides what the page offers, never what the server
+   * allows: the signature is not checked here - it cannot be, without the
+   * signing key - and a token outlives a demotion by up to its expiry. Every
+   * server-scoped endpoint re-reads the flag from the database, so a tampered
+   * or stale claim buys nothing beyond seeing a section whose requests are then
+   * refused.
+   */
+  public get isAdmin(): boolean {
+    return this.readTokenClaims()?.['ufo:is_admin'] === 'true';
+  }
+
+  private readTokenClaims(): Record<string, unknown> | null {
+    const token = this.getToken();
+    const payload = token?.split('.')[1];
+
+    if (!payload) {
+      return null;
+    }
+
+    try {
+      // JWT payloads are base64url and unpadded; atob wants base64 with padding.
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+
+      return JSON.parse(atob(padded)) as Record<string, unknown>;
+    } catch {
+      // A token we cannot read is one we cannot claim anything from.
+      return null;
+    }
+  }
+
   private getStoredUsername(): string | null {
     return localStorage.getItem('username');
   }

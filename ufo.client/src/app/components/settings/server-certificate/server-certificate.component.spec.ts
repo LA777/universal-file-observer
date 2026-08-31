@@ -32,7 +32,6 @@ describe('ServerCertificateComponent', () => {
     source: 'self-signed',
     isExpired: false,
     updatedAt: '2026-01-01T00:00:00.0000000Z',
-    canManage: true,
     ...overrides
   });
 
@@ -176,11 +175,13 @@ describe('ServerCertificateComponent', () => {
     httpMock.verify();
   });
 
-  it('renders the certificate and the management controls for an administrator', () => {
+  it('renders the certificate and the management controls', () => {
     fixture.detectChanges();
-    flushLoad({ subject: 'CN=box.lan', thumbprint: 'FEED1234', canManage: true });
+    flushLoad({ subject: 'CN=box.lan', thumbprint: 'FEED1234' });
     fixture.detectChanges();
 
+    // Reaching this component at all means the caller is an administrator: the
+    // page does not render it otherwise, and the endpoint refuses anyone else.
     const rendered = fixture.nativeElement as HTMLElement;
     expect(rendered.textContent).toContain('CN=box.lan');
     expect(rendered.textContent).toContain('FEED1234');
@@ -188,16 +189,13 @@ describe('ServerCertificateComponent', () => {
     httpMock.verify();
   });
 
-  it('offers no management controls to a non-administrator', () => {
-    fixture.detectChanges();
-    flushLoad({ canManage: false });
-    fixture.detectChanges();
+  it('says so when the server refuses the read', () => {
+    component.ngOnInit();
+    httpMock.expectOne(CERTIFICATE_URL).flush('', { status: 403, statusText: 'Forbidden' });
 
-    const rendered = fixture.nativeElement as HTMLElement;
-    // The server refuses the write regardless; hiding it keeps the page honest
-    // about what this user can do.
-    expect(rendered.querySelector('input[type="file"]')).toBeNull();
-    expect(rendered.textContent).toContain('Only an administrator');
+    // A demotion mid-session: the token still claims administrator, the database
+    // no longer agrees. That is a decision, not a fault, and reads differently.
+    expect(component.errorMessage).toBe('Only an administrator can view the server certificate.');
     httpMock.verify();
   });
 });

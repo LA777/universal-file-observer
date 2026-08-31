@@ -22,8 +22,9 @@ export class SettingsService {
   }
 
   /**
-   * The server's TLS certificate. Readable by any signed-in user; the response
-   * says via `canManage` whether this one may change it.
+   * The server's TLS certificate. Administrators only - anyone else is refused
+   * with a 403, which is why the Settings page does not render this section for
+   * them in the first place.
    */
   getCertificate(): Observable<ServerCertificate> {
     return this.http.get<ServerCertificate>(`${this.apiUrl}/certificate`);

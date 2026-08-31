@@ -15,9 +15,17 @@ namespace Ufo.Server.Services;
 public interface IServerCertificateService
 {
     /// <summary>
-    /// Describes the certificate the server is presenting, for the Settings page.
+    /// Describes the certificate the server is presenting, for the Settings page,
+    /// or <c>null</c> when the caller does not administer this installation.
     /// </summary>
-    Task<ServerCertificateDto> GetCertificateAsync(Ulid userId, CancellationToken cancellationToken);
+    /// <remarks>
+    /// Administrators only, like the writes below. The certificate is not itself
+    /// a secret - every client that connects is shown it - but this is a
+    /// server-scoped setting, and leaving it readable while hiding it in the UI
+    /// would make "administrators only" a matter of which page you happened to
+    /// load rather than something the server enforces.
+    /// </remarks>
+    Task<ServerCertificateDto?> GetCertificateAsync(Ulid userId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the certificate with one an administrator uploaded. Takes effect
@@ -70,11 +78,15 @@ public class ServerCertificateService : IServerCertificateService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<ServerCertificateDto> GetCertificateAsync(Ulid userId, CancellationToken cancellationToken)
+    public async Task<ServerCertificateDto?> GetCertificateAsync(Ulid userId, CancellationToken cancellationToken)
     {
         _logger.LogInformation("GetCertificateAsync - UserId: {UserId}", userId);
 
-        var canManage = await IsAdministratorAsync(userId, cancellationToken);
+        if (!await IsAdministratorAsync(userId, cancellationToken))
+        {
+            return null;
+        }
+
         var serverSettings = await _serverSettingsRepository.GetServerSettingsAsync(cancellationToken);
 
         // A host that does not serve TLS may still carry a row from an earlier
@@ -86,7 +98,7 @@ public class ServerCertificateService : IServerCertificateService
             || serverSettings == null
             || string.IsNullOrEmpty(serverSettings.CertificateThumbprint))
         {
-            return new ServerCertificateDto { IsConfigured = false, CanManage = canManage };
+            return new ServerCertificateDto { IsConfigured = false };
         }
 
         var notAfter = ParseTimestamp(serverSettings.CertificateNotAfter);
@@ -100,8 +112,7 @@ public class ServerCertificateService : IServerCertificateService
             NotAfter = serverSettings.CertificateNotAfter,
             Source = serverSettings.CertificateSource,
             IsExpired = notAfter.HasValue && notAfter.Value < DateTimeOffset.UtcNow,
-            UpdatedAt = serverSettings.UpdatedAt,
-            CanManage = canManage
+            UpdatedAt = serverSettings.UpdatedAt
         };
     }
 

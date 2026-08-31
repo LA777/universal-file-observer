@@ -109,13 +109,8 @@ public class ServerCertificateDto
     [JsonPropertyOrder(8)]
     public string UpdatedAt { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Whether the caller may replace the certificate. Drives whether the
-    /// Settings page renders the upload control; the server enforces it
-    /// independently on every write.
-    /// </summary>
-    [JsonPropertyOrder(9)]
-    public bool CanManage { get; set; }
+    // No "canManage" flag: only an administrator can obtain this object at all,
+    // so a response in hand already answers the question the flag used to.
 }
 
 public class PcDto : DtoWithUserIdAndNameAndIdBase

@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminSettingsDividerComponent } from './admin-settings-divider/admin-settings-divider.component';
 import { ServerCertificateComponent } from './server-certificate/server-certificate.component';
 import { Theme } from '../../models/models';
+import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
 
 interface ThemeChoice {
@@ -44,9 +45,22 @@ export class SettingsComponent implements OnInit {
 
   constructor(
     private themeService: ThemeService,
+    private authService: AuthService,
     private router: Router
   ) {
     this.selectedTheme = this.themeService.currentTheme;
+  }
+
+  /**
+   * Whether to render the server-wide section of the page at all.
+   *
+   * Read from the token rather than by asking the server, so the page does not
+   * fire a request it expects to be refused. It only decides what is drawn: the
+   * endpoints behind it are administrator-only in their own right, so a stale or
+   * tampered claim shows a section whose every request then fails.
+   */
+  get showsAdministratorSettings(): boolean {
+    return this.authService.isAdmin;
   }
 
   ngOnInit(): void {

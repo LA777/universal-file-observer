@@ -43,11 +43,15 @@
       </div>
     </section>
 
-    <!-- Everything from here down is server-wide rather than per-account. Any
-         further administrator section belongs below this divider. -->
-    <app-admin-settings-divider />
+    <!-- Everything in here is server-wide rather than per-account, and a user
+         who cannot change any of it is shown none of it - the divider included,
+         since a heading over nothing is just a locked door. Any further
+         administrator section belongs inside this block. -->
+    <ng-container *ngIf="showsAdministratorSettings">
+      <app-admin-settings-divider />
 
-    <app-server-certificate />
+      <app-server-certificate />
+    </ng-container>
 
   </div>
 </div>

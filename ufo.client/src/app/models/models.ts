@@ -43,8 +43,9 @@ export type CertificateSource = 'self-signed' | 'user-supplied';
 
 /**
  * The TLS certificate the server is presenting. Server-wide rather than
- * per-user: one certificate is served to everybody, so only an administrator
- * (`canManage`) may replace it.
+ * per-user: one certificate is served to everybody, so only an administrator may
+ * read or replace it - there is no flag for that, because obtaining one of these
+ * at all means the server already agreed.
  */
 export interface ServerCertificate {
   /** False on a deployment that terminates TLS upstream and serves plain HTTP. */
@@ -58,8 +59,6 @@ export interface ServerCertificate {
   /** Computed on the server, so it does not depend on the browser's clock. */
   isExpired: boolean;
   updatedAt: string;
-  /** Whether this user may replace the certificate. Re-checked server-side. */
-  canManage: boolean;
 }
 
 export interface Label {

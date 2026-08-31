@@ -47,7 +47,7 @@
       </span>
     </div>
 
-    <div class="certificate-actions" *ngIf="currentCertificate.canManage; else notAdministrator">
+    <div class="certificate-actions">
       <label class="file-picker">
         <input
           #certificateFileInput
@@ -96,10 +96,6 @@
         passphrase you type here is not kept.
       </p>
     </div>
-
-    <ng-template #notAdministrator>
-      <p class="section-hint">Only an administrator can change the server certificate.</p>
-    </ng-template>
   </ng-container>
 
   <!-- Outside the ng-container above: a failed load leaves `certificate` null,

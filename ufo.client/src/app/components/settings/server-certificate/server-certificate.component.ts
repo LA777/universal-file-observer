@@ -139,9 +139,14 @@ export class ServerCertificateComponent implements OnInit {
         this.certificate = certificate;
         this.changeDetectorRef.markForCheck();
       },
-      error: () => {
+      error: response => {
         this.certificate = null;
-        this.errorMessage = 'Could not read the server certificate.';
+        // A 403 here means the claim in the token says administrator but the
+        // database no longer agrees - a demotion during the session. Saying so
+        // beats "could not read", which reads as a fault rather than a decision.
+        this.errorMessage = (response as { status?: number })?.status === 403
+          ? 'Only an administrator can view the server certificate.'
+          : 'Could not read the server certificate.';
         this.changeDetectorRef.markForCheck();
       }
     });

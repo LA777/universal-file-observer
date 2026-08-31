@@ -61,10 +61,10 @@ public class SettingsController : ControllerBase
     /// The TLS certificate the server is currently presenting.
     /// </summary>
     /// <remarks>
-    /// Readable by any signed-in user, because the response describes only what
-    /// the certificate already tells every client that connects. The response
-    /// carries <c>canManage</c> so the client knows whether to offer the upload
-    /// control; the write endpoints below enforce that independently.
+    /// Administrators only, like the writes below. The certificate is not a
+    /// secret - every client that connects is shown it - but it is a
+    /// server-scoped setting, and hiding it in the UI while leaving it readable
+    /// would make "administrators only" depend on which page you loaded.
     /// </remarks>
     [HttpGet("certificate")]
     public async Task<IActionResult> GetServerCertificateAsync(CancellationToken cancellationToken)
@@ -74,7 +74,7 @@ public class SettingsController : ControllerBase
 
         var result = await _serverCertificateService.GetCertificateAsync(userId, cancellationToken);
 
-        return Ok(result);
+        return result is null ? Forbid() : Ok(result);
     }
 
     /// <summary>

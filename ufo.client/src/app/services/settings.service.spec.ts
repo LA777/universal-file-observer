@@ -53,7 +53,7 @@ describe('SettingsService', () => {
 
     const request = httpMock.expectOne('/api/settings/certificate');
     expect(request.request.method).toBe('GET');
-    request.flush({ isConfigured: true, subject: 'CN=box', canManage: false });
+    request.flush({ isConfigured: true, subject: 'CN=box' });
 
     expect((received as { subject: string }).subject).toBe('CN=box');
   });
