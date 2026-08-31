@@ -186,6 +186,7 @@ public static class UfoHost
 
         builder.Services.AddScoped<ILabelsService, LabelsService>();
         builder.Services.AddScoped<IUserService, UserService>();
+        builder.Services.AddScoped<IUserSettingsService, UserSettingsService>();
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
@@ -198,6 +199,7 @@ public static class UfoHost
         builder.Services.AddScoped<ILabelsRepository, LabelsRepository>();
         builder.Services.AddScoped<ISearchRepository, SearchRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
+        builder.Services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
 
         // TODO LA - Get sqliteConnection and Init Database (refactor)
         if (!isFunctionalTesting)

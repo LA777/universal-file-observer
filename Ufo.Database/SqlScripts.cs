@@ -158,6 +158,17 @@ public class SqlScripts
             CONSTRAINT FK_UsersToSnapshots_Snapshots_SnapshotId  FOREIGN KEY (SnapshotId)  REFERENCES Snapshots (Id) ON DELETE NO ACTION
         );
 
+        -- One row per user, hence the UNIQUE on UserId: it is what lets
+        -- UpsertUserSettingsSql resolve a concurrent first-write with
+        -- ON CONFLICT instead of a read-then-insert race.
+        CREATE TABLE IF NOT EXISTS UserSettings (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_UserSettings PRIMARY KEY,
+            Theme                     TEXT NOT NULL DEFAULT 'dark',
+            UserId                    TEXT NOT NULL UNIQUE,
+
+            CONSTRAINT FK_UserSettings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
         -- ============================================================================
         -- Indexes. SQLite does not index foreign keys automatically; composite PKs
         -- only cover lookups by their leading column(s). Each index below serves
@@ -384,6 +395,12 @@ public class SqlScripts
     public const string DeleteLabelsToSnapshotsBySnapshotIdSql = "DELETE FROM LabelsToSnapshots WHERE SnapshotId = @SnapshotId;";
     public const string DeleteLabelFromSnapshotSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId AND SnapshotId = @SnapshotId;";
     public const string DeleteLabelsToSnapshotsByLabelIdSql = "DELETE FROM LabelsToSnapshots WHERE LabelId = @LabelId;";
+
+    // User Settings SQL Scripts
+    public const string SelectUserSettingsSql = "SELECT * FROM UserSettings WHERE UserId = @UserId;";
+    public const string UpsertUserSettingsSql = "INSERT INTO UserSettings (Id, Theme, UserId) " +
+                                                    "VALUES (@Id, @Theme, @UserId) " +
+                                                    "ON CONFLICT (UserId) DO UPDATE SET Theme = excluded.Theme;";
 
     // User SQL Scripts
     public const string SelectUserByIdSql = "SELECT * FROM Users WHERE Id = @UserId;";

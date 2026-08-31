@@ -6,7 +6,8 @@ import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-commu
 import { Subscription } from 'rxjs';
 import { File, Folder, Snapshot } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
-import { darkGridTheme } from '../../shared/grid-theme';
+import { gridThemeFor } from '../../shared/grid-theme';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-snapshot',
@@ -26,7 +27,10 @@ export class SnapshotComponent implements OnInit, OnDestroy {
 
   private snapshotSubscription?: Subscription;
 
-  readonly gridTheme = darkGridTheme;
+  // A getter, not a field: the grid then follows the active theme without
+  // this component having to subscribe. gridThemeFor returns one of two
+  // module-level constants, so the binding only actually changes on a switch.
+  get gridTheme() { return gridThemeFor(this.themeService.currentTheme); }
 
   childrenAccessor = (node: Folder) => node.childFolders ?? [];
   hasChild = (_: number, node: Folder) => !!node.childFolders && node.childFolders.length > 0;
@@ -68,7 +72,10 @@ export class SnapshotComponent implements OnInit, OnDestroy {
     },
   ];
 
-  constructor(private snapshotService: SnapshotService) {}
+  constructor(
+    private snapshotService: SnapshotService,
+    private themeService: ThemeService,
+  ) {}
 
   ngOnInit() {
     this.getLatestSnapshot();

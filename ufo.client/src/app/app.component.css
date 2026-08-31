@@ -20,9 +20,9 @@
     height: 40px;
     padding: 0 16px;
     box-sizing: border-box;
-    background-color: #1c1c1c;
-    color: #e0e0e0;
-    border-bottom: 1px solid #4d4d4d;
+    background-color: var(--ufo-bg-app);
+    color: var(--ufo-text);
+    border-bottom: 1px solid var(--ufo-border);
 }
 
 .app-title {
@@ -40,18 +40,18 @@
     font-family: Consolas, 'Courier New', monospace;
     font-weight: 700;
     letter-spacing: 6px;
-    background: linear-gradient(135deg, #c5cae9 0%, #7986cb 55%, #5c6bc0 100%);
+    background: linear-gradient(135deg, var(--ufo-accent-soft) 0%, var(--ufo-accent) 55%, var(--ufo-accent-strong) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    filter: drop-shadow(0 0 6px rgba(92, 107, 192, 0.35));
+    filter: drop-shadow(0 0 6px var(--ufo-accent-tint));
 }
 
 .app-subtitle {
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #757575;
+    color: var(--ufo-text-faint);
 }
 
 .user-info {
@@ -68,9 +68,9 @@
     height: 24px;
     padding: 0 10px;
     font-size: 12px;
-    color: #e0e0e0;
-    background-color: #3a3a3a;
-    border: 1px solid #555;
+    color: var(--ufo-text);
+    background-color: var(--ufo-bg-control);
+    border: 1px solid var(--ufo-border-control);
     border-radius: 12px;
 }
 
@@ -78,11 +78,11 @@
     font-size: 16px;
     width: 16px;
     height: 16px;
-    color: #9e9e9e;
+    color: var(--ufo-text-muted);
 }
 
 .app-header .mat-mdc-icon-button {
-    --mdc-icon-button-icon-color: #9e9e9e;
+    --mdc-icon-button-icon-color: var(--ufo-text-muted);
     width: 32px;
     height: 32px;
     padding: 4px;
@@ -96,9 +96,13 @@
     line-height: 20px;
 }
 
-/* Logout is destructive — warm up on hover. */
 .app-header .mat-mdc-icon-button:hover {
-    --mdc-icon-button-icon-color: #ef9a9a;
+    --mdc-icon-button-icon-color: var(--ufo-text);
+}
+
+/* Logout is destructive — warm up on hover. */
+.app-header .logout-button:hover {
+    --mdc-icon-button-icon-color: var(--ufo-danger-text);
 }
 
 .dashboard-content {

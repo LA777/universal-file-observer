@@ -1,0 +1,46 @@
+<div class="settings-page">
+  <div class="settings-toolbar">
+    <button class="toolbar-button" (click)="goBack()" matTooltip="Back to the dashboard">
+      <mat-icon>arrow_back</mat-icon>
+      Back
+    </button>
+    <span class="toolbar-title">Settings</span>
+    <span class="save-state" *ngIf="isSaving">Saving…</span>
+    <span class="save-state saved" *ngIf="!isSaving && savedMessage">{{ savedMessage }}</span>
+  </div>
+
+  <div class="settings-body">
+    <section class="settings-section">
+      <h2 class="section-title">Appearance</h2>
+      <p class="section-hint">Choose how UFO looks. Your choice is saved to your account.</p>
+
+      <div class="theme-choices">
+        <button
+          type="button"
+          class="theme-card"
+          *ngFor="let choice of themeChoices"
+          [class.selected]="choice.value === selectedTheme"
+          [attr.aria-pressed]="choice.value === selectedTheme"
+          [disabled]="isSaving"
+          (click)="selectTheme(choice.value)">
+          <span class="theme-preview" [class.light]="choice.value === 'light'">
+            <span class="preview-header"></span>
+            <span class="preview-row"></span>
+            <span class="preview-row short"></span>
+          </span>
+          <span class="theme-label">
+            <mat-icon>{{ choice.icon }}</mat-icon>
+            {{ choice.label }}
+          </span>
+          <span class="theme-description">{{ choice.description }}</span>
+          <mat-icon class="selected-check" *ngIf="choice.value === selectedTheme">check_circle</mat-icon>
+        </button>
+      </div>
+
+      <div class="error-row" *ngIf="errorMessage">
+        <mat-icon>error_outline</mat-icon>
+        <span class="error-text">{{ errorMessage }}</span>
+      </div>
+    </section>
+  </div>
+</div>

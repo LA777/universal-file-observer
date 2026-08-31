@@ -13,7 +13,8 @@ import { Label, Snapshot } from '../../models/models';
 import { LabelService } from '../../services/label.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { TabChangeService } from '../../services/tab-change.service';
-import { darkGridTheme } from '../../shared/grid-theme';
+import { gridThemeFor } from '../../shared/grid-theme';
+import { ThemeService } from '../../services/theme.service';
 import { LABEL_COLORS } from '../label-dialog/label-dialog.component';
 
 interface LabelRow extends Label {
@@ -42,7 +43,10 @@ export class LabelsComponent implements OnInit, OnDestroy {
   editorColor = LABEL_COLORS[3];
 
   readonly palette = LABEL_COLORS;
-  readonly gridTheme = darkGridTheme;
+  // A getter, not a field: the grid then follows the active theme without
+  // this component having to subscribe. gridThemeFor returns one of two
+  // module-level constants, so the binding only actually changes on a switch.
+  get gridTheme() { return gridThemeFor(this.themeService.currentTheme); }
 
   readonly rowSelection: RowSelectionOptions = {
     mode: 'singleRow',
@@ -96,6 +100,7 @@ export class LabelsComponent implements OnInit, OnDestroy {
     private labelService: LabelService,
     private snapshotService: SnapshotService,
     private tabChangeService: TabChangeService,
+    private themeService: ThemeService,
   ) {}
 
   ngOnInit() {

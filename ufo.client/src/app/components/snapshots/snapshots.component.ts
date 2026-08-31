@@ -16,7 +16,8 @@ import { SnapshotService } from '../../services/snapshot.service';
 import { TabChangeService } from '../../services/tab-change.service';
 import { DialogComponent } from '../dialog/dialog.component';
 import { LabelDialogComponent, LabelDialogData } from '../label-dialog/label-dialog.component';
-import { darkGridTheme } from '../../shared/grid-theme';
+import { gridThemeFor } from '../../shared/grid-theme';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-snapshots',
@@ -37,7 +38,10 @@ export class SnapshotsComponent implements OnInit, OnDestroy {
   private subscriptionAllSnapshots: Subscription;
   private subscriptionDelete: Subscription;
 
-  readonly gridTheme = darkGridTheme;
+  // A getter, not a field: the grid then follows the active theme without
+  // this component having to subscribe. gridThemeFor returns one of two
+  // module-level constants, so the binding only actually changes on a switch.
+  get gridTheme() { return gridThemeFor(this.themeService.currentTheme); }
 
   readonly rowSelection: RowSelectionOptions = {
     mode: 'singleRow',
@@ -122,6 +126,7 @@ export class SnapshotsComponent implements OnInit, OnDestroy {
     private snapshotService: SnapshotService,
     private tabChangeService: TabChangeService,
     public dialog: MatDialog,
+    private themeService: ThemeService,
   ) {}
 
   ngOnInit() {

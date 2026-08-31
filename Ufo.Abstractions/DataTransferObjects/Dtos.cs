@@ -66,6 +66,12 @@ public class LabelDto : DtoWithUserIdAndNameAndIdBase
     public List<Ulid> SnapshotIds { get; set; } = [];
 }
 
+public class UserSettingsDto : DtoWithUserIdAndIdBase
+{
+    [JsonPropertyOrder(1)]
+    public string Theme { get; set; } = UiThemes.Default;
+}
+
 public class PcDto : DtoWithUserIdAndNameAndIdBase
 {
     [JsonPropertyOrder(14)]

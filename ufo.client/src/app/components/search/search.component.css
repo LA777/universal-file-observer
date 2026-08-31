@@ -3,14 +3,14 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background-color: #2e2e2e;
+  background-color: var(--ufo-bg-surface);
   text-align: left;
 }
 
 .search-panel {
   padding: 6px 8px;
-  background-color: #242424;
-  border-bottom: 1px solid #4d4d4d;
+  background-color: var(--ufo-bg-toolbar);
+  border-bottom: 1px solid var(--ufo-border);
 }
 
 .form-row {
@@ -26,7 +26,7 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #757575;
+  color: var(--ufo-text-faint);
 }
 
 .hint-label {
@@ -42,13 +42,13 @@
   align-items: center;
   gap: 5px;
   font-size: 12px;
-  color: #e0e0e0;
+  color: var(--ufo-text);
   cursor: pointer;
 }
 
 .check input[type='checkbox'],
 .check input[type='radio'] {
-  accent-color: #5c6bc0;
+  accent-color: var(--ufo-accent-strong);
   width: 14px;
   height: 14px;
 }
@@ -61,27 +61,27 @@
 }
 
 .file-icon {
-  color: #e0e0e0;
+  color: var(--ufo-text);
 }
 
 .folder-icon {
-  color: #ffd04c;
+  color: var(--ufo-folder-icon);
 }
 
 .text-input {
   height: 26px;
   padding: 0 8px;
-  border: 1px solid #555;
+  border: 1px solid var(--ufo-border-control);
   border-radius: 4px;
-  background-color: #1f1f1f;
-  color: #e0e0e0;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text);
   font-size: 12px;
   outline: none;
   box-sizing: border-box;
 }
 
 .text-input:focus {
-  border-color: #5c6bc0;
+  border-color: var(--ufo-accent-strong);
 }
 
 .text-input:disabled {
@@ -103,7 +103,6 @@
 
 .date-input {
   width: 130px;
-  color-scheme: dark;
 }
 
 .path-input {
@@ -124,19 +123,19 @@
   width: 16px;
   height: 16px;
   line-height: 16px;
-  color: #757575;
+  color: var(--ufo-text-faint);
 }
 
 .dash {
-  color: #757575;
+  color: var(--ufo-text-faint);
 }
 
 .unit-select {
   height: 26px;
-  border: 1px solid #555;
+  border: 1px solid var(--ufo-border-control);
   border-radius: 4px;
-  background-color: #1f1f1f;
-  color: #e0e0e0;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text);
   font-size: 12px;
   outline: none;
 }
@@ -148,10 +147,10 @@
   height: 26px;
   margin-left: auto;
   padding: 0 14px;
-  border: 1px solid #7986cb;
+  border: 1px solid var(--ufo-accent);
   border-radius: 4px;
-  background-color: #5c6bc0;
-  color: #ffffff;
+  background-color: var(--ufo-accent-strong);
+  color: var(--ufo-text-on-accent);
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
@@ -159,7 +158,7 @@
 }
 
 .search-button:hover:not(:disabled) {
-  background-color: #7986cb;
+  background-color: var(--ufo-accent);
 }
 
 .search-button:disabled {
@@ -176,7 +175,7 @@
 }
 
 .picker-row {
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--ufo-border-subtle);
 }
 
 .chip-list {
@@ -194,10 +193,10 @@
   gap: 5px;
   height: 22px;
   padding: 0 10px;
-  border: 1px solid #555;
+  border: 1px solid var(--ufo-border-control);
   border-radius: 11px;
-  background-color: #3a3a3a;
-  color: #bdbdbd;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-secondary);
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
@@ -205,17 +204,17 @@
 }
 
 .pick-chip:hover {
-  background-color: #4a4a4a;
+  background-color: var(--ufo-bg-control-hover);
 }
 
 .pick-chip.selected {
-  background-color: rgba(92, 107, 192, 0.35);
-  border-color: #7986cb;
-  color: #ffffff;
+  background-color: var(--ufo-accent-tint);
+  border-color: var(--ufo-accent);
+  color: var(--ufo-text-strong);
 }
 
 .pick-chip .chip-icon {
-  color: #9e9e9e;
+  color: var(--ufo-text-muted);
 }
 
 .color-dot {
@@ -225,7 +224,7 @@
 }
 
 .hint {
-  color: #757575;
+  color: var(--ufo-text-faint);
   font-size: 12px;
 }
 
@@ -235,10 +234,10 @@
   gap: 8px;
   margin-top: 6px;
   padding: 6px 8px;
-  border: 1px solid #b71c1c;
+  border: 1px solid var(--ufo-danger-border);
   border-radius: 4px;
-  background-color: rgba(183, 28, 28, 0.15);
-  color: #ef9a9a;
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
   font-size: 12px;
 }
 
@@ -258,13 +257,13 @@
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #ef9a9a;
+  color: var(--ufo-danger-text);
   cursor: pointer;
 }
 
 .error-close:hover {
-  background-color: rgba(183, 28, 28, 0.35);
-  color: #ffffff;
+  background-color: var(--ufo-danger-tint-strong);
+  color: var(--ufo-text-on-danger);
 }
 
 .error-close mat-icon {
@@ -277,16 +276,16 @@
 .results-bar {
   padding: 4px 8px;
   font-size: 12px;
-  color: #9e9e9e;
-  background-color: #262626;
-  border-bottom: 1px solid #4d4d4d;
+  color: var(--ufo-text-muted);
+  background-color: var(--ufo-bg-subtle);
+  border-bottom: 1px solid var(--ufo-border);
 }
 
 .search-grid {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  scrollbar-color: #6b6b6b #2e2e2e;
+  scrollbar-color: var(--ufo-scrollbar-thumb) var(--ufo-bg-surface);
 }
 
 /* Renderer output lives outside Angular's scoping. */
@@ -313,7 +312,7 @@
 :host ::ng-deep .location-cell {
   font-family: Consolas, 'Courier New', monospace;
   font-size: 11px;
-  color: #9e9e9e;
+  color: var(--ufo-text-muted);
 }
 
 :host ::ng-deep .labels-cell {
@@ -329,9 +328,9 @@
   align-items: center;
   height: 18px;
   padding: 0 8px;
-  border: 1px solid #7986cb;
+  border: 1px solid var(--ufo-accent);
   border-radius: 9px;
-  color: #ffffff;
+  color: var(--ufo-text-on-accent);
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;
@@ -342,10 +341,10 @@
   align-items: center;
   height: 18px;
   padding: 0 8px;
-  border: 1px solid #555;
+  border: 1px solid var(--ufo-border-control);
   border-radius: 9px;
-  background-color: #3a3a3a;
-  color: #e0e0e0;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text);
   font-size: 11px;
   line-height: 1;
   white-space: nowrap;

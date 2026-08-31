@@ -14,7 +14,8 @@ import { LabelService } from '../../services/label.service';
 import { SearchService } from '../../services/search.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { TabChangeService } from '../../services/tab-change.service';
-import { darkGridTheme } from '../../shared/grid-theme';
+import { gridThemeFor } from '../../shared/grid-theme';
+import { ThemeService } from '../../services/theme.service';
 
 type SearchSource = 'snapshots' | 'labels' | 'filesystem';
 
@@ -72,7 +73,10 @@ export class SearchComponent implements OnInit, OnDestroy {
   searching = false;
   error = '';
 
-  readonly gridTheme = darkGridTheme;
+  // A getter, not a field: the grid then follows the active theme without
+  // this component having to subscribe. gridThemeFor returns one of two
+  // module-level constants, so the binding only actually changes on a switch.
+  get gridTheme() { return gridThemeFor(this.themeService.currentTheme); }
 
   readonly defaultColDef: ColDef<SearchRow> = {
     sortable: true,
@@ -140,6 +144,7 @@ export class SearchComponent implements OnInit, OnDestroy {
     private snapshotService: SnapshotService,
     private labelService: LabelService,
     private tabChangeService: TabChangeService,
+    private themeService: ThemeService,
   ) {}
 
   ngOnInit() {

@@ -28,55 +28,55 @@
 
 .mat-tab-group {
   margin: 0px;
-  background-color: #2e2e2e;
+  background-color: var(--ufo-bg-surface);
 }
 
 /* Dark tab header matching the file grid / panel header theme. */
 :host ::ng-deep .mat-mdc-tab-group {
-  --mat-tab-header-inactive-label-text-color: #9e9e9e;
-  --mat-tab-header-inactive-hover-label-text-color: #e0e0e0;
-  --mat-tab-header-inactive-focus-label-text-color: #e0e0e0;
-  --mat-tab-header-active-label-text-color: #ffffff;
-  --mat-tab-header-active-hover-label-text-color: #ffffff;
-  --mat-tab-header-active-focus-label-text-color: #ffffff;
-  --mdc-tab-indicator-active-indicator-color: #7986cb;
-  --mat-tab-header-active-focus-indicator-color: #7986cb;
-  --mat-tab-header-active-hover-indicator-color: #7986cb;
-  --mat-tab-header-active-ripple-color: #5c6bc0;
-  --mat-tab-header-inactive-ripple-color: #5c6bc0;
+  --mat-tab-header-inactive-label-text-color: var(--ufo-text-muted);
+  --mat-tab-header-inactive-hover-label-text-color: var(--ufo-text);
+  --mat-tab-header-inactive-focus-label-text-color: var(--ufo-text);
+  --mat-tab-header-active-label-text-color: var(--ufo-text-strong);
+  --mat-tab-header-active-hover-label-text-color: var(--ufo-text-strong);
+  --mat-tab-header-active-focus-label-text-color: var(--ufo-text-strong);
+  --mdc-tab-indicator-active-indicator-color: var(--ufo-accent);
+  --mat-tab-header-active-focus-indicator-color: var(--ufo-accent);
+  --mat-tab-header-active-hover-indicator-color: var(--ufo-accent);
+  --mat-tab-header-active-ripple-color: var(--ufo-accent-strong);
+  --mat-tab-header-inactive-ripple-color: var(--ufo-accent-strong);
 }
 
 :host ::ng-deep .mat-mdc-tab-header {
-  background-color: #242424;
-  border-bottom: 1px solid #4d4d4d;
+  background-color: var(--ufo-bg-toolbar);
+  border-bottom: 1px solid var(--ufo-border);
   --mat-tab-container-height: 40px;
   --mdc-secondary-navigation-tab-container-height: 40px;
 }
 
 /* Fallbacks in case the Material token names shift between versions. */
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab__text-label {
-  color: #9e9e9e;
+  color: var(--ufo-text-muted);
   font-size: 12px;
   line-height: 1;
   letter-spacing: 0.3px;
 }
 
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab:hover .mdc-tab__text-label {
-  color: #e0e0e0;
+  color: var(--ufo-text);
 }
 
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab--active .mdc-tab__text-label,
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab--active:hover .mdc-tab__text-label {
-  color: #ffffff;
+  color: var(--ufo-text-strong);
 }
 
 /* Subtle indigo tint behind the selected tab. */
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab--active {
-  background-color: rgba(92, 107, 192, 0.15);
+  background-color: var(--ufo-accent-tint-weak);
 }
 
 :host ::ng-deep .mat-mdc-tab-header .mdc-tab-indicator__content--underline {
-  border-color: #7986cb;
+  border-color: var(--ufo-accent);
 }
 
 :host ::ng-deep .mat-mdc-tab-header,

@@ -29,6 +29,15 @@ export interface Folder extends FsItem {
   // snapshots: SnapshotSummary[]; - not needed in client models, as we will get the snapshots for a folder when we click on it, not when we load the folder tree
 }
 
+/** Mirrors Ufo.Abstractions.UiThemes — these strings are also CSS class suffixes. */
+export type Theme = 'light' | 'dark';
+
+export interface UserSettings {
+  id: string;
+  // userId: string; - not needed in client models, as we will only be dealing with the current user's data
+  theme: Theme;
+}
+
 export interface Label {
   id: string;
   name: string;

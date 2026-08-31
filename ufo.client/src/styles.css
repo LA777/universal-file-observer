@@ -1,3 +1,139 @@
+/* ============================================================================
+ * Theme tokens.
+ *
+ * :root carries the dark palette because dark is UiThemes.Default and is what
+ * every component stylesheet was originally written against — an unthemed page
+ * (or one rendered before the saved theme arrives from /api/settings) therefore
+ * looks exactly as it always has. ThemeService adds `theme-light` to <html> to
+ * swap the palette; no component stylesheet names a color of its own.
+ *
+ * Tokens are named for the role they play, not the color they hold, so the
+ * light values below are free to invert the lightness ordering.
+ * ==========================================================================*/
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, from the deepest chrome to the raised controls. */
+  --ufo-bg-app: #1c1c1c;
+  --ufo-bg-input: #1f1f1f;
+  --ufo-bg-toolbar: #242424;
+  --ufo-bg-subtle: #262626;
+  --ufo-bg-surface: #2e2e2e;
+  --ufo-bg-row-hover: #353535;
+  --ufo-bg-control: #3a3a3a;
+  --ufo-bg-control-hover: #4a4a4a;
+  --ufo-bg-control-active: #2f2f2f;
+
+  /* Borders, weakest to strongest. */
+  --ufo-border-subtle: #3d3d3d;
+  --ufo-border-muted: #444;
+  --ufo-border: #4d4d4d;
+  --ufo-border-control: #555;
+  --ufo-border-control-hover: #777;
+
+  /* Text, strongest to faintest. */
+  --ufo-text-strong: #ffffff;
+  --ufo-text: #e0e0e0;
+  --ufo-text-secondary: #bdbdbd;
+  --ufo-text-muted: #9e9e9e;
+  --ufo-text-faint: #757575;
+
+  /* Indigo accent. */
+  --ufo-accent-soft: #c5cae9;
+  --ufo-accent: #7986cb;
+  --ufo-accent-strong: #5c6bc0;
+  --ufo-accent-deep: #3f51b5;
+  --ufo-accent-tint-weak: rgba(92, 107, 192, 0.15);
+  --ufo-accent-tint: rgba(92, 107, 192, 0.35);
+  --ufo-accent-glow: rgba(92, 107, 192, 0.4);
+
+  /* Destructive actions and error surfaces. */
+  --ufo-danger-text: #ef9a9a;
+  --ufo-danger-border: #b71c1c;
+  --ufo-danger-tint: rgba(183, 28, 28, 0.15);
+  --ufo-danger-tint-strong: rgba(183, 28, 28, 0.35);
+
+  /*
+   * Text that sits on a filled accent or danger surface. That surface keeps its
+   * color in both themes, so these do NOT follow --ufo-text-strong: white on
+   * indigo has to stay white when the rest of the page turns light.
+   */
+  --ufo-text-on-accent: #ffffff;
+  --ufo-text-on-danger: #ffffff;
+
+  --ufo-folder-icon: #ffd04c;
+
+  --ufo-scrollbar-thumb: #6b6b6b;
+  --ufo-scrollbar-thumb-hover: #8a8a8a;
+
+  --ufo-shadow-soft: rgba(0, 0, 0, 0.2);
+  --ufo-shadow-strong: rgba(0, 0, 0, 0.5);
+
+  /* The dual file panes: gutter between them, and the frame around the active one. */
+  --ufo-panel-gutter: rgb(93, 125, 195);
+  --ufo-panel-frame: rgb(40, 219, 219);
+  --ufo-panel-active: rgb(255, 140, 0);
+  --ufo-panel-active-glow: rgba(255, 140, 0, 0.5);
+}
+
+:root.theme-light {
+  color-scheme: light;
+
+  --ufo-bg-app: #ffffff;
+  --ufo-bg-input: #ffffff;
+  --ufo-bg-toolbar: #f1f3f7;
+  --ufo-bg-subtle: #f7f8fa;
+  --ufo-bg-surface: #fafbfc;
+  --ufo-bg-row-hover: #eef1f7;
+  --ufo-bg-control: #eceef3;
+  --ufo-bg-control-hover: #dfe3ec;
+  --ufo-bg-control-active: #d2d7e3;
+
+  --ufo-border-subtle: #e3e6ec;
+  --ufo-border-muted: #dcdfe6;
+  --ufo-border: #d4d8e0;
+  --ufo-border-control: #c2c7d2;
+  --ufo-border-control-hover: #9aa1b1;
+
+  --ufo-text-strong: #1a1c22;
+  --ufo-text: #2f333d;
+  --ufo-text-secondary: #4d5361;
+  --ufo-text-muted: #6b7280;
+  --ufo-text-faint: #868c99;
+
+  /* The soft indigo reads as a tint on dark; on white it has to darken to stay legible. */
+  --ufo-accent-soft: #3949ab;
+  --ufo-accent: #3f51b5;
+  --ufo-accent-strong: #3949ab;
+  --ufo-accent-deep: #303f9f;
+  --ufo-accent-tint-weak: rgba(63, 81, 181, 0.1);
+  --ufo-accent-tint: rgba(63, 81, 181, 0.18);
+  --ufo-accent-glow: rgba(63, 81, 181, 0.25);
+
+  --ufo-danger-text: #b3261e;
+  --ufo-danger-border: #d9534f;
+  --ufo-danger-tint: rgba(217, 83, 79, 0.12);
+  --ufo-danger-tint-strong: rgba(217, 83, 79, 0.25);
+
+  --ufo-text-on-accent: #ffffff;
+  /* The danger tint is pale here, so the hover label darkens instead of going white. */
+  --ufo-text-on-danger: #7f1d1a;
+
+  --ufo-folder-icon: #d99a00;
+
+  --ufo-scrollbar-thumb: #c2c7d2;
+  --ufo-scrollbar-thumb-hover: #a5abb8;
+
+  --ufo-shadow-soft: rgba(20, 25, 40, 0.08);
+  --ufo-shadow-strong: rgba(20, 25, 40, 0.16);
+
+  --ufo-panel-gutter: #c8cede;
+  --ufo-panel-frame: #dfe3ec;
+  --ufo-panel-active: #e07b00;
+  --ufo-panel-active-glow: rgba(224, 123, 0, 0.35);
+}
+
 html {
   /* background-color: aquamarine; */
 }
@@ -14,20 +150,20 @@ html {
 }
 
 .mat-mdc-header-row {
-  background-color: #3f51b5 !important; /* Example: Material blue */
-  color: white !important;
+  background-color: var(--ufo-accent-deep) !important;
+  color: var(--ufo-text-on-accent) !important;
 }
 
 .mat-mdc-row:nth-child(even){
-  background-color: #9fe29e;
+  background-color: var(--ufo-bg-surface);
 }
 
 .mat-mdc-row:nth-child(odd){
-  background-color: #dfa4a4;
+  background-color: var(--ufo-bg-subtle);
 }
 
 .mat-mdc-row:hover {
-  background-color: rgb(129, 172, 233);
+  background-color: var(--ufo-bg-row-hover);
 }
 
 html, body {
@@ -35,13 +171,16 @@ html, body {
   padding: 0;
   height: 100%;
   overflow: hidden;
+  background-color: var(--ufo-bg-surface);
+  color: var(--ufo-text);
 }
 
-/* Dark surface for dialogs opened with panelClass: 'dark-dialog-panel'. */
+/* Themed surface for dialogs opened with panelClass: 'dark-dialog-panel'.
+   The class name predates theming; it now follows whichever theme is active. */
 .dark-dialog-panel .mat-mdc-dialog-surface {
-  background-color: #2e2e2e;
-  color: #e0e0e0;
-  border: 1px solid #4d4d4d;
+  background-color: var(--ufo-bg-surface);
+  color: var(--ufo-text);
+  border: 1px solid var(--ufo-border);
 }
 
 app-root {

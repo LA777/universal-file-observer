@@ -16,7 +16,7 @@
   width: 100%;
   /* Dark scrollbars to match the grid theme; inherits into the grid's
      scroll containers. Chrome/Edge/Firefox. */
-  scrollbar-color: #6b6b6b #2e2e2e;
+  scrollbar-color: var(--ufo-scrollbar-thumb) var(--ufo-bg-surface);
 }
 
 /* Fallback for browsers without scrollbar-color support (e.g. Safari). */
@@ -26,16 +26,16 @@
 }
 
 :host ::ng-deep .folder-grid ::-webkit-scrollbar-track {
-  background: #2e2e2e;
+  background: var(--ufo-bg-surface);
 }
 
 :host ::ng-deep .folder-grid ::-webkit-scrollbar-thumb {
-  background: #6b6b6b;
+  background: var(--ufo-scrollbar-thumb);
   border-radius: 6px;
 }
 
 :host ::ng-deep .folder-grid ::-webkit-scrollbar-thumb:hover {
-  background: #8a8a8a;
+  background: var(--ufo-scrollbar-thumb-hover);
 }
 
 /*

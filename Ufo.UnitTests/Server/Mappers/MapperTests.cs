@@ -1,4 +1,5 @@
-using FluentAssertions;
+﻿using FluentAssertions;
+using Ufo.Abstractions;
 using Ufo.Abstractions.Database.Entities;
 using Ufo.Server.Mappers;
 
@@ -180,6 +181,36 @@ public class MapperTests : BaseTest
         dto.Name.Should().Be(entity.Name);
         dto.ColorHex.Should().Be("#e57373");
         dto.SnapshotIds.Should().ContainSingle().Which.Should().Be(snapshot.Id);
+    }
+
+    #endregion
+
+    #region UserSettingsMapper
+
+    [Fact]
+    public void UserSettingsMapper_ToDto_MapsThemeAndUserId()
+    {
+        var entity = new UserSettingsEntity
+        {
+            Id = Ulid.NewUlid(),
+            Theme = UiThemes.Light,
+            UserId = _user.Id
+        };
+
+        var dto = entity.ToDto();
+
+        dto.Id.Should().Be(entity.Id);
+        dto.UserId.Should().Be(_user.Id);
+        dto.Theme.Should().Be(UiThemes.Light);
+    }
+
+    [Fact]
+    public void UserSettingsMapper_DefaultsFor_CarriesTheCallersUserIdAndTheDefaultTheme()
+    {
+        var dto = UserSettingsMapper.DefaultsFor(_user.Id);
+
+        dto.UserId.Should().Be(_user.Id);
+        dto.Theme.Should().Be(UiThemes.Default);
     }
 
     #endregion

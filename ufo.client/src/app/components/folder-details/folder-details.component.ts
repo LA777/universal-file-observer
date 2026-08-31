@@ -9,7 +9,8 @@ import {
   RowHeightParams,
 } from 'ag-grid-community';
 import { FsItemUi } from '../../models/models';
-import { darkGridTheme } from '../../shared/grid-theme';
+import { gridThemeFor } from '../../shared/grid-theme';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-folder-details',
@@ -28,13 +29,18 @@ export class FolderDetailsComponent implements OnChanges {
 
   private gridApi?: GridApi<FsItemUi>;
 
+  constructor(private themeService: ThemeService) {}
+
   private videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.flv', '.mkv', '.m4v'];
   private imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp'];
 
   /** Compact text row height; media rows are sized per-row in getRowHeight. */
   readonly textRowHeight = 28;
 
-  readonly gridTheme = darkGridTheme;
+  // A getter, not a field: the grid then follows the active theme without
+  // this component having to subscribe. gridThemeFor returns one of two
+  // module-level constants, so the binding only actually changes on a switch.
+  get gridTheme() { return gridThemeFor(this.themeService.currentTheme); }
 
   readonly defaultColDef: ColDef<FsItemUi> = {
     sortable: true,

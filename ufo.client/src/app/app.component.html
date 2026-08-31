@@ -10,7 +10,10 @@
         <mat-icon>person</mat-icon>
         {{ user }}
       </span>
-      <button mat-icon-button (click)="logout()" matTooltip="Logout">
+      <button mat-icon-button (click)="openSettings()" matTooltip="Settings">
+        <mat-icon>settings</mat-icon>
+      </button>
+      <button mat-icon-button class="logout-button" (click)="logout()" matTooltip="Logout">
         <mat-icon>logout</mat-icon>
       </button>
     </div>

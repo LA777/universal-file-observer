@@ -11,12 +11,12 @@
 .file-explorer-container {
   display: flex;
   height: 500px; /* Adjust as needed */
-  border: 1px solid #ccc; /* Optional border */
+  border: 1px solid var(--ufo-border); /* Optional border */
 }
 
 .mat-tree {
   width: 500px; /* Adjust width as needed */
-  border-right: 1px solid #ccc; /* Optional separator */
+  border-right: 1px solid var(--ufo-border); /* Optional separator */
   overflow-y: auto; /* Add scroll if content overflows */
 }
 
