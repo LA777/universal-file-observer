@@ -1,0 +1,47 @@
+/* Uses the shared --ufo-* variables only, so it follows the light theme without
+   a second set of rules. */
+
+.admin-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 32px 0 0;
+}
+
+/* The rules grow to fill whatever the label leaves, so the label stays centred
+   at any width. */
+.admin-divider-rule {
+  flex: 1 1 auto;
+  height: 1px;
+  background-color: var(--ufo-border);
+}
+
+.admin-divider-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 3px 12px;
+  border: 1px solid var(--ufo-accent-tint);
+  border-radius: 12px;
+  background-color: var(--ufo-accent-tint-weak);
+  color: var(--ufo-accent-soft);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.admin-divider-label mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.admin-divider-hint {
+  max-width: 640px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}

@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { AdminSettingsDividerComponent } from './admin-settings-divider/admin-settings-divider.component';
 import { ServerCertificateComponent } from './server-certificate/server-certificate.component';
 import { Theme } from '../../models/models';
 import { ThemeService } from '../../services/theme.service';
@@ -18,7 +19,14 @@ interface ThemeChoice {
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatTooltipModule, ServerCertificateComponent],
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatIconModule,
+    MatTooltipModule,
+    AdminSettingsDividerComponent,
+    ServerCertificateComponent
+  ],
   templateUrl: './settings.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './settings.component.css'
