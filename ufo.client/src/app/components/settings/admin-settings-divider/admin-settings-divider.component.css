@@ -5,6 +5,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Matches .settings-section so the rule ends where the sections it divides
+     end, and the badge centres over that column rather than over the page. Left
+     unbounded it stretched the full viewport and the badge sat well to the
+     right of everything it labels. */
+  max-width: 640px;
   margin: 32px 0 0;
 }
 
@@ -41,7 +46,9 @@
 
 .admin-divider-hint {
   max-width: 640px;
-  margin: 8px 0 0;
+  /* The bottom margin is what keeps the first section's heading off this text;
+     that heading sets margin: 0 of its own. */
+  margin: 8px 0 24px;
   font-size: 12px;
   color: var(--ufo-text-muted);
 }
