@@ -143,7 +143,7 @@ Compose reads these from the environment or a local `.env` file:
 | `UFO_JWT_KEY` | yes | JWT signing key. Compose fails fast if unset, and so does the application: no key ships in `appsettings.json`, because one baked into the image would be shared by every copy of it. |
 | `UFO_LIBRARY_PATH` | no (`./library`) | Host folder to index. Mounted **read-only** at `/library`, which is the only path the browse, search and video endpoints will serve. |
 | `UFO_MACHINE_ID` | no | Identity recorded against each snapshot. Worth setting: a container's own `/etc/machine-id` is regenerated whenever the container is recreated, which fragments snapshot history. |
-| `UFO_ENABLE_HTTPS` | no (`true`) | Whether the application serves TLS itself on `8443`, storing a certificate in its database. Set to `false` behind a reverse proxy that terminates TLS. |
+| `UFO_ENABLE_HTTPS` | no (`true`) | Whether the application serves TLS itself on `8443`, storing a certificate in its database. Turning it off also requires swapping the endpoint to plaintext, which the `docker-compose.no-tls.yml` overlay does for you. |
 
 Generate it with `openssl rand -hex 32`.
 
@@ -161,11 +161,17 @@ others — a root-owned `lost+found` at the top of a mounted filesystem will rai
 
 #### Reaching it from the LAN
 
-Nothing extra is needed. Compose publishes `8080:8080` on all host interfaces, and the image
-sets `Kestrel__Endpoints__App__Url=http://0.0.0.0:8080` — this override matters, because
+Nothing extra is needed. Compose publishes `8443:8443` on all host interfaces, and the image
+sets `Kestrel__Endpoints__App__Url=https://0.0.0.0:8443` — this override matters, because
 Kestrel endpoint configuration takes precedence over `ASPNETCORE_URLS`, and the `localhost`
 endpoint in `appsettings.json` would leave the port unreachable from outside the container.
-The app answers at `http://<host-lan-ip>:8080`.
+The app answers at `https://<host-lan-ip>:8443`.
+
+**There is no plaintext listener.** The container serves one endpoint and it is HTTPS. An
+open HTTP port would carry credentials and JWTs in the clear to anything that can reach the
+container, and having both would make the TLS one optional in practice. Only the reverse-proxy
+overlay below swaps it for plaintext, and then only because something in front is doing the
+encryption.
 
 Find the host's LAN address:
 
@@ -176,29 +182,22 @@ ip -4 -o addr show scope global | awk '{print $2, $4}'
 Confirm the published port is bound to all interfaces rather than loopback:
 
 ```
-ss -lntp | grep 8080
+ss -lntp | grep 8443
 ```
 
 If it responds on the host but not from another machine, the host firewall is the usual
 cause — where `ufw` is active, open the port:
 
 ```
-sudo ufw allow 8080/tcp
-```
-
-And the HTTPS port:
-
-```
 sudo ufw allow 8443/tcp
 ```
 
 To deliberately narrow the exposure instead, bind the mapping to a single interface by
-changing the compose port to `"192.168.1.10:8080:8080"`, or to `"127.0.0.1:8080:8080"` to
+changing the compose port to `"192.168.1.10:8443:8443"`, or to `"127.0.0.1:8443:8443"` to
 take it off the LAN entirely.
 
-The container publishes both ports: `8080` plain HTTP and `8443` HTTPS. Prefer
-`https://<host-lan-ip>:8443` — on `8080` credentials and JWTs cross the network unencrypted.
-Whichever you use, do not port-forward it to the internet as-is.
+Traffic is encrypted, but with a certificate nothing else trusts by default — see
+[TLS and certificates](#tls-and-certificates). Do not port-forward it to the internet as-is.
 
 #### TLS and certificates
 

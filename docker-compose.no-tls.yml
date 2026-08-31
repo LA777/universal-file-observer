@@ -2,17 +2,18 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.no-tls.yml up -d
 #
-# Kestrel refuses to start an https:// endpoint it has no certificate for, and an
-# endpoint declared with an empty Url is just as fatal - it fails with "missing
-# the required 'Url' parameter". The variable therefore has to be absent, not
-# blank, and a null value here is the only way Compose can express that: it means
-# "pass through from the host environment", which omits the variable entirely
-# when it is not set there.
+# The base image serves HTTPS on 8443 and nothing else. This swaps that single
+# endpoint back to plaintext on 8080 and turns certificate handling off, which
+# have to move together: Kestrel refuses to start an https:// endpoint it has no
+# certificate for, and with Ufo__EnableHttps off nothing supplies one.
+#
+# Only use this where something in front is actually terminating TLS. On its own
+# it puts credentials and JWTs on the wire in the clear.
 services:
   ufo:
     environment:
       Ufo__EnableHttps: "false"
-      Kestrel__Endpoints__Https__Url:
+      Kestrel__Endpoints__App__Url: "http://0.0.0.0:8080"
     # Compose appends list fields rather than replacing them, so without
     # !override the base file's 8443 mapping would survive and publish a host
     # port with nothing behind it.

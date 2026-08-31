@@ -168,9 +168,10 @@ public class UfoHostOptions
     public static UfoHostOptions ForContainer() => new()
     {
         OpenBrowserOnStartup = false,
-        // Left off even though the container serves TLS: the HTTP endpoint stays
-        // open for a reverse proxy or a health probe, and redirecting it would
-        // break both.
+        // Nothing to redirect: the container serves a single HTTPS endpoint and
+        // opens no plaintext listener. A deployment that terminates TLS upstream
+        // swaps that endpoint for an http one, and redirecting there would bounce
+        // requests to a port that is not listening.
         EnableHttpsRedirection = false,
         EnableFileLogging = false,
         EnableHttps = true,

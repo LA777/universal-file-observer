@@ -68,20 +68,20 @@ ENV DOTNET_RUNNING_IN_CONTAINER=true
 # Kestrel endpoint configuration takes precedence over ASPNETCORE_URLS, so the
 # endpoint declared in appsettings.json has to be overridden here. Binding to
 # localhost would leave the port unreachable from outside the container.
-ENV Kestrel__Endpoints__App__Url=http://0.0.0.0:8080
-
-# TLS is deliberately NOT declared here, unlike the HTTP endpoint above. Kestrel
-# refuses to start an https:// endpoint it has no certificate for, so an endpoint
-# baked into the image would turn Ufo__EnableHttps=false - the documented way to
-# run behind a TLS-terminating proxy - into a crash loop. The port is the
-# deployment's decision: docker-compose.yml sets
 #
-#   Kestrel__Endpoints__Https__Url=https://0.0.0.0:8443
+# One endpoint, and it is HTTPS. There is deliberately no plaintext listener
+# alongside it: an open HTTP port carries credentials and JWTs in the clear, and
+# anything that can reach the container can use it, so serving both would make
+# the TLS endpoint optional in practice.
 #
-# and a bare `docker run` passes the same variable to serve TLS. The certificate
-# itself is never baked in or mounted: the application stores one in its database,
-# generating a self-signed certificate on first run and serving whatever an
-# administrator later uploads on the Settings page.
+# The certificate is never baked in or mounted: the application stores one in its
+# database, generating a self-signed certificate on first run and serving whatever
+# an administrator later uploads on the Settings page.
+#
+# A deployment terminating TLS upstream overrides this endpoint back to http and
+# turns Ufo__EnableHttps off - Kestrel refuses to start an https:// endpoint it
+# has no certificate for. docker-compose.no-tls.yml does exactly that.
+ENV Kestrel__Endpoints__App__Url=https://0.0.0.0:8443
 
 ENV Ufo__DataDirectory=/data
 ENV ConnectionStrings__DefaultConnection="Data Source=/data/ufo.db;Foreign Keys=True"
@@ -101,7 +101,7 @@ ENV Ufo__AllowedRoots__0=/library
 # and the host refuses to start without one rather than falling back to a shared
 # default. Generate one with: openssl rand -hex 32
 
-EXPOSE 8080 8443
+EXPOSE 8443
 USER $APP_UID
 
 # Probes /api/user/is-created using the runtime that is already in the image, so

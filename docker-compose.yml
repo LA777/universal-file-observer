@@ -8,12 +8,9 @@ services:
     restart: unless-stopped
     ports:
       # Host port : container port, bound on every host interface so the app is
-      # reachable from the LAN.
-      - "8080:8080"
-      # HTTPS, served by the application itself from the certificate in its
-      # database - self-signed on first run, replaceable on the Settings page.
-      # Both endpoints stay open: the health check and any reverse proxy use the
-      # plain one, which is why Ufo__EnableHttpsRedirection stays false.
+      # reachable from the LAN. HTTPS only - there is no plaintext listener to
+      # publish, because an open HTTP port would carry credentials and JWTs in
+      # the clear for anything that can reach the container.
       - "8443:8443"
     environment:
       # Required. Generate your own and keep it out of source control:
@@ -34,12 +31,6 @@ services:
       # generated certificate would not cover the LAN address and every client
       # would report a host-name mismatch. Add more as __1, __2 and so on.
       Ufo__CertificateSubjectAlternativeNames__0: "${UFO_CERTIFICATE_HOST:-}"
-      # The TLS port, declared by the deployment rather than baked into the
-      # image: Kestrel refuses to start an https:// endpoint it has no
-      # certificate for, so an image-level default would make
-      # UFO_ENABLE_HTTPS=false a crash loop. Behind a TLS-terminating proxy, set
-      # UFO_ENABLE_HTTPS=false and UFO_HTTPS_URL= (empty) together.
-      Kestrel__Endpoints__Https__Url: "${UFO_HTTPS_URL-https://0.0.0.0:8443}"
     volumes:
       # Database, rolling logs, generated machine id, and the key that the stored
       # TLS certificate is encrypted with. Losing this volume loses the

@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Configuration;
+using System.Net;
+using System.Net.Security;
 
 namespace Ufo.Server.Hosting;
 
 /// <summary>
-/// Probes a running instance over HTTP and reports the result as a process exit
-/// code, so a container HEALTHCHECK needs no extra tooling in the image.
+/// Probes a running instance over whichever scheme its endpoint is configured
+/// with, and reports the result as a process exit code, so a container
+/// HEALTHCHECK needs no extra tooling in the image.
 /// </summary>
 /// <remarks>
 /// The alternative was installing curl or wget into the runtime image. Reusing
@@ -32,7 +35,7 @@ public static class HealthCheckCommand
 
         try
         {
-            using var httpClient = new HttpClient { Timeout = RequestTimeout };
+            using var httpClient = new HttpClient(CreateLoopbackHandler()) { Timeout = RequestTimeout };
             using var response = await httpClient.GetAsync(healthUrl);
 
             if (response.IsSuccessStatusCode)
@@ -49,6 +52,35 @@ public static class HealthCheckCommand
 
         return 1;
     }
+
+    /// <summary>
+    /// An HTTP handler that accepts the certificate on a loopback address without
+    /// validating it.
+    /// </summary>
+    /// <remarks>
+    /// The probe talks to this same container over 127.0.0.1, and the certificate
+    /// it will be shown is normally one the application generated for itself -
+    /// self-signed, and trusted by nothing. Validating it would make the health
+    /// check fail on every default installation.
+    /// <para>
+    /// The exemption is deliberately limited to loopback. Nothing off-box is
+    /// reachable at 127.0.0.1, so this cannot be turned into a way of ignoring a
+    /// bad certificate on a real connection, and a non-loopback host falls through
+    /// to normal validation.
+    /// </para>
+    /// </remarks>
+    private static HttpClientHandler CreateLoopbackHandler() =>
+        new()
+        {
+            ServerCertificateCustomValidationCallback = (request, _, _, sslPolicyErrors) =>
+                sslPolicyErrors == SslPolicyErrors.None
+                || IsLoopback(request.RequestUri)
+        };
+
+    private static bool IsLoopback(Uri? requestUri) =>
+        requestUri is not null
+        && IPAddress.TryParse(requestUri.Host, out var address)
+        && IPAddress.IsLoopback(address);
 
     private static Uri ResolveHealthUrl()
     {
