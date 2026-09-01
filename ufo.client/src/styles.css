@@ -70,9 +70,11 @@
   --ufo-shadow-soft: rgba(0, 0, 0, 0.2);
   --ufo-shadow-strong: rgba(0, 0, 0, 0.5);
 
-  /* The dual file panes: gutter between them, and the frame around the active one. */
+  /* The dual file panes: gutter between them, and the frame around the active one.
+     The frame is also the pane's own backdrop, and it fills the whole pane while the
+     folder is still loading, so it stays a chrome tone rather than a saturated color. */
   --ufo-panel-gutter: rgb(93, 125, 195);
-  --ufo-panel-frame: rgb(40, 219, 219);
+  --ufo-panel-frame: #3a3a3a;
   --ufo-panel-active: rgb(255, 140, 0);
   --ufo-panel-active-glow: rgba(255, 140, 0, 0.5);
 }
