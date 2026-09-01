@@ -156,6 +156,59 @@ internal static class AuthRequestFactory
 
 #endregion
 
+/// <summary>
+/// The refresh cookie, as seen from a test.
+///
+/// The cookie is written Secure, and the test host speaks http, so the handler's
+/// own cookie container will not store or resend it - a browser would, over TLS.
+/// These read it off the response and put it back on the next request by hand,
+/// which also makes each test say out loud which token it is presenting.
+/// </summary>
+internal static class RefreshCookie
+{
+    public const string Name = "ufo_refresh_token";
+
+    /// <summary>
+    /// The cookie's value, empty when the server cleared it, or null when the
+    /// response did not set it at all.
+    /// </summary>
+    public static string? Read(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues("Set-Cookie", out var setCookieHeaders))
+        {
+            return null;
+        }
+
+        var cookieHeader = setCookieHeaders.LastOrDefault(header => header.StartsWith($"{Name}=", StringComparison.Ordinal));
+        if (cookieHeader == null)
+        {
+            return null;
+        }
+
+        var value = cookieHeader[(Name.Length + 1)..];
+        var end = value.IndexOf(';');
+
+        return end < 0 ? value : value[..end];
+    }
+
+    public static string? ReadAttributes(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Set-Cookie", out var setCookieHeaders)
+            ? setCookieHeaders.LastOrDefault(header => header.StartsWith($"{Name}=", StringComparison.Ordinal))
+            : null;
+
+    public static Task<HttpResponseMessage> PostWithAsync(HttpClient client, string requestUri, string? refreshToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, requestUri);
+
+        if (refreshToken != null)
+        {
+            request.Headers.Add("Cookie", $"{Name}={refreshToken}");
+        }
+
+        return client.SendAsync(request);
+    }
+}
+
 #region JSON deserialization helpers
 
 internal static class AuthJson
@@ -558,4 +611,200 @@ public class AuthController_LoginTests : IAsyncLifetime
 
 #endregion
 
+#region 4. POST /api/auth/refresh and /api/auth/logout - the session's stored half
 
+public class AuthController_RefreshTokenTests : IAsyncLifetime
+{
+    private const string Username = "refreshuser";
+
+    private readonly AuthApiFactory _factory = new();
+    private HttpClient _client = null!;
+
+    public async Task InitializeAsync() =>
+        _client = await _factory.CreateClientAsync();
+
+    public Task DisposeAsync()
+    {
+        _client.Dispose();
+        _factory.Dispose();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Signs a user up and in, returning the refresh cookie's value.</summary>
+    private async Task<string> SignInAsync()
+    {
+        await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup", AuthRequestFactory.NewRegister(Username));
+
+        var response = await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/login", AuthRequestFactory.NewLogin(Username));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var refreshToken = RefreshCookie.Read(response);
+        Assert.False(string.IsNullOrEmpty(refreshToken));
+
+        return refreshToken!;
+    }
+
+    private static async Task<string> ReadAccessTokenAsync(HttpResponseMessage response)
+    {
+        var payload = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        if (!payload.RootElement.TryGetProperty("Token", out var token))
+        {
+            payload.RootElement.TryGetProperty("token", out token);
+        }
+
+        return token.GetString() ?? string.Empty;
+    }
+
+    [Fact]
+    public async Task Login_SetsARefreshCookieThatScriptsCannotRead()
+    {
+        await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/signup", AuthRequestFactory.NewRegister(Username));
+
+        var response = await _client.PostAsJsonAsync(
+            $"{AuthTestConstants.ApiBase}/login", AuthRequestFactory.NewLogin(Username));
+
+        // The flags are the whole reason the refresh token lives in a cookie
+        // rather than in the response body beside the access token.
+        var cookie = RefreshCookie.ReadAttributes(response);
+        Assert.NotNull(cookie);
+        Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("secure", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=strict", cookie, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("path=/api/auth", cookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Refresh_WithTheCookieFromLogin_ReturnsAFreshAccessTokenAndANewCookie()
+    {
+        var refreshToken = await SignInAsync();
+
+        var response = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var accessToken = await ReadAccessTokenAsync(response);
+        Assert.False(string.IsNullOrEmpty(accessToken));
+
+        // The access token is a real one for the same user.
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(accessToken);
+        Assert.Equal(Username, jwt.Claims.First(claim => claim.Type == "unique_name").Value);
+
+        // Rotation: the cookie that comes back is not the one that went in.
+        var rotatedToken = RefreshCookie.Read(response);
+        Assert.False(string.IsNullOrEmpty(rotatedToken));
+        Assert.NotEqual(refreshToken, rotatedToken);
+    }
+
+    [Fact]
+    public async Task Refresh_WithNoCookie_Returns401()
+    {
+        var response = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_WithATokenThatWasAlreadyRotated_IsRefusedWithoutTouchingTheLiveCookie()
+    {
+        var refreshToken = await SignInAsync();
+
+        var firstRefresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+        Assert.Equal(HttpStatusCode.OK, firstRefresh.StatusCode);
+
+        // Presenting the spent token again. Within the grace period this is read
+        // as a retry rather than a theft, and it is refused either way - one
+        // rotation, one successor.
+        var secondRefresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, secondRefresh.StatusCode);
+
+        // But the cookie is left alone: the successor from the first refresh is
+        // live and sitting in the browser, and a deletion here would take it with
+        // it - two tabs refreshing together would end a session with nothing wrong
+        // with it.
+        Assert.Null(RefreshCookie.Read(secondRefresh));
+
+        var successor = RefreshCookie.Read(firstRefresh);
+        var afterTheRefusal = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", successor);
+        Assert.Equal(HttpStatusCode.OK, afterTheRefusal.StatusCode);
+    }
+
+    [Fact]
+    public async Task Refresh_WithAnUnknownToken_IsRefusedAndClearsTheCookie()
+    {
+        // A token this server never issued cannot become usable, so the cookie
+        // carrying it is worth deleting - unlike the raced case above.
+        var response = await RefreshCookie.PostWithAsync(
+            _client, $"{AuthTestConstants.ApiBase}/refresh", "not-a-token-this-server-issued");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(string.Empty, RefreshCookie.Read(response));
+    }
+
+    [Fact]
+    public async Task Refresh_WithTheSuccessorCookie_KeepsTheSessionGoing()
+    {
+        var refreshToken = await SignInAsync();
+
+        var firstRefresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+        var successor = RefreshCookie.Read(firstRefresh);
+
+        var secondRefresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", successor);
+
+        Assert.Equal(HttpStatusCode.OK, secondRefresh.StatusCode);
+        Assert.NotEqual(successor, RefreshCookie.Read(secondRefresh));
+    }
+
+    [Fact]
+    public async Task Logout_RevokesTheSessionSoItCannotBeRefreshedAgain()
+    {
+        var refreshToken = await SignInAsync();
+
+        var logout = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/logout", refreshToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+        Assert.Equal(string.Empty, RefreshCookie.Read(logout));
+
+        // The revocation is server-side: keeping a copy of the cookie buys nothing.
+        var refresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, refresh.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_EndsTheSessionEvenWhenARefreshRotatedTheTokenFirst()
+    {
+        // A refresh that overlapped the sign-out has already rotated the cookie
+        // the sign-out is carrying. Revoking only what was presented would leave
+        // the successor live and the session resumable.
+        var refreshToken = await SignInAsync();
+
+        var refresh = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", refreshToken);
+        var successor = RefreshCookie.Read(refresh);
+
+        // Signing out with the token the client had before that refresh landed.
+        var logout = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/logout", refreshToken);
+        Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
+
+        var resumeAttempt = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/refresh", successor);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resumeAttempt.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_WithNoCookie_Succeeds()
+    {
+        // Signing out is not a place to tell a caller which tokens exist, and a
+        // client whose access token has already expired still has to be able to.
+        var response = await RefreshCookie.PostWithAsync(_client, $"{AuthTestConstants.ApiBase}/logout", null);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+}
+
+#endregion

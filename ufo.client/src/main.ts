@@ -9,6 +9,7 @@ import { RegisterComponent } from './app/components/register/register.component'
 import { DashboardComponent } from './app/components/dashboard/dashboard.component';
 import { SettingsComponent } from './app/components/settings/settings.component';
 import { AuthGuard } from './app/guards/auth.guard';
+import { RootRedirectGuard } from './app/guards/root-redirect.guard';
 import { JwtInterceptor } from './app/interceptors/jwt.interceptor';
 
 const routes: Routes = [
@@ -16,7 +17,9 @@ const routes: Routes = [
   { path: 'register', component: RegisterComponent },
   { path: 'dashboard', canActivate: [AuthGuard], component: DashboardComponent },
   { path: 'settings', canActivate: [AuthGuard], component: SettingsComponent },
-  { path: '', redirectTo: 'login', pathMatch: 'full' }
+  // Componentless, and the guard always answers with a UrlTree: "/" is a
+  // decision about where to send someone, not a page of its own.
+  { path: '', pathMatch: 'full', canActivate: [RootRedirectGuard], children: [] }
 ];
 
 bootstrapApplication(AppComponent, {

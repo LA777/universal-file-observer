@@ -120,16 +120,35 @@ public class JwtTokenServiceTests : BaseTest
     }
 
     [Fact]
-    public void CreateToken_WithValidUser_TokenExpiresIn7Days()
+    public void CreateToken_WithNoConfiguredLifetime_TokenExpiresAfterTheDefaultLifetime()
     {
-        // Arrange
+        // Arrange - _validJwtOptions leaves TokenLifetimeMinutes at its default.
         var beforeCreation = DateTime.UtcNow;
 
         // Act
         var jwtToken = Read(_sut.CreateToken(CreateUser()));
 
         // Assert - allow a small time window for test execution.
-        jwtToken.ValidTo.Should().BeCloseTo(beforeCreation.AddDays(7), TimeSpan.FromSeconds(5));
+        jwtToken.ValidTo.Should().BeCloseTo(
+            beforeCreation.AddMinutes(JwtOptions.DefaultTokenLifetimeMinutes), TimeSpan.FromSeconds(5));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(90)]
+    [InlineData(60 * 24 * 7)]
+    public void CreateToken_WithConfiguredLifetime_TokenExpiresAfterThatLifetime(int tokenLifetimeMinutes)
+    {
+        // Arrange
+        var customService = CreateServiceWithOptions(tokenLifetimeMinutes: tokenLifetimeMinutes);
+        var beforeCreation = DateTime.UtcNow;
+
+        // Act
+        var jwtToken = Read(customService.CreateToken(CreateUser()));
+
+        // Assert - allow a small time window for test execution.
+        jwtToken.ValidTo.Should().BeCloseTo(
+            beforeCreation.AddMinutes(tokenLifetimeMinutes), TimeSpan.FromSeconds(5));
     }
 
     [Fact]
@@ -184,6 +203,20 @@ public class JwtTokenServiceTests : BaseTest
     public void Constructor_WithNullOptionsMonitor_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() => new JwtTokenService(null!));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(int.MinValue)]
+    public void Constructor_WithNonPositiveTokenLifetime_ThrowsInvalidOperationException(int tokenLifetimeMinutes)
+    {
+        // Assert - a token issued with such a lifetime is expired before it is
+        // handed over, so the service refuses rather than minting dead tokens.
+        var createService = () => CreateServiceWithOptions(tokenLifetimeMinutes: tokenLifetimeMinutes);
+
+        createService.Should().Throw<InvalidOperationException>()
+            .WithMessage("*TokenLifetimeMinutes*");
     }
 
     [Fact]
@@ -267,9 +300,18 @@ public class JwtTokenServiceTests : BaseTest
         jwtToken.Audiences.Should().Contain(customAudience);
     }
 
-    private static JwtTokenService CreateServiceWithOptions(string issuer = "TestIssuer", string audience = "TestAudience")
+    private static JwtTokenService CreateServiceWithOptions(
+        string issuer = "TestIssuer",
+        string audience = "TestAudience",
+        int tokenLifetimeMinutes = JwtOptions.DefaultTokenLifetimeMinutes)
     {
-        var options = new JwtOptions { Key = SigningKey, Issuer = issuer, Audience = audience };
+        var options = new JwtOptions
+        {
+            Key = SigningKey,
+            Issuer = issuer,
+            Audience = audience,
+            TokenLifetimeMinutes = tokenLifetimeMinutes
+        };
         var monitorMock = new Mock<IOptionsMonitor<JwtOptions>>();
         monitorMock.Setup(x => x.CurrentValue).Returns(options);
         return new JwtTokenService(monitorMock.Object);

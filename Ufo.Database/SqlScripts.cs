@@ -203,6 +203,32 @@ public class SqlScripts
             CONSTRAINT FK_ServerSettings_Users_UpdatedByUserId FOREIGN KEY (UpdatedByUserId) REFERENCES Users (Id) ON DELETE SET NULL
         );
 
+        -- One row per issued refresh token: the state that makes a session
+        -- revocable. Access tokens are stateless JWTs that nothing can withdraw
+        -- early, which is why they are short-lived; this table is the other half
+        -- of that trade - long-lived, but written down.
+        --
+        -- TokenHash is SHA-256 of the token, never the token. This database is not
+        -- encrypted, and stored refresh tokens would be ready-made credentials for
+        -- every account in it. It is UNIQUE because it is how a presented token is
+        -- looked up.
+        --
+        -- A NULL RevokedAt is what makes a token live, and rotation's conditional
+        -- UPDATE tests exactly that, so two simultaneous refreshes resolve to one
+        -- winner instead of two successors for one sign-in.
+        CREATE TABLE IF NOT EXISTS RefreshTokens (
+            Id                TEXT NOT NULL UNIQUE CONSTRAINT PK_RefreshTokens PRIMARY KEY,
+            UserId            TEXT NOT NULL,
+            TokenHash         TEXT NOT NULL UNIQUE,
+            CreatedAt         TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ExpiresAt         TEXT NOT NULL,
+            AbsoluteExpiresAt TEXT NOT NULL,
+            RevokedAt         TEXT,
+            ReplacedByTokenId TEXT,
+
+            CONSTRAINT FK_RefreshTokens_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
         -- ============================================================================
         -- Indexes. SQLite does not index foreign keys automatically; composite PKs
         -- only cover lookups by their leading column(s). Each index below serves
@@ -244,6 +270,11 @@ public class SqlScripts
 
         -- Label lookups by user/name and label<->snapshot association by snapshot
         -- (LabelsToSnapshots PK is (LabelId, SnapshotId), so SnapshotId needs its own index).
+        -- Revoking every token for a user (sign-out everywhere, and reuse
+        -- detection) and expiring old rows. Lookup by TokenHash rides the UNIQUE.
+        CREATE INDEX IF NOT EXISTS IX_RefreshTokens_UserId              ON RefreshTokens (UserId);
+        CREATE INDEX IF NOT EXISTS IX_RefreshTokens_AbsoluteExpiresAt   ON RefreshTokens (AbsoluteExpiresAt);
+
         CREATE INDEX IF NOT EXISTS IX_Labels_UserId_Name                ON Labels (UserId, Name);
         CREATE INDEX IF NOT EXISTS IX_LabelsToSnapshots_SnapshotId      ON LabelsToSnapshots (SnapshotId);
     ";
@@ -448,6 +479,34 @@ public class SqlScripts
             "CertificateSource = excluded.CertificateSource, " +
             "UpdatedAt = excluded.UpdatedAt, " +
             "UpdatedByUserId = excluded.UpdatedByUserId;";
+
+    public const string InsertRefreshTokenSql =
+        "INSERT INTO RefreshTokens (Id, UserId, TokenHash, CreatedAt, ExpiresAt, AbsoluteExpiresAt) " +
+        "VALUES (@Id, @UserId, @TokenHash, @CreatedAt, @ExpiresAt, @AbsoluteExpiresAt);";
+
+    public const string SelectRefreshTokenByHashSql = "SELECT * FROM RefreshTokens WHERE TokenHash = @TokenHash;";
+
+    public const string SelectRefreshTokenByIdSql = "SELECT * FROM RefreshTokens WHERE Id = @Id;";
+
+    // Conditional on RevokedAt IS NULL, which is what settles a race: of two
+    // refreshes presenting the same live token, exactly one updates a row, and the
+    // loser is told no rather than both being handed a successor.
+    public const string RotateRefreshTokenSql =
+        "UPDATE RefreshTokens SET RevokedAt = @RevokedAt, ReplacedByTokenId = @ReplacedByTokenId " +
+        "WHERE Id = @Id AND RevokedAt IS NULL;";
+
+    public const string RevokeRefreshTokenSql =
+        "UPDATE RefreshTokens SET RevokedAt = @RevokedAt WHERE Id = @Id AND RevokedAt IS NULL;";
+
+    // Sign-out everywhere, and what reuse detection falls back on: one presented
+    // copy proves the token was duplicated, but not which side is the impostor.
+    public const string RevokeAllRefreshTokensForUserSql =
+        "UPDATE RefreshTokens SET RevokedAt = @RevokedAt WHERE UserId = @UserId AND RevokedAt IS NULL;";
+
+    // Housekeeping. A row past its absolute deadline can never be rotated again,
+    // whatever its sliding deadline says, so nothing is lost by dropping it.
+    public const string DeleteExpiredRefreshTokensSql =
+        "DELETE FROM RefreshTokens WHERE AbsoluteExpiresAt < @UtcNow;";
 
     public const string SelectUserSettingsSql = "SELECT * FROM UserSettings WHERE UserId = @UserId;";
     public const string UpsertUserSettingsSql = "INSERT INTO UserSettings (Id, Theme, UserId) " +

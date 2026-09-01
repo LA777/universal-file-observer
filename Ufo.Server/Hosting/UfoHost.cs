@@ -46,6 +46,11 @@ public static class UfoHost
     /// </summary>
     private const int MinimumJwtKeyLengthInBytes = 32;
 
+    // A day. Past this a token is less a session than a standing credential, so
+    // startup says so - without refusing, since only the deployment knows what it
+    // is trading away.
+    private const int LongJwtTokenLifetimeMinutes = 24 * 60;
+
     /// <summary>
     /// File in <see cref="UfoHostOptions.DataDirectory"/> holding the signing key
     /// generated for this installation. Sits beside the database and the machine
@@ -165,6 +170,7 @@ public static class UfoHost
         }
 
         ValidateJwtSigningKey(jwtOptions.Key);
+        ValidateJwtLifetimes(jwtOptions);
 
         var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrEmpty(connectionString))
@@ -202,6 +208,7 @@ public static class UfoHost
         builder.Services.AddScoped<IUserRepository, UserRepository>();
         builder.Services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
         builder.Services.AddScoped<IServerSettingsRepository, ServerSettingsRepository>();
+        builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         // TLS certificate. The provider is a singleton because Kestrel reads it
         // on every handshake and it outlives any request scope; everything that
@@ -219,6 +226,7 @@ public static class UfoHost
         }
 
         builder.Services.AddTransient<IJwtTokenService, JwtTokenService>();
+        builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         builder.Services.AddTransient<IJwtClaimsService, JwtClaimsService>();
         builder.Services.AddHttpContextAccessor();
 
@@ -599,6 +607,56 @@ public static class UfoHost
             throw new InvalidOperationException(
                 $"JWT:Key is {signingKeyLengthInBytes} bytes; HmacSha256 requires at least "
                 + $"{MinimumJwtKeyLengthInBytes}. {remedy}");
+        }
+    }
+
+    /// <summary>
+    /// Refuses to start on a lifetime that cannot issue a usable token, and says
+    /// so when an access token lives long enough to be worth a second thought.
+    /// </summary>
+    private static void ValidateJwtLifetimes(JwtOptions jwtOptions)
+    {
+        var tokenLifetimeMinutes = jwtOptions.TokenLifetimeMinutes;
+
+        if (jwtOptions.RefreshTokenLifetimeDays <= 0)
+        {
+            throw new InvalidOperationException(
+                $"JWT:RefreshTokenLifetimeDays is {jwtOptions.RefreshTokenLifetimeDays}; it must be greater than zero. "
+                + "A refresh token issued with that lifetime is expired before the browser stores it, so every "
+                + "session would end with its first access token. Leave it unset for the "
+                + $"{JwtOptions.DefaultRefreshTokenLifetimeDays}-day default.");
+        }
+
+        if (jwtOptions.RefreshTokenAbsoluteLifetimeDays < jwtOptions.RefreshTokenLifetimeDays)
+        {
+            throw new InvalidOperationException(
+                $"JWT:RefreshTokenAbsoluteLifetimeDays is {jwtOptions.RefreshTokenAbsoluteLifetimeDays}, which is less "
+                + $"than JWT:RefreshTokenLifetimeDays ({jwtOptions.RefreshTokenLifetimeDays}). The absolute deadline "
+                + "caps the sliding one, so the sliding window could never be reached and the setting would be a "
+                + "misleading way of writing the shorter number.");
+        }
+
+        if (tokenLifetimeMinutes <= 0)
+        {
+            throw new InvalidOperationException(
+                $"JWT:TokenLifetimeMinutes is {tokenLifetimeMinutes}; it must be greater than zero. "
+                + "A token issued with that lifetime is expired before it reaches the client, so nobody "
+                + "could stay signed in. Leave it unset for the "
+                + $"{JwtOptions.DefaultTokenLifetimeMinutes}-minute default, or set "
+                + "JWT:TokenLifetimeMinutes (JWT__TokenLifetimeMinutes for a deployment).");
+        }
+
+        // Allowed, because how long an access token should last is the
+        // deployment's call - but said out loud, because an access token is the
+        // one credential here that nothing can withdraw early. Revoking a session
+        // ends its refresh token immediately; the access token already handed out
+        // keeps working until it expires.
+        if (tokenLifetimeMinutes > LongJwtTokenLifetimeMinutes)
+        {
+            Log.Warning(
+                "JWT:TokenLifetimeMinutes is {TokenLifetimeMinutes} minutes. An access token cannot be revoked, "
+                + "so one that leaks stays usable for that long even after the session behind it has been ended.",
+                tokenLifetimeMinutes);
         }
     }
 

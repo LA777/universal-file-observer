@@ -25,6 +25,14 @@ export class AppComponent implements OnInit {
   title = 'ufo.client';
   currentUser$ = this.authService.currentUser$;
 
+  /**
+   * Whether the last thing this subscription saw was a signed-in user, so the
+   * sign-out work runs on the transition and not on the null that a page opened
+   * signed out starts with - there is no session to clear there, and clearing
+   * the theme cache would repaint the login page for nobody's benefit.
+   */
+  private wasSignedIn = false;
+
   constructor(
     private authService: AuthService,
     private themeService: ThemeService,
@@ -39,11 +47,26 @@ export class AppComponent implements OnInit {
     // since /api/settings is authenticated.
     this.authService.currentUser$.subscribe(user => {
       if (user && this.authService.isAuthenticated) {
+        this.wasSignedIn = true;
+
         this.themeService.loadFromServer().subscribe({
           // A failed load leaves the already-applied theme in place; the
           // Settings page is where a failure is worth reporting, not here.
           error: () => { }
         });
+
+        return;
+      }
+
+      // The session has ended - by the button, by AuthGuard finding an expired
+      // token, or by a 401 reaching JwtInterceptor. The theme cache is one key
+      // for the whole browser, so it goes with the token: without this the next
+      // user to sign in here paints in the previous one's theme. Every way out
+      // of a session passes through this subject, which is why the reset lives
+      // here rather than being repeated at each of them.
+      if (this.wasSignedIn) {
+        this.wasSignedIn = false;
+        this.themeService.resetToDefault();
       }
     });
   }
@@ -54,11 +77,13 @@ export class AppComponent implements OnInit {
 
   logout() {
     console.log('Logout button clicked');
-    this.authService.logout();
-    // The theme cache is one key for the whole browser, so it has to go with
-    // the token — otherwise the next user to sign in here starts in this
-    // user's theme.
-    this.themeService.resetToDefault();
+    // Revokes the refresh token server-side as well, so the session cannot be
+    // resumed from another copy of the cookie. Local state is dropped inside
+    // signOut() before the request goes out, so navigation below does not wait
+    // on it - and resetting the theme is not repeated here either: ending the
+    // session pushes null through currentUser$, and the subscription in ngOnInit
+    // does it for every way a session can end.
+    this.authService.signOut().subscribe();
     console.log('Auth service logout called');
     
     // Navigate to login with explicit handling
