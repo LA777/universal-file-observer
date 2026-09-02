@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Subject, Observable } from 'rxjs';
-import { Snapshot } from '../models/models'
+import { Snapshot, SnapshotSummary } from '../models/models'
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { AuthService } from './auth.service';
 
@@ -38,8 +38,8 @@ export class SnapshotService {
     console.log("setSnapshot SnapshotService - " + snapshot.id);
   }
 
-  createSnapshot(path: string): Observable <string> {
-    return this.http.post<string>(
+  createSnapshot(path: string): Observable <SnapshotSummary> {
+    return this.http.post<SnapshotSummary>(
       '/api/snapshot/create',
       { path: path },
       { headers: this.getAuthHeaders() }

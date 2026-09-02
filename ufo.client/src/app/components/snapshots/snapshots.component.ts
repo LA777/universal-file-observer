@@ -11,10 +11,11 @@ import {
   ValueFormatterParams,
 } from 'ag-grid-community';
 import { Subscription } from 'rxjs';
-import { DialogData, Label, Pc, Snapshot, StorageDrive, VolumeInfo } from '../../models/models';
+import { Label, Pc, Snapshot, StorageDrive, VolumeInfo } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
 import { TabChangeService } from '../../services/tab-change.service';
-import { DialogComponent } from '../dialog/dialog.component';
+import { openMessageDialog } from '../dialog/dialog.component';
+import { describeHttpError } from '../../shared/http-error';
 import { LabelDialogComponent, LabelDialogData } from '../label-dialog/label-dialog.component';
 import { gridThemeFor } from '../../shared/grid-theme';
 import { ThemeService } from '../../services/theme.service';
@@ -252,8 +253,7 @@ export class SnapshotsComponent implements OnInit, OnDestroy {
   }
 
   showErrorDialog(error: any) {
-    const dialogData: DialogData = { title: 'Error', message: error.error };
-    this.dialog.open(DialogComponent, { data: dialogData });
+    openMessageDialog(this.dialog, describeHttpError(error, { action: 'delete the snapshot' }));
     console.error(error);
   }
 

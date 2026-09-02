@@ -4,8 +4,9 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { Folder, FileSystemRoot, DialogData, FsItemUi } from '../../models/models';
-import { DialogComponent } from '../dialog/dialog.component';
+import { Folder, FileSystemRoot, DialogData, FsItemUi, SnapshotSummary } from '../../models/models';
+import { openMessageDialog } from '../dialog/dialog.component';
+import { describeHttpError, describeInfo } from '../../shared/http-error';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { Subscription } from 'rxjs';
@@ -79,13 +80,18 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   getRoot() {
     this.subscriptionRoot = this.fileService.getRoot().subscribe({
       next: (result) => {
+        if (!result?.folder) {
+          this.showEmptyResponseDialog('open the starting folder');
+          return;
+        }
+
         this.fileSystemRoot = result;
         this.selectedFolder = result.folder;
         this.initiateFolder(result.folder);
         this.recordHistory(result.folder.fullPath);
       },
       error: (error) => {
-        this.showErrorDialog(error);
+        this.showErrorDialog(error, 'open the starting folder');
       }
     });
   }
@@ -162,13 +168,20 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.subscriptionFolder?.unsubscribe();
     this.subscriptionFolder = this.fileService.getFolder(path).subscribe({
       next: (result) => {
+        // A 204 arrives here as a null body - the listing was cancelled server-side,
+        // and rendering it would blank the pane with no word of why.
+        if (!result) {
+          this.showEmptyResponseDialog('open the folder', path);
+          return;
+        }
+
         this.initiateFolder(result);
         if (recordHistory) {
           this.recordHistory(result.fullPath);
         }
       },
       error: (error) => {
-        this.showErrorDialog(error);
+        this.showErrorDialog(error, 'open the folder', path);
       }
     });
   }
@@ -194,10 +207,10 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   createSnapshot() {
     this.subscriptionCreateSnapshot = this.snapshotService.createSnapshot(this.selectedFolder.fullPath).subscribe({
       next: (result) => {
-        this.showInfoDialog(result);
+        this.showSnapshotCreatedDialog(result);
       },
       error: (error) => {
-        this.showErrorDialog(error);
+        this.showErrorDialog(error, 'create a snapshot of', this.selectedFolder?.fullPath);
       }
     });
   }
@@ -242,14 +255,35 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.loadFolder(this.history[this.historyIndex], false);
   }
 
-  showInfoDialog(result: any) {
-    const dialogData: DialogData = { title: 'Info', message: result };
-    this.dialog.open(DialogComponent, { data: dialogData });
+  /** Confirms a created snapshot by name and id, not by dumping the response. */
+  showSnapshotCreatedDialog(snapshot: SnapshotSummary) {
+    const folderName = snapshot?.rootOnlyFolder?.fullPath ?? this.selectedFolder?.fullPath;
+
+    openMessageDialog(this.dialog, {
+      ...describeInfo(folderName ? `Snapshot created for "${folderName}".` : 'Snapshot created.'),
+      hint: snapshot?.id ? `Snapshot id: ${snapshot.id}` : undefined,
+    });
   }
 
-  showErrorDialog(error: any) {
-    const dialogData: DialogData = { title: 'Error', message: error.error };
-    this.dialog.open(DialogComponent, { data: dialogData });
+  showErrorDialog(error: any, action: string, target?: string) {
+    openMessageDialog(this.dialog, describeHttpError(error, { action, target }));
     console.error(error);
+  }
+
+  /**
+   * A request that succeeded but came back with nothing. There is no error to
+   * describe, so the popup says what was asked for and why nothing came of it.
+   */
+  private showEmptyResponseDialog(action: string, target?: string) {
+    const dialogData: DialogData = {
+      title: 'Error',
+      severity: 'error',
+      message: target
+        ? `Could not ${action} "${target}". The server returned no content for it.`
+        : `Could not ${action}. The server returned no content.`,
+      hint: 'The folder may have become unreadable, or the request was cancelled before it finished.',
+    };
+
+    openMessageDialog(this.dialog, dialogData);
   }
 }

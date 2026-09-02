@@ -1,7 +1,32 @@
-<h1 mat-dialog-title>{{data.title}}</h1>
-<div mat-dialog-content>
-  <p>{{data.message}}</p>
-</div>
-<div mat-dialog-actions>
-  <button mat-button (click)="closeDialog()">OK</button>
+<div class="message-dialog" [class.error]="isError">
+  <div class="dialog-header">
+    <mat-icon class="header-icon">{{ isError ? 'error_outline' : 'info_outline' }}</mat-icon>
+    <span class="dialog-title">{{data.title}}</span>
+    <button class="icon-button" (click)="closeDialog()" title="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-body">
+    <p class="message">{{data.message}}</p>
+
+    @if (data.hint) {
+      <p class="hint">{{data.hint}}</p>
+    }
+
+    @if (data.details) {
+      <button class="details-toggle" (click)="showDetails = !showDetails">
+        <mat-icon>{{ showDetails ? 'expand_less' : 'expand_more' }}</mat-icon>
+        {{ showDetails ? 'Hide technical details' : 'Show technical details' }}
+      </button>
+
+      @if (showDetails) {
+        <pre class="details">{{data.details}}</pre>
+      }
+    }
+  </div>
+
+  <div class="dialog-actions">
+    <button class="action-button" (click)="closeDialog()">OK</button>
+  </div>
 </div>

@@ -319,7 +319,7 @@ public class FileSystemControllerFunctionalTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetFolderInfo_WithNonExistentPath_ThrowsException()
+    public async Task GetFolderInfo_WithNonExistentPath_ReturnsNotFoundWithAnExplanation()
     {
         // Arrange
         var token = GenerateToken(FileSystemTestConstants.TestUserId, FileSystemTestConstants.TestUserName);
@@ -328,13 +328,108 @@ public class FileSystemControllerFunctionalTests : IAsyncLifetime
         var nonExistentPath = Path.Combine(_testDir, "does-not-exist-" + Guid.NewGuid());
         var request = new PathRequest { Path = nonExistentPath };
 
-        // Act & Assert
-        // The controller does not handle DirectoryNotFoundException gracefully
-        // This test documents the current behavior - it throws an unhandled exception
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(async () =>
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/filesystem/folder", request);
+
+        // Assert
+        // This used to escape as an unhandled DirectoryNotFoundException, which reached
+        // the user as an error popup with nothing readable in it.
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains(nonExistentPath, content);
+        Assert.Contains("does not exist", content);
+    }
+
+    [Fact]
+    public async Task GetFolderInfo_InsideAFolderThatCannotBeTraversed_ReportsThePermissionRatherThanAbsence()
+    {
+        // Arrange
+        var lockedDir = Path.Combine(_testDir, "locked");
+        var insideLockedDir = Path.Combine(lockedDir, "inside");
+        Directory.CreateDirectory(insideLockedDir);
+
+        if (!OperatingSystem.IsLinux())
         {
-            await _client.PostAsJsonAsync("/api/filesystem/folder", request);
-        });
+            return;
+        }
+
+        File.SetUnixFileMode(lockedDir, UnixFileMode.None);
+
+        try
+        {
+            // Running as root ignores the mode, so there is nothing to assert then.
+            if (Directory.Exists(insideLockedDir))
+            {
+                return;
+            }
+
+            var token = GenerateToken(FileSystemTestConstants.TestUserId, FileSystemTestConstants.TestUserName);
+            _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+            // Act
+            var response = await _client.PostAsJsonAsync(
+                "/api/filesystem/folder",
+                new PathRequest { Path = insideLockedDir });
+
+            // Assert
+            // Directory.Exists answers false here just as it does for a deleted folder, so
+            // without the attribute probe this came back as "does not exist".
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.Contains("does not have permission", content);
+        }
+        finally
+        {
+            File.SetUnixFileMode(
+                lockedDir,
+                UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    [Fact]
+    public async Task GetFolderInfo_WithAPathThatIsAFile_ReturnsBadRequestWithAnExplanation()
+    {
+        // Arrange
+        var token = GenerateToken(FileSystemTestConstants.TestUserId, FileSystemTestConstants.TestUserName);
+        _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var filePath = Path.Combine(_testDir, "not-a-folder.txt");
+        await File.WriteAllTextAsync(filePath, "content");
+
+        var request = new PathRequest { Path = filePath };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/filesystem/folder", request);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("is a file, not a folder", content);
+    }
+
+    [Fact]
+    public async Task GetFolderInfo_WithBlankPath_ReturnsBadRequestNamingTheField()
+    {
+        // Arrange
+        var token = GenerateToken(FileSystemTestConstants.TestUserId, FileSystemTestConstants.TestUserName);
+        _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var request = new PathRequest { Path = "   " };
+
+        // Act
+        var response = await _client.PostAsJsonAsync("/api/filesystem/folder", request);
+
+        // Assert
+        // [ApiController] model validation rejects a blank Path before the action runs,
+        // so this arrives as a ProblemDetails rather than the controller's own sentence.
+        // The client renders either one, so what matters here is that a body arrives at all.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Path", content);
     }
 
     [Fact]

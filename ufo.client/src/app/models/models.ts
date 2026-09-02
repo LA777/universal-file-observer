@@ -191,7 +191,16 @@ export interface FsSearchResult {
   isHidden: boolean;
 }
 
+/** Chooses the popup's icon and accent: a failure reads red, anything else neutral. */
+export type DialogSeverity = 'error' | 'info';
+
 export interface DialogData {
   title: string;
+  /** The one sentence explaining what happened, in the user's terms. */
   message: string;
+  /** What to do about it, when there is something to do. */
+  hint?: string;
+  /** Technical text (status, URL, raw server response), hidden behind a toggle. */
+  details?: string;
+  severity?: DialogSeverity;
 }

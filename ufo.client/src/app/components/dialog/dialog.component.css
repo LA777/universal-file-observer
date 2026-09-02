@@ -1,0 +1,150 @@
+/* No color is named here: every value is a theme token, so the popup follows the
+   app between the dark and light palettes like the rest of the chrome. */
+.message-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 460px;
+  max-width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  color: var(--ufo-text);
+  text-align: left;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ufo-border);
+}
+
+.header-icon {
+  flex: 0 0 auto;
+  color: var(--ufo-accent);
+}
+
+.message-dialog.error .header-icon {
+  color: var(--ufo-danger-text);
+}
+
+.dialog-title {
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ufo-text-strong);
+}
+
+.dialog-body {
+  padding: 12px 0 4px;
+}
+
+.message {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ufo-text);
+  /* A path has no spaces to wrap at, so it has to be allowed to break anywhere. */
+  overflow-wrap: anywhere;
+}
+
+.hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ufo-text-muted);
+}
+
+.message-dialog.error .message {
+  padding: 8px 10px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 4px;
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
+}
+
+.details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ufo-accent);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.details-toggle:hover {
+  color: var(--ufo-accent-soft);
+  text-decoration: underline;
+}
+
+.details {
+  margin: 6px 0 0;
+  padding: 8px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--ufo-border-subtle);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text-secondary);
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  scrollbar-color: var(--ufo-scrollbar-thumb) var(--ufo-bg-input);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 12px;
+}
+
+.action-button {
+  height: 28px;
+  min-width: 72px;
+  padding: 0 14px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.action-button:hover {
+  background-color: var(--ufo-bg-control-hover);
+  border-color: var(--ufo-border-control-hover);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ufo-text-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-strong);
+}
+
+.icon-button mat-icon,
+.details-toggle mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
