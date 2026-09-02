@@ -68,9 +68,9 @@ export class SnapshotService {
   }
 
   deleteSnapshot(id: string): Observable <string> {
-    return this.http.delete<string>(
+    return this.http.delete(
       `/api/snapshot/delete/${id}`,
-      { headers: this.getAuthHeaders() }
+      { headers: this.getAuthHeaders(), responseType: 'text' }
     );
   }
 }
