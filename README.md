@@ -371,8 +371,36 @@ All endpoints are under `/api` and (except auth/first-run) require a JWT Bearer 
 - `GET/POST/PUT/DELETE /api/Label/...` — labels and label↔snapshot associations
 - `POST /api/Search` — search indexed files/folders by name
 - `GET /api/Video?filePath=...` — stream video files with range support
+- `GET /api/version` — the running build, as `{ "version": "1.2.5" }`
 
 OpenAPI document: `/openapi/v1.json` (Swagger UI in Development).
+
+## Versioning
+
+Releases are numbered `major.minor.patch` — for example `1.2.5`:
+
+- **major** — the release breaks something an existing installation depends on
+- **minor** — the release adds something, and everything that worked still works
+- **patch** — the release only fixes or tightens existing behaviour
+
+The number is written down in exactly one place: the `<Version>` element of
+`Ufo.Server/Ufo.Server.csproj`. The build stamps it into the assembly metadata,
+`GET /api/version` reads it back, and the **About** tab shows it. `Ufo.Desktop`
+reads the same element, so `ufo.exe` reports the same number. The headless host
+prints it at startup too (the tray executable has no console to print to):
+
+```
+App started. Version: 1.0.0
+```
+
+To cut a release, bump `<Version>`, run the tests, and tag the commit:
+
+```
+git tag -a v1.2.5 -m "UFO 1.2.5"
+```
+
+The full scheme — what earns each segment, how the number reaches every surface,
+and why it is built this way — is in `_docs/AI_VERSIONING.md`.
 
 ## Repository conventions
 

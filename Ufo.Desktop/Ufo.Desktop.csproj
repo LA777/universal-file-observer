@@ -106,6 +106,26 @@
     </ItemGroup>
   </Target>
 
+  <!-- ufo.exe reports the same version as the API it hosts. Read out of
+       Ufo.Server.csproj rather than written down a second time, so a release is
+       one edit and the two can never disagree; see _docs/AI_VERSIONING.md.
+       GetAssemblyVersion is where the SDK turns $(Version) into the assembly,
+       file and informational versions, so this is the last moment it can be set. -->
+  <Target Name="InheritApplicationVersion" BeforeTargets="GetAssemblyVersion">
+    <XmlPeek XmlInputPath="$(MSBuildThisFileDirectory)..\Ufo.Server\Ufo.Server.csproj"
+             Query="/Project/PropertyGroup/Version/text()">
+      <Output TaskParameter="Result" ItemName="ServerVersion" />
+    </XmlPeek>
+    <Error Condition="'@(ServerVersion)' == ''"
+           Text="No &lt;Version&gt; found in Ufo.Server.csproj. It is the single source of truth for the application version; see _docs/AI_VERSIONING.md." />
+    <PropertyGroup>
+      <Version>@(ServerVersion)</Version>
+      <!-- Same reason as in Ufo.Server.csproj: keep the "+<commit sha>" the SDK
+           would otherwise append out of the version shown in file properties. -->
+      <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    </PropertyGroup>
+  </Target>
+
   <Target Name="AssertSpaEmbedded" BeforeTargets="Publish">
     <Error Condition="!Exists('$(SpaDist)index.html')"
            Text="The Angular bundle was not found at $(SpaDist). Build the front end before publishing (publish-desktop.ps1 does this), otherwise the executable would ship without a UI." />

@@ -1,6 +1,7 @@
 using Serilog;
 using Ufo.Abstractions.Options;
 using Ufo.Server.Hosting;
+using Ufo.Server.Services;
 
 // Container HEALTHCHECK path: probe a running instance and exit with its verdict
 // instead of starting a second host.
@@ -9,7 +10,9 @@ if (HealthCheckCommand.IsRequested(args))
     return await HealthCheckCommand.RunAsync();
 }
 
-Console.WriteLine("App started. Version: 0.0.3");
+// The version comes from <Version> in Ufo.Server.csproj by way of the assembly
+// metadata, so this line and GET /api/version can never disagree.
+Console.WriteLine($"App started. Version: {ApplicationVersionService.Current}");
 
 // Headless entry point: `dotnet run`, and the container image.
 // The Windows desktop tray application has its own entry point in Ufo.Desktop and

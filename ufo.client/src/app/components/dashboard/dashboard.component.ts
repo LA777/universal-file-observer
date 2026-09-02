@@ -11,6 +11,7 @@ import { SnapshotsComponent } from '../snapshots/snapshots.component';
 import { FilesComponent } from '../files/files.component';
 import { LabelsComponent } from '../labels/labels.component';
 import { SearchComponent } from '../search/search.component';
+import { AboutComponent } from '../about/about.component';
 
 // Material imports
 import { DragDropModule } from '@angular/cdk/drag-drop';
@@ -69,7 +70,8 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     SnapshotsComponent,
     FilesComponent,
     LabelsComponent,
-    SearchComponent
+    SearchComponent,
+    AboutComponent
   ],
   templateUrl: './dashboard.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

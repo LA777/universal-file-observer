@@ -197,6 +197,9 @@ public static class UfoHost
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
+        // The version is read out of the assembly metadata once and never changes
+        // while the process lives, so there is nothing per-request about it.
+        builder.Services.AddSingleton<IApplicationVersionService, ApplicationVersionService>();
         // Stateless, so it is shared rather than rebuilt per request.
         builder.Services.AddSingleton<IFolderTreeBuilder, FolderTreeBuilder>();
 

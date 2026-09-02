@@ -1,0 +1,30 @@
+<div class="about-panel">
+  <section class="about-card">
+    <header class="about-identity">
+      <img class="about-logo" src="favicon.ico" alt="" />
+      <div class="about-names">
+        <h2 class="about-name">UFO</h2>
+        <p class="about-full-name">Universal File Observer</p>
+      </div>
+    </header>
+
+    <p class="about-blurb">
+      Point-in-time snapshots of a folder tree, with a SHA-256 for every file, so
+      you can see what changed between two moments on disk.
+    </p>
+
+    <dl class="about-facts">
+      <dt>Version</dt>
+      <dd>
+        <span class="about-version" *ngIf="version">{{ version }}</span>
+        <span class="about-version pending" *ngIf="!version && isLoading">Asking the server…</span>
+        <span class="about-version pending" *ngIf="!version && !isLoading">Unavailable</span>
+      </dd>
+    </dl>
+
+    <div class="error-row" *ngIf="error">
+      <mat-icon>error_outline</mat-icon>
+      <span class="error-text">{{ error }}</span>
+    </div>
+  </section>
+</div>

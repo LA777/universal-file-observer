@@ -2,6 +2,14 @@
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
+		<!-- The application version, and the only place it is written down.
+		     Three segments, major.minor.patch - see _docs/AI_VERSIONING.md. It feeds
+		     the assembly metadata, GET /api/version, the About tab and the startup
+		     log line; Ufo.Desktop reads it from here rather than keeping its own. -->
+		<Version>1.0.0</Version>
+		<!-- Keeps InformationalVersion equal to <Version>. The SDK otherwise appends
+		     "+<commit sha>", which every reader of the version would have to strip. -->
+		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<SpaRoot>..\ufo.client\</SpaRoot>
@@ -16,6 +24,12 @@
 		<!-- Development-only overrides; they have no business inside a published
 		     artifact. The JWT signing key lives in user-secrets, not in either file. -->
 		<Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<!-- Lets the unit tests reach the parsing helpers that back the version and
+		     nothing else, instead of widening the public surface for them. -->
+		<InternalsVisibleTo Include="Ufo.UnitTests" />
 	</ItemGroup>
 
 	<ItemGroup>

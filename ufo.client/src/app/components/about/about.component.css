@@ -1,0 +1,118 @@
+:host {
+  display: block;
+  height: 100%;
+  /* The app shell centers its text; this panel reads left-aligned, like Settings. */
+  text-align: left;
+}
+
+.about-panel {
+  padding: 16px;
+  background-color: var(--ufo-bg-surface);
+  color: var(--ufo-text);
+  height: 100%;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.about-card {
+  max-width: 520px;
+  padding: 18px 20px;
+  border: 1px solid var(--ufo-border-subtle);
+  border-radius: 6px;
+  background-color: var(--ufo-bg-subtle);
+}
+
+.about-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.about-logo {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+}
+
+.about-names {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.about-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ufo-text-strong);
+}
+
+.about-full-name {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ufo-text-secondary);
+}
+
+.about-blurb {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ufo-text-secondary);
+}
+
+.about-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin: 16px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--ufo-border-subtle);
+}
+
+.about-facts dt {
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+.about-facts dd {
+  margin: 0;
+}
+
+.about-version {
+  /* A version is read digit by digit; a monospace face keeps them aligned. */
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  font-size: 13px;
+  color: var(--ufo-text-strong);
+}
+
+.about-version.pending {
+  font-family: 'Segoe UI', system-ui, Roboto, sans-serif;
+  font-size: 12px;
+  color: var(--ufo-text-faint);
+}
+
+.error-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 4px;
+  background-color: var(--ufo-danger-tint);
+}
+
+.error-row mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  color: var(--ufo-danger-text);
+}
+
+.error-text {
+  font-size: 12px;
+  color: var(--ufo-danger-text);
+}

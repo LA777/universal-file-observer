@@ -204,3 +204,8 @@ export interface DialogData {
   details?: string;
   severity?: DialogSeverity;
 }
+
+/** Answer from GET /api/version - the running build, as major.minor.patch. */
+export interface ApplicationVersion {
+  version: string;
+}

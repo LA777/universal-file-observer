@@ -14,7 +14,8 @@ const PROXY_CONFIG = [
       "/api/label",
       "/api/labels",
       "/api/search",
-      "/api/settings"
+      "/api/settings",
+      "/api/version"
     ],
     target,
     secure: false
