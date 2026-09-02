@@ -6,7 +6,7 @@
 		     Three segments, major.minor.patch - see _docs/AI_VERSIONING.md. It feeds
 		     the assembly metadata, GET /api/version, the About tab and the startup
 		     log line; Ufo.Desktop reads it from here rather than keeping its own. -->
-		<Version>1.0.0</Version>
+		<Version>0.1.1</Version>
 		<!-- Keeps InformationalVersion equal to <Version>. The SDK otherwise appends
 		     "+<commit sha>", which every reader of the version would have to strip. -->
 		<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
