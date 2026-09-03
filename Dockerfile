@@ -53,10 +53,17 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 # /data holds the SQLite database, the rolling logs, the generated machine id and
 # the key the stored TLS certificate is encrypted with (losing it costs the
 # certificate, which is then regenerated self-signed);
-# /library is where the folders to be indexed are mounted. Mount volumes over
-# both - anything written to the image layer is lost when the container is
-# recreated, and a churning machine id fragments snapshot history across runs.
-RUN mkdir -p /data /library && chown -R $APP_UID:$APP_UID /data /library
+# /library is where the folders to be indexed are mounted;
+# /workspace is where the file operations (create, rename, copy, move, delete)
+# can actually write - /library is expected to be mounted read-only. Mount
+# volumes over all three: anything written to the image layer is lost when the
+# container is recreated, and a churning machine id fragments snapshot history.
+#
+# All three are created here rather than left to Docker precisely so they end up
+# owned by the application. Docker seeds a named volume from the image directory
+# it covers, so a /workspace that does not exist in the image becomes a
+# root-owned volume that the app - running as $APP_UID - cannot write a byte to.
+RUN mkdir -p /data /library /workspace && chown -R $APP_UID:$APP_UID /data /library /workspace
 VOLUME ["/data"]
 
 WORKDIR /app
@@ -86,11 +93,16 @@ ENV Kestrel__Endpoints__App__Url=https://0.0.0.0:8443
 ENV Ufo__DataDirectory=/data
 ENV ConnectionStrings__DefaultConnection="Data Source=/data/ufo.db;Foreign Keys=True"
 
-# Restricts the file-browsing, search and video endpoints to what is mounted in.
-# UfoHostOptions.ForContainer() already defaults to this, so the restriction holds
-# even in an image that does not set it; stated here as the mount contract. Add
-# further roots as Ufo__AllowedRoots__1, __2 and so on.
+# Restricts the file-browsing, search, video and file-operation endpoints to what
+# is mounted in. UfoHostOptions.ForContainer() already defaults to /library, so
+# the restriction holds even in an image that does not set it; stated here as the
+# mount contract. Add further roots as Ufo__AllowedRoots__2, __3 and so on.
+#
+# /library is the tree to index and is expected to be mounted read-only, so the
+# write operations are refused there by the file system rather than by UFO.
+# /workspace is the writable root those operations are for.
 ENV Ufo__AllowedRoots__0=/library
+ENV Ufo__AllowedRoots__1=/workspace
 
 # The machine identity recorded against each snapshot. A container's own
 # /etc/machine-id is regenerated whenever the container is recreated, so set this

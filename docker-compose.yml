@@ -17,7 +17,11 @@ services:
       #   openssl rand -hex 32
       JWT__Key: "${UFO_JWT_KEY:?set UFO_JWT_KEY in .env}"
       # Every folder listed here must also be mounted below, and vice versa.
+      # /library is mounted read-only and is what snapshots are taken of;
+      # /workspace is the writable one, and the only place the file operations
+      # (create, rename, copy, move, delete) can actually change anything.
       Ufo__AllowedRoots__0: /library
+      Ufo__AllowedRoots__1: /workspace
       # Identity recorded against each snapshot. Set it to something stable for
       # this deployment, otherwise the container's regenerated /etc/machine-id is
       # used and snapshot history fragments whenever the container is recreated.
@@ -36,8 +40,23 @@ services:
       # TLS certificate is encrypted with. Losing this volume loses the
       # certificate along with everything else.
       - ufo-data:/data
-      # The folders to index. Read-only: UFO only ever reads what it indexes.
+      # The folders to index. Read-only on purpose: indexing never needs to write,
+      # and the file operations added to the Files tab are perfectly capable of
+      # deleting what they are pointed at. Keeping this mount ro is what stops a
+      # browser on the LAN reaching the indexed tree with a Delete button.
       - "${UFO_LIBRARY_PATH:-./library}:/library:ro"
+      # Somewhere the file operations can actually be used. A named volume rather
+      # than a host path, so nothing on the host is exposed by default; point
+      # UFO_WORKSPACE_PATH at a host folder to work on real files instead.
+      #
+      # A host path has to be writable by the container's uid (1654 by default,
+      # from $APP_UID in the image), which is not the uid that owns most host
+      # folders - set `user:` to a uid:gid that can write there, or chown the
+      # folder. The named volume has no such problem: Docker creates it owned by
+      # whoever first writes to it.
+      - "${UFO_WORKSPACE_PATH:-ufo-workspace}:/workspace"
 
 volumes:
   ufo-data:
+  # Only used when UFO_WORKSPACE_PATH is left unset; a host path overrides it.
+  ufo-workspace:
