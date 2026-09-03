@@ -273,6 +273,35 @@ export interface DialogData {
   isDestructive?: boolean;
 }
 
+/**
+ * One row of the keyboard-shortcuts table.
+ *
+ * The label and the defaults come down with the binding rather than being looked
+ * up here, so the page renders whatever list the server sends. Adding an action
+ * is then a server-side change; a client holding its own copy of the catalogue
+ * would be a second list to keep in step, and one that silently disagrees.
+ */
+export interface KeyBinding {
+  actionId: string;
+  label: string;
+  /** The heading the action is listed under. */
+  group: string;
+  /** The chord in effect, or '' for none. */
+  primaryKey: string;
+  secondaryKey: string;
+  defaultPrimaryKey: string;
+  defaultSecondaryKey: string;
+  /** True while this action still sits on the build's defaults. */
+  isDefault: boolean;
+}
+
+/** One action's two slots, as sent back to PUT /api/settings/shortcuts. */
+export interface KeyBindingUpdate {
+  actionId: string;
+  primaryKey: string;
+  secondaryKey: string;
+}
+
 /** Answer from GET /api/version - the running build, as major.minor.patch. */
 export interface ApplicationVersion {
   version: string;

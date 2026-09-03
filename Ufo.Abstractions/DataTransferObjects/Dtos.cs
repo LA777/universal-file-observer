@@ -73,6 +73,50 @@ public class UserSettingsDto : DtoWithUserIdAndIdBase
 }
 
 /// <summary>
+/// One row of the Settings page's keyboard-shortcuts table: what the action is
+/// called, what it is bound to now, and what it would go back to on a reset.
+/// </summary>
+/// <remarks>
+/// The label and the defaults travel with the binding rather than being looked up
+/// on the client, so the page can render a build's whole shortcut list without
+/// holding a second copy of the catalogue that could fall out of step with this one.
+/// </remarks>
+public class KeyBindingDto
+{
+    [JsonPropertyOrder(1)]
+    public string ActionId { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(2)]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The heading this action is listed under.</summary>
+    [JsonPropertyOrder(3)]
+    public string Group { get; set; } = string.Empty;
+
+    /// <summary>The chord in effect, or empty for none.</summary>
+    [JsonPropertyOrder(4)]
+    public string PrimaryKey { get; set; } = string.Empty;
+
+    /// <summary>The second chord in effect, or empty for none.</summary>
+    [JsonPropertyOrder(5)]
+    public string SecondaryKey { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(6)]
+    public string DefaultPrimaryKey { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(7)]
+    public string DefaultSecondaryKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// True when this action still sits on the build's defaults - nothing saved,
+    /// or saved back to exactly what it started as. Lets the page mark what has
+    /// been changed without recomputing the comparison itself.
+    /// </summary>
+    [JsonPropertyOrder(8)]
+    public bool IsDefault { get; set; }
+}
+
+/// <summary>
 /// The TLS certificate the server is currently presenting, as shown on the
 /// Settings page. Describes the certificate only - the private key, protected or
 /// otherwise, never leaves the server.

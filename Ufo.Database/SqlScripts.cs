@@ -174,6 +174,29 @@ public class SqlScripts
             CONSTRAINT FK_UserSettings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
         );
 
+        -- Keyboard shortcuts, one row per action the user has actually changed.
+        -- Actions left alone have no row and are answered from the build's own
+        -- defaults, so re-keying a default in a later release reaches everyone
+        -- who never expressed an opinion instead of only new accounts.
+        --
+        -- (UserId, ActionId) is UNIQUE, which is what lets UpsertUserKeyBindingSql
+        -- resolve a concurrent first-write with ON CONFLICT rather than a
+        -- read-then-insert race, exactly as UserSettings.UserId does.
+        --
+        -- The two key columns are TEXT and may be empty: an empty chord is a real
+        -- preference, meaning this action should have no key at all, and is not
+        -- the same as having no row, which means whatever the build says.
+        CREATE TABLE IF NOT EXISTS UserKeyBindings (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_UserKeyBindings PRIMARY KEY,
+            ActionId                  TEXT NOT NULL,
+            PrimaryKey                TEXT NOT NULL DEFAULT '',
+            SecondaryKey              TEXT NOT NULL DEFAULT '',
+            UserId                    TEXT NOT NULL,
+
+            CONSTRAINT UQ_UserKeyBindings_User_Action UNIQUE (UserId, ActionId),
+            CONSTRAINT FK_UserKeyBindings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
         -- Server-scoped configuration: exactly one row for the whole installation.
         -- Deliberately the only table without a UserId. A TLS certificate belongs
         -- to the listener, not to a user: Kestrel presents one certificate to
@@ -507,6 +530,28 @@ public class SqlScripts
     // whatever its sliding deadline says, so nothing is lost by dropping it.
     public const string DeleteExpiredRefreshTokensSql =
         "DELETE FROM RefreshTokens WHERE AbsoluteExpiresAt < @UtcNow;";
+
+    public const string SelectUserKeyBindingsSql =
+        "SELECT * FROM UserKeyBindings WHERE UserId = @UserId;";
+
+    // PrimaryKey and SecondaryKey are quoted: PRIMARY and KEY are both SQLite
+    // keywords, and the pair reads as one to the parser without them.
+    public const string UpsertUserKeyBindingSql =
+        "INSERT INTO UserKeyBindings (Id, ActionId, \"PrimaryKey\", SecondaryKey, UserId) " +
+        "VALUES (@Id, @ActionId, @PrimaryKey, @SecondaryKey, @UserId) " +
+        "ON CONFLICT (UserId, ActionId) DO UPDATE SET " +
+        "\"PrimaryKey\" = excluded.\"PrimaryKey\", SecondaryKey = excluded.SecondaryKey;";
+
+    /// <summary>
+    /// Drops the rows for actions the caller did not send, which is how an action
+    /// put back to its default stops being stored and starts following the build
+    /// again. Dapper expands @ActionIds into an IN list.
+    /// </summary>
+    public const string DeleteUserKeyBindingsNotInSql =
+        "DELETE FROM UserKeyBindings WHERE UserId = @UserId AND ActionId NOT IN @ActionIds;";
+
+    public const string DeleteAllUserKeyBindingsSql =
+        "DELETE FROM UserKeyBindings WHERE UserId = @UserId;";
 
     public const string SelectUserSettingsSql = "SELECT * FROM UserSettings WHERE UserId = @UserId;";
     public const string UpsertUserSettingsSql = "INSERT INTO UserSettings (Id, Theme, UserId) " +

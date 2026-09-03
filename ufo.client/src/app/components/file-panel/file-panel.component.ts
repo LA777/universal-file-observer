@@ -18,6 +18,8 @@ import { openMessageDialog, openConfirmDialog } from '../dialog/dialog.component
 import { describeHttpError, describeInfo } from '../../shared/http-error';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
+import { KeyBindingsService } from '../../services/key-bindings.service';
+import { KeyBindingActions } from '../../shared/key-binding-actions';
 import { Subscription } from 'rxjs';
 import {
   DraftCommit,
@@ -84,11 +86,14 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   constructor(
     public dialog: MatDialog,
     private fileService: FileService,
-    private snapshotService: SnapshotService
+    private snapshotService: SnapshotService,
+    private keyBindingsService: KeyBindingsService
   ) {}
 
   ngOnInit() {
     this.getRoot();
+    // Shared and replayed, so the second panel asking costs nothing.
+    this.keyBindingsService.load().subscribe();
   }
 
   ngOnDestroy() {
@@ -353,7 +358,11 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   /**
    * The shortcuts a file browser is expected to answer to.
    *
-   * Ignored while the caret is in a text box - the path bar and the name box are
+   * Which key does what is the user's, from the Settings page, so nothing is
+   * matched by name here - the service is asked what a keypress means and this
+   * only decides whether the answer can be carried out right now.
+   *
+   * Ignored while the caret is in a text box: the path bar and the name box are
    * both inputs, and Delete there means delete a character.
    */
   onPanelKeyDown(event: KeyboardEvent) {
@@ -361,37 +370,55 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    switch (event.key) {
-      case 'F2':
-        if (this.canRename) {
-          event.preventDefault();
-          this.startRename();
-        }
-        break;
+    const actionId = this.keyBindingsService.actionFor(event);
 
-      case 'F5':
-        if (this.canTransfer) {
-          // Without this the browser reloads the page and the whole session's
-          // navigation history with it.
-          event.preventDefault();
-          this.copySelection();
-        }
-        break;
-
-      case 'F6':
-        if (this.canTransfer) {
-          event.preventDefault();
-          this.moveSelection();
-        }
-        break;
-
-      case 'Delete':
-        if (this.hasSelection) {
-          event.preventDefault();
-          this.deleteSelection();
-        }
-        break;
+    if (!actionId) {
+      return;
     }
+
+    const action = this.runnableActions[actionId];
+
+    // A shortcut for something that cannot be done right now - Copy with nothing
+    // selected - is left alone rather than swallowed, so the key keeps whatever
+    // meaning the browser gives it.
+    if (!action?.canRun()) {
+      return;
+    }
+
+    // Only once the shortcut is actually being honoured: F5 would otherwise
+    // reload the page and take the session's navigation history with it.
+    event.preventDefault();
+    action.run();
+  }
+
+  /**
+   * What each bindable action does here, and when it is available.
+   *
+   * Keyed by the ids the server publishes, so a new action is a row in the
+   * catalogue plus an entry here - and one this panel does not implement is
+   * simply not found, rather than throwing.
+   */
+  private get runnableActions(): Record<string, { canRun: () => boolean; run: () => void }> {
+    return {
+      [KeyBindingActions.rename]: { canRun: () => this.canRename, run: () => this.startRename() },
+      [KeyBindingActions.createFile]: { canRun: () => this.canCreate, run: () => this.startNewFile() },
+      [KeyBindingActions.createFolder]: { canRun: () => this.canCreate, run: () => this.startNewFolder() },
+      [KeyBindingActions.copy]: { canRun: () => this.canTransfer, run: () => this.copySelection() },
+      [KeyBindingActions.move]: { canRun: () => this.canTransfer, run: () => this.moveSelection() },
+      [KeyBindingActions.delete]: { canRun: () => this.hasSelection, run: () => this.deleteSelection() },
+      [KeyBindingActions.navigateBackward]: {
+        canRun: () => this.canNavigateBackward,
+        run: () => this.navigateBackward(),
+      },
+      [KeyBindingActions.navigateForward]: {
+        canRun: () => this.canNavigateForward,
+        run: () => this.navigateForward(),
+      },
+      [KeyBindingActions.navigateUpward]: {
+        canRun: () => !!this.selectedFolder?.hasParent,
+        run: () => this.navigateToPath(this.selectedFolder.parentFolderPath),
+      },
+    };
   }
 
   // --- Create ---

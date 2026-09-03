@@ -1,0 +1,92 @@
+<section class="settings-section">
+  <h2 class="section-title">Keyboard shortcuts</h2>
+  <p class="section-hint">
+    Two keys per action, either of which will do. Click a key to record a new one,
+    Backspace to clear it, Esc to leave it alone. Saved to your account.
+  </p>
+
+  @if (isLoading()) {
+    <p class="shortcuts-state"><em>Loading shortcuts…</em></p>
+  } @else {
+    @for (group of groups(); track group.name) {
+      <h3 class="group-title">{{ group.name }}</h3>
+
+      <table class="shortcuts-table">
+        <thead>
+          <tr>
+            <th class="action-column">Action</th>
+            <th class="key-column">Key</th>
+            <th class="key-column">Alternative</th>
+            <th class="reset-column"><span class="visually-hidden">Reset</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (binding of group.bindings; track binding.actionId) {
+            <tr>
+              <td class="action-name">{{ binding.label }}</td>
+
+              @for (slot of ['primaryKey', 'secondaryKey']; track slot) {
+                <td>
+                  <button
+                    type="button"
+                    class="key-slot"
+                    [class.capturing]="isCapturing(binding.actionId, $any(slot))"
+                    [class.conflicting]="isConflicting($any(binding)[slot])"
+                    [class.unset]="!$any(binding)[slot]"
+                    [attr.aria-label]="binding.label + ' ' + (slot === 'primaryKey' ? 'key' : 'alternative key')"
+                    (click)="startCapturing(binding.actionId, $any(slot))"
+                    (blur)="stopCapturing()"
+                    (keydown)="onSlotKeyDown($event, binding.actionId, $any(slot))">
+                    {{ isCapturing(binding.actionId, $any(slot)) ? 'Press a key…' : describe($any(binding)[slot]) }}
+                  </button>
+                </td>
+              }
+
+              <td class="reset-cell">
+                @if (!isActionDefault(binding)) {
+                  <button
+                    type="button"
+                    class="icon-button"
+                    matTooltip="Reset to the default"
+                    (click)="resetAction(binding.actionId)">
+                    <mat-icon>settings_backup_restore</mat-icon>
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (hasConflicts()) {
+      <div class="error-row">
+        <mat-icon>error_outline</mat-icon>
+        <span class="error-text">
+          The same key is doing two jobs. Change one of the highlighted keys before saving.
+        </span>
+      </div>
+    }
+
+    @if (errorMessage()) {
+      <div class="error-row">
+        <mat-icon>error_outline</mat-icon>
+        <span class="error-text">{{ errorMessage() }}</span>
+      </div>
+    }
+
+    <div class="shortcuts-actions">
+      @if (savedMessage()) {
+        <span class="save-state saved">{{ savedMessage() }}</span>
+      }
+      <button type="button" class="secondary-button" (click)="resetAll()">Reset all</button>
+      <button
+        type="button"
+        class="primary-button"
+        [disabled]="isSaving() || hasConflicts() || !hasChanges()"
+        (click)="save()">
+        {{ isSaving() ? 'Saving…' : 'Save shortcuts' }}
+      </button>
+    </div>
+  }
+</section>

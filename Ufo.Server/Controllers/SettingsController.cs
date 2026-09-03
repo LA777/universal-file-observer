@@ -15,15 +15,53 @@ public class SettingsController : ControllerBase
     private readonly ILogger<SettingsController> _logger;
     private readonly IUserSettingsService _userSettingsService;
     private readonly IServerCertificateService _serverCertificateService;
+    private readonly IKeyBindingsService _keyBindingsService;
 
     public SettingsController(
         IUserSettingsService userSettingsService,
         IServerCertificateService serverCertificateService,
+        IKeyBindingsService keyBindingsService,
         ILogger<SettingsController> logger)
     {
         _userSettingsService = userSettingsService ?? throw new ArgumentNullException(nameof(userSettingsService));
         _serverCertificateService = serverCertificateService ?? throw new ArgumentNullException(nameof(serverCertificateService));
+        _keyBindingsService = keyBindingsService ?? throw new ArgumentNullException(nameof(keyBindingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    /// <summary>
+    /// Every bindable action with the keys in force for this user.
+    /// </summary>
+    /// <remarks>
+    /// Always the whole list, defaults included, so a user who has never opened
+    /// the page gets exactly the same shape as one who has rebound everything -
+    /// and the Files panes have one thing to read rather than a saved set to
+    /// reconcile against a built-in one.
+    /// </remarks>
+    [HttpGet("shortcuts")]
+    public async Task<IActionResult> GetKeyBindingsAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("GetKeyBindingsAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
+
+        return Ok(await _keyBindingsService.GetKeyBindingsAsync(userId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Saves the shortcuts table whole. Sending an action back at its default
+    /// stops it being stored, which is how "reset" is expressed.
+    /// </summary>
+    [HttpPut("shortcuts")]
+    public async Task<IActionResult> SaveKeyBindingsAsync(
+        [FromBody] KeyBindingsRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("SaveKeyBindingsAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
+
+        var serverResult = await _keyBindingsService.SaveKeyBindingsAsync(request, userId, cancellationToken);
+
+        return serverResult.Result == Result.Success ? Ok(serverResult) : BadRequest(serverResult);
     }
 
     /// <summary>

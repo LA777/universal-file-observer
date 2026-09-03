@@ -6,6 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminSettingsDividerComponent } from './admin-settings-divider/admin-settings-divider.component';
 import { ServerCertificateComponent } from './server-certificate/server-certificate.component';
+import { KeyboardShortcutsComponent } from './keyboard-shortcuts/keyboard-shortcuts.component';
 import { Theme } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
@@ -26,7 +27,8 @@ interface ThemeChoice {
     MatIconModule,
     MatTooltipModule,
     AdminSettingsDividerComponent,
-    ServerCertificateComponent
+    ServerCertificateComponent,
+    KeyboardShortcutsComponent
   ],
   templateUrl: './settings.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,

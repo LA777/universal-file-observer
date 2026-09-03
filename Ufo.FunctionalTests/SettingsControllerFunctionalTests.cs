@@ -169,6 +169,7 @@ internal static class TestConstants
     public const string JwtIssuer = "ufo-test-issuer";
     public const string JwtAudience = "ufo-test-audience";
     public const string ApiBase = "/api/settings";
+    public const string ShortcutsEndpoint = "/api/settings/shortcuts";
 }
 
 internal static class JwtTestHelper
@@ -456,6 +457,205 @@ public class SettingsControllerFunctionalTests
         // Refused for who they are, before anything looks at what they sent.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Contains("administrator", await response.Content.ReadAsStringAsync());
+    }
+
+    #endregion
+
+    #region Keyboard shortcuts
+
+    /// <summary>
+    /// Sends one action's slots, leaving every other action at whatever the
+    /// server currently has for it.
+    /// </summary>
+    private static KeyBindingsRequest ShortcutsRequest(
+        params (string ActionId, string Primary, string Secondary)[] bindings) =>
+        new()
+        {
+            Bindings = bindings
+                .Select(binding => new KeyBindingRequest
+                {
+                    ActionId = binding.ActionId,
+                    PrimaryKey = binding.Primary,
+                    SecondaryKey = binding.Secondary
+                })
+                .ToList()
+        };
+
+    [Fact]
+    public async Task GetShortcuts_WhenNothingSaved_ReturnsEveryActionOnItsDefaults()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.GetAsync(TestConstants.ShortcutsEndpoint);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(response);
+
+        Assert.NotNull(keyBindings);
+        Assert.Equal(KeyBindingActions.All.Count, keyBindings!.Count);
+        Assert.All(keyBindings, keyBinding => Assert.True(keyBinding.IsDefault));
+
+        // The conventions the function keys have had since Norton Commander.
+        Assert.Equal("F5", keyBindings.Single(k => k.ActionId == KeyBindingActions.Copy).PrimaryKey);
+        Assert.Equal("F7", keyBindings.Single(k => k.ActionId == KeyBindingActions.CreateFolder).PrimaryKey);
+
+        var delete = keyBindings.Single(k => k.ActionId == KeyBindingActions.Delete);
+        Assert.Equal("F8", delete.PrimaryKey);
+        Assert.Equal("Delete", delete.SecondaryKey);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_ThenGet_ReturnsTheSavedKeys()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var saveResponse = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, "Ctrl+C", "F5")));
+
+        Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
+
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await client.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        var copy = keyBindings!.Single(keyBinding => keyBinding.ActionId == KeyBindingActions.Copy);
+        Assert.Equal("Ctrl+C", copy.PrimaryKey);
+        Assert.Equal("F5", copy.SecondaryKey);
+        Assert.False(copy.IsDefault);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_SendingAnActionBackAtItsDefault_StopsStoringIt()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, "Ctrl+C", "")));
+
+        await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, "F5", "")));
+
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await client.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        // Back on the default, and stored as no row - which is what lets a later
+        // release re-key that default and have it reach this account.
+        var copy = keyBindings!.Single(keyBinding => keyBinding.ActionId == KeyBindingActions.Copy);
+        Assert.Equal("F5", copy.PrimaryKey);
+        Assert.True(copy.IsDefault);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_WithOneChordOnTwoActions_IsRefused()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest(
+                (KeyBindingActions.Copy, "Ctrl+D", ""),
+                (KeyBindingActions.Delete, "Ctrl+D", "")));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("more than one action", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task PutShortcuts_SwappingTwoActionsKeys_IsAccepted()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        // The reason the table is saved whole: row by row, giving Move the key
+        // Copy still holds would be a conflict on the way to a valid arrangement.
+        var response = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest(
+                (KeyBindingActions.Copy, "F6", ""),
+                (KeyBindingActions.Move, "F5", "")));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await client.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        Assert.Equal("F6", keyBindings!.Single(k => k.ActionId == KeyBindingActions.Copy).PrimaryKey);
+        Assert.Equal("F5", keyBindings.Single(k => k.ActionId == KeyBindingActions.Move).PrimaryKey);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_WithAnUnknownAction_IsRefused()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest(("files.notAThing", "F9", "")));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_ClearingBothSlots_LeavesTheActionWithNoKey()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Delete, "", "")));
+
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await client.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        // An empty chord is a preference, not an absence of one: the default must
+        // not come back and make Delete's key unremovable.
+        var delete = keyBindings!.Single(keyBinding => keyBinding.ActionId == KeyBindingActions.Delete);
+        Assert.Equal(string.Empty, delete.PrimaryKey);
+        Assert.Equal(string.Empty, delete.SecondaryKey);
+    }
+
+    [Fact]
+    public async Task Shortcuts_AreKeptApartBetweenAccounts()
+    {
+        using var factory = new SettingsApiFactory();
+        var (firstClient, _) = await factory.CreateAuthenticatedClientAsync();
+        var (secondClient, _) = await factory.CreateAuthenticatedClientAsync();
+
+        await firstClient.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, "Ctrl+C", "")));
+
+        var secondUsersBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await secondClient.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        Assert.Equal(
+            "F5",
+            secondUsersBindings!.Single(keyBinding => keyBinding.ActionId == KeyBindingActions.Copy).PrimaryKey);
+    }
+
+    [Fact]
+    public async Task Shortcuts_RequireAuthentication()
+    {
+        using var factory = new SettingsApiFactory();
+        using var client = factory.CreateClient();
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.GetAsync(TestConstants.ShortcutsEndpoint)).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.PutAsJsonAsync(
+                TestConstants.ShortcutsEndpoint,
+                ShortcutsRequest((KeyBindingActions.Copy, "F9", "")))).StatusCode);
     }
 
     #endregion
