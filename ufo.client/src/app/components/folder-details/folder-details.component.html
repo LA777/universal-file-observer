@@ -2,10 +2,16 @@
   class="folder-grid"
   [theme]="gridTheme"
   [rowData]="folderData"
+  [pinnedTopRowData]="draftRows"
   [columnDefs]="columnDefs"
   [defaultColDef]="defaultColDef"
   [getRowHeight]="getRowHeight"
   [headerHeight]="28"
+  [rowSelection]="rowSelection"
+  [stopEditingWhenCellsLoseFocus]="true"
+  [suppressClickEdit]="true"
   (gridReady)="onGridReady($event)"
+  (selectionChanged)="onSelectionChanged()"
+  (cellEditingStopped)="onCellEditingStopped($event)"
   (rowDoubleClicked)="onRowDoubleClicked($event)">
 </ag-grid-angular>

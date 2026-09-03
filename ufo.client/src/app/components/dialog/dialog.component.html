@@ -27,6 +27,15 @@
   </div>
 
   <div class="dialog-actions">
-    <button class="action-button" (click)="closeDialog()">OK</button>
+    @if (isQuestion) {
+      <button class="action-button" (click)="closeDialog()">{{cancelLabel}}</button>
+      <button
+        class="action-button primary"
+        [class.destructive]="data.isDestructive"
+        cdkFocusInitial
+        (click)="confirm()">{{data.confirmLabel}}</button>
+    } @else {
+      <button class="action-button" (click)="closeDialog()">OK</button>
+    }
   </div>
 </div>

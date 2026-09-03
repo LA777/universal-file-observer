@@ -146,3 +146,10 @@
   margin-left: 6px;
 }
 
+/* Delete gets its own colour, because it is the one button in the row whose
+   effect no amount of navigating back will undo. */
+.drive-list button.destructive:hover:not(:disabled) {
+  background-color: var(--ufo-danger-tint);
+  border-color: var(--ufo-danger-border);
+  color: var(--ufo-danger-text);
+}

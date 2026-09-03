@@ -15,6 +15,13 @@ export interface FsItem {
 export interface FsItemUi extends FsItem {
   fileExtension: string;
   isFile: boolean;
+  /**
+   * A row that is not on disk yet: the blank line New File / New Folder puts at
+   * the top of the listing, which becomes a file only once a name is typed into
+   * it. Nothing else in the panel treats a draft as an item - it cannot be
+   * selected, copied, or navigated into.
+   */
+  isDraft?: boolean;
 }
 
 
@@ -136,6 +143,58 @@ export interface FileSystemRoot {
    */
   roots: string[];
   folder: Folder
+  /** The host's naming rules, so a bad name is caught while it is being typed. */
+  nameRules: FileNameRules;
+}
+
+/**
+ * What the server will accept as a file or folder name.
+ *
+ * These come from the host rather than being hard-coded here, because they
+ * genuinely differ: a colon is a legal character in a Linux file name and an
+ * impossible one on Windows, and guessing either way is wrong on the other. The
+ * server re-checks every name it is sent - this only exists so the user finds out
+ * before they press Enter.
+ */
+export interface FileNameRules {
+  /** Characters a name may not contain, as one string to scan. */
+  invalidCharacters: string;
+  /** Whole names the host reserves - the Windows device names, or nothing. */
+  reservedNames: string[];
+  maximumLength: number;
+  rejectsTrailingDotOrSpace: boolean;
+  /** False where "README.md" and "readme.md" are the same entry. */
+  isCaseSensitive: boolean;
+}
+
+/** Answer from create and rename: where the entry ended up. */
+export interface FileSystemOperationResult {
+  path?: string;
+  message?: string;
+}
+
+/** One entry a copy, move, or delete could not handle. */
+export interface FsItemFailure {
+  path: string;
+  /** The entry's own name, so a message reads without the full path. */
+  name: string;
+  reason: string;
+  /**
+   * True when the only obstacle was something already at the destination, which
+   * is the one failure the user can resolve by answering a question.
+   */
+  isConflict: boolean;
+}
+
+/**
+ * The answer to a copy, move, or delete over several entries.
+ *
+ * A partial failure is not a failed request - nineteen files copied and one was
+ * locked - so this arrives with a 200 and the panel reports the difference.
+ */
+export interface FsBatchResult {
+  succeededCount: number;
+  failures: FsItemFailure[];
 }
 
 /** Criteria for POST /api/search (indexed snapshot data). */
@@ -203,6 +262,15 @@ export interface DialogData {
   /** Technical text (status, URL, raw server response), hidden behind a toggle. */
   details?: string;
   severity?: DialogSeverity;
+  /**
+   * Set to turn the popup into a question: the label of the button that goes
+   * ahead ('Delete', 'Copy'). Left unset, the popup is a statement with one OK.
+   */
+  confirmLabel?: string;
+  /** The label declining it. Defaults to 'Cancel' whenever a question is asked. */
+  cancelLabel?: string;
+  /** Draws the confirm button as the destructive choice. */
+  isDestructive?: boolean;
 }
 
 /** Answer from GET /api/version - the running build, as major.minor.patch. */

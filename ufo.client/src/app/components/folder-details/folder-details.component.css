@@ -68,3 +68,15 @@
   height: 300px;
   object-fit: contain;
 }
+
+/*
+ * The name box is a popup editor, so the grid wraps it in its own surface. That
+ * surface is themed by AG Grid rather than by --ufo-*, and it would otherwise
+ * draw a second border and a light background around the box.
+ */
+:host ::ng-deep .ag-popup-editor {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}

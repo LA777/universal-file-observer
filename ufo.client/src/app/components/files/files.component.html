@@ -1,15 +1,23 @@
 <div class="dual-panel-container">
   <app-file-panel
+    #leftPanel
     panelId="left"
     [isActive]="activePanel === 'left'"
-    (activate)="setActive('left')">
+    [otherPanelPath]="rightPath"
+    (activate)="setActive('left')"
+    (pathChanged)="leftPath = $event"
+    (otherPanelChanged)="rightPanel.refresh()">
   </app-file-panel>
 
   <div class="panel-divider"></div>
 
   <app-file-panel
+    #rightPanel
     panelId="right"
     [isActive]="activePanel === 'right'"
-    (activate)="setActive('right')">
+    [otherPanelPath]="leftPath"
+    (activate)="setActive('right')"
+    (pathChanged)="rightPath = $event"
+    (otherPanelChanged)="leftPanel.refresh()">
   </app-file-panel>
 </div>

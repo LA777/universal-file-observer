@@ -1,16 +1,31 @@
-import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChild, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { Folder, FileSystemRoot, DialogData, FsItemUi, SnapshotSummary } from '../../models/models';
-import { openMessageDialog } from '../dialog/dialog.component';
+import {
+  Folder,
+  FileSystemRoot,
+  DialogData,
+  FileNameRules,
+  FsBatchResult,
+  FsItemFailure,
+  FsItemUi,
+  SnapshotSummary,
+} from '../../models/models';
+import { openMessageDialog, openConfirmDialog } from '../dialog/dialog.component';
 import { describeHttpError, describeInfo } from '../../shared/http-error';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { Subscription } from 'rxjs';
-import { FolderDetailsComponent } from '../folder-details/folder-details.component';
+import {
+  DraftCommit,
+  FolderDetailsComponent,
+  RenameRequest,
+} from '../folder-details/folder-details.component';
+import { STRICT_FILE_NAME_RULES } from '../../shared/file-name-validation';
+import { fileExtensionOf, fullNameOf, isParentRow, FOLDER_EXTENSION_LABEL } from '../../shared/fs-item';
 
 @Component({
   selector: 'app-file-panel',
@@ -23,7 +38,23 @@ import { FolderDetailsComponent } from '../folder-details/folder-details.compone
 export class FilePanelComponent implements OnInit, OnDestroy {
   @Input() panelId: string = 'panel';
   @Input() isActive: boolean = false;
+  /**
+   * Where the other panel is standing, which is where Copy and Move send things.
+   * Null until that panel has loaded, and then those two buttons stay disabled -
+   * there is nowhere to send anything to yet.
+   */
+  @Input() otherPanelPath: string | null = null;
+
   @Output() activate = new EventEmitter<void>();
+  /** This panel's folder changed, so the other one can be told where to aim. */
+  @Output() pathChanged = new EventEmitter<string>();
+  /**
+   * Something was written outside this panel - a copy or move that landed in the
+   * other one, which is now showing a listing that is one entry short.
+   */
+  @Output() otherPanelChanged = new EventEmitter<void>();
+
+  @ViewChild(FolderDetailsComponent) private folderDetails?: FolderDetailsComponent;
 
   fileSystemRoot: FileSystemRoot;
   selectedFolder: Folder;
@@ -32,9 +63,19 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   isVideosView: boolean = false;
   isImagesView: boolean = false;
 
+  /** Replaced by the host's own rules as soon as the root listing arrives. */
+  nameRules: FileNameRules = STRICT_FILE_NAME_RULES;
+
+  /** The blank row waiting for a name, or null when there is not one. */
+  draftItem: FsItemUi | null = null;
+
+  /** What Copy, Move, Delete and Rename act on. Never holds the '..' row. */
+  selectedItems: FsItemUi[] = [];
+
   private subscriptionRoot: Subscription;
   private subscriptionFolder: Subscription;
   private subscriptionCreateSnapshot: Subscription;
+  private subscriptionWrite: Subscription;
 
   /** Browser-style navigation history of visited folder paths. */
   private history: string[] = [];
@@ -54,6 +95,7 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.subscriptionRoot?.unsubscribe();
     this.subscriptionFolder?.unsubscribe();
     this.subscriptionCreateSnapshot?.unsubscribe();
+    this.subscriptionWrite?.unsubscribe();
   }
 
   /**
@@ -87,6 +129,9 @@ export class FilePanelComponent implements OnInit, OnDestroy {
 
         this.fileSystemRoot = result;
         this.selectedFolder = result.folder;
+        // Sent with the root because it is the one call every panel makes before
+        // it can show anything, so the name box is never opened without them.
+        this.nameRules = result.nameRules ?? STRICT_FILE_NAME_RULES;
         this.initiateFolder(result.folder);
         this.recordHistory(result.folder.fullPath);
       },
@@ -99,6 +144,12 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   initiateFolder(folder: Folder) {
     this.selectedFolder = folder;
     this.folderData = [];
+    // Both belong to the listing being replaced: a selection of paths that are no
+    // longer on screen would still be what Delete acted on, and a draft would
+    // create its file in whichever folder happened to be open when it closed.
+    this.selectedItems = [];
+    this.draftItem = null;
+    this.pathChanged.emit(folder.fullPath);
 
     if (folder.hasParent) {
       this.folderData.push({
@@ -255,6 +306,374 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.loadFolder(this.history[this.historyIndex], false);
   }
 
+  // ---------------------------------------------------------------------------
+  // File and folder operations
+  // ---------------------------------------------------------------------------
+
+  /** Re-reads the current folder. The other panel calls this after writing into it. */
+  refresh() {
+    if (this.selectedFolder?.fullPath) {
+      this.loadFolder(this.selectedFolder.fullPath, false);
+    }
+  }
+
+  get hasSelection(): boolean {
+    return this.selectedItems.length > 0;
+  }
+
+  /** A new entry needs a folder to go in, and only one blank row at a time. */
+  get canCreate(): boolean {
+    return !!this.selectedFolder && !this.draftItem;
+  }
+
+  /** There is no renaming two entries to one name, so this wants exactly one. */
+  get canRename(): boolean {
+    return this.selectedItems.length === 1 && this.isFilesView && !this.draftItem;
+  }
+
+  get canTransfer(): boolean {
+    return this.hasSelection && !!this.otherPanelPath;
+  }
+
+  /** Names the destination in the tooltip, since the button itself cannot show it. */
+  transferTitle(verb: string, shortcutKey: string): string {
+    return this.otherPanelPath
+      ? `${verb} to ${this.otherPanelPath} (${shortcutKey})`
+      : `${verb} to the other panel (${shortcutKey}) - the other panel has not loaded yet`;
+  }
+
+  /**
+   * The '..' row is filtered out here rather than left to every caller: it is not
+   * an entry on disk, and the grid only excludes it from selection by mouse.
+   */
+  onSelectionChanged(items: FsItemUi[]) {
+    this.selectedItems = items.filter(item => !isParentRow(item) && !item.isDraft);
+  }
+
+  /**
+   * The shortcuts a file browser is expected to answer to.
+   *
+   * Ignored while the caret is in a text box - the path bar and the name box are
+   * both inputs, and Delete there means delete a character.
+   */
+  onPanelKeyDown(event: KeyboardEvent) {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    switch (event.key) {
+      case 'F2':
+        if (this.canRename) {
+          event.preventDefault();
+          this.startRename();
+        }
+        break;
+
+      case 'F5':
+        if (this.canTransfer) {
+          // Without this the browser reloads the page and the whole session's
+          // navigation history with it.
+          event.preventDefault();
+          this.copySelection();
+        }
+        break;
+
+      case 'F6':
+        if (this.canTransfer) {
+          event.preventDefault();
+          this.moveSelection();
+        }
+        break;
+
+      case 'Delete':
+        if (this.hasSelection) {
+          event.preventDefault();
+          this.deleteSelection();
+        }
+        break;
+    }
+  }
+
+  // --- Create ---
+
+  startNewFile() {
+    this.beginDraft(true);
+  }
+
+  startNewFolder() {
+    this.beginDraft(false);
+  }
+
+  /**
+   * Puts a blank row at the top of the listing with the cursor in its name.
+   *
+   * Nothing is created yet, and nothing will be unless a name is typed: closing
+   * the row empty leaves the folder exactly as it was. That is what makes this
+   * safe to reach for by accident.
+   */
+  private beginDraft(isFile: boolean) {
+    if (!this.selectedFolder) {
+      return;
+    }
+
+    this.draftItem = {
+      name: '',
+      size: undefined,
+      // A folder shows the listing's own label rather than an extension; a new
+      // file has none until the user types one as part of the name.
+      fileExtension: isFile ? '' : FOLDER_EXTENSION_LABEL,
+      sha256Hash: '',
+      id: '',
+      fullPath: '',
+      isHidden: false,
+      hasParent: false,
+      parentFolderPath: this.selectedFolder.fullPath,
+      createdAt: '',
+      updatedAt: '',
+      isFile,
+      isDraft: true,
+    };
+  }
+
+  /** The blank row was closed with nothing in it. */
+  onDraftCancelled() {
+    this.draftItem = null;
+  }
+
+  onDraftCommitted(commit: DraftCommit) {
+    const parentPath = this.selectedFolder?.fullPath;
+    this.draftItem = null;
+
+    if (!parentPath) {
+      return;
+    }
+
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = this.fileService.createEntry(parentPath, commit.name, commit.isFile).subscribe({
+      next: () => this.refresh(),
+      error: (error) => {
+        this.showErrorDialog(error, `create the ${commit.isFile ? 'file' : 'folder'}`, commit.name);
+        // The listing never showed the new entry, but the folder may have changed
+        // underneath for the very reason the create failed.
+        this.refresh();
+      }
+    });
+  }
+
+
+  // --- Rename ---
+
+  /** Opens the name box on the selected row - the Rename button and F2. */
+  startRename() {
+    this.folderDetails?.startRenamingSelected();
+  }
+
+  /**
+   * A name was typed over an existing one.
+   *
+   * The Name column holds a file's stem, so the extension is put back before the
+   * server is asked - renaming "report" to "summary" must not turn "report.pdf"
+   * into an extensionless "summary".
+   */
+  onRenameRequested(request: RenameRequest) {
+    const newFullName = request.newName + fileExtensionOf(request.item);
+
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = this.fileService.renameEntry(request.item.fullPath, newFullName).subscribe({
+      next: () => this.refresh(),
+      error: (error) => {
+        this.showErrorDialog(error, 'rename', fullNameOf(request.item));
+        // Reloading is also what puts the old name back on screen.
+        this.refresh();
+      }
+    });
+  }
+
+
+  // --- Copy, move and delete ---
+
+  copySelection() {
+    this.transferSelection(false);
+  }
+
+  moveSelection() {
+    this.transferSelection(true);
+  }
+
+  /**
+   * Sends the selection to the other panel's folder.
+   *
+   * Two panes are the whole reason the destination needs no dialog of its own:
+   * the user put the other one where they wanted it, and it is on screen next to
+   * this one. The confirmation still names it, because "the other panel" is not
+   * something to take on trust before moving thirty files.
+   */
+  private transferSelection(isMove: boolean) {
+    const destinationPath = this.otherPanelPath;
+
+    if (!destinationPath || !this.hasSelection) {
+      return;
+    }
+
+    const items = [...this.selectedItems];
+    const verb = isMove ? 'Move' : 'Copy';
+
+    openConfirmDialog(this.dialog, {
+      title: verb,
+      severity: 'info',
+      message: `${verb} ${describeItems(items)} to "${destinationPath}"?`,
+      confirmLabel: verb,
+    }).subscribe(isConfirmed => {
+      if (isConfirmed) {
+        this.runTransfer(items.map(item => item.fullPath), destinationPath, isMove, false);
+      }
+    });
+  }
+
+  private runTransfer(paths: string[], destinationPath: string, isMove: boolean, overwrite: boolean) {
+    const transfer = isMove
+      ? this.fileService.moveEntries(paths, destinationPath, overwrite)
+      : this.fileService.copyEntries(paths, destinationPath, overwrite);
+
+    const action = isMove ? 'move the items' : 'copy the items';
+
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = transfer.subscribe({
+      next: (result) => {
+        // A move empties rows out of this panel; both fill the other one.
+        if (isMove) {
+          this.refresh();
+        }
+
+        if (result.succeededCount > 0) {
+          this.otherPanelChanged.emit();
+        }
+
+        this.handleTransferFailures(result, destinationPath, isMove, overwrite);
+      },
+      error: (error) => {
+        this.showErrorDialog(error, action, destinationPath);
+        this.refresh();
+      }
+    });
+  }
+
+  /**
+   * What to do about the entries that did not make it.
+   *
+   * A collision is the one failure the user can answer, so it is put to them as a
+   * question rather than reported as an error - and only the entries that
+   * actually collided are re-sent, so that agreeing to replace two files cannot
+   * overwrite a third that failed for some other reason.
+   */
+  private handleTransferFailures(
+    result: FsBatchResult,
+    destinationPath: string,
+    isMove: boolean,
+    wasOverwrite: boolean,
+  ) {
+    const failures = result.failures ?? [];
+
+    if (failures.length === 0) {
+      return;
+    }
+
+    const conflicts = failures.filter(failure => failure.isConflict);
+
+    if (!wasOverwrite && conflicts.length === failures.length) {
+      openConfirmDialog(this.dialog, {
+        title: 'Already exists',
+        severity: 'info',
+        message: `${describeNames(conflicts)} already ${conflicts.length === 1 ? 'exists' : 'exist'} in "${destinationPath}".`,
+        hint: 'Replacing overwrites what is there now, and that cannot be undone.',
+        confirmLabel: 'Replace',
+        isDestructive: true,
+      }).subscribe(isConfirmed => {
+        if (isConfirmed) {
+          this.runTransfer(conflicts.map(conflict => conflict.path), destinationPath, isMove, true);
+        }
+      });
+
+      return;
+    }
+
+    this.showFailuresDialog(
+      isMove ? 'Move' : 'Copy',
+      result.succeededCount,
+      failures,
+      isMove ? 'moved' : 'copied',
+    );
+  }
+
+  /**
+   * Deletes the selection for good.
+   *
+   * There is no recycle bin behind this and no undo in front of it, so the
+   * question says exactly what is about to go and how permanent it is.
+   */
+  deleteSelection() {
+    if (!this.hasSelection) {
+      return;
+    }
+
+    const items = [...this.selectedItems];
+    const containsFolder = items.some(item => !item.isFile);
+
+    openConfirmDialog(this.dialog, {
+      title: 'Delete',
+      severity: 'error',
+      message: `Delete ${describeItems(items)} permanently?`,
+      hint: containsFolder
+        ? 'Folders go with everything inside them. This cannot be undone.'
+        : 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    }).subscribe(isConfirmed => {
+      if (isConfirmed) {
+        this.runDelete(items.map(item => item.fullPath));
+      }
+    });
+  }
+
+  private runDelete(paths: string[]) {
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = this.fileService.deleteEntries(paths).subscribe({
+      next: (result) => {
+        this.refresh();
+
+        if (result.failures?.length) {
+          this.showFailuresDialog('Delete', result.succeededCount, result.failures, 'deleted');
+        }
+      },
+      error: (error) => {
+        this.showErrorDialog(error, 'delete the items');
+        this.refresh();
+      }
+    });
+  }
+
+
+  /**
+   * Names the entries an operation could not handle, and says how many it did.
+   *
+   * The count matters as much as the list: nineteen files copied and one locked
+   * is a different situation from nothing having happened, and a popup that only
+   * shows the failure reads like the second.
+   */
+  private showFailuresDialog(title: string, succeededCount: number, failures: FsItemFailure[], pastVerb: string) {
+    const message = succeededCount > 0
+      ? `${succeededCount} of ${succeededCount + failures.length} items were ${pastVerb}. ${failures.length} could not be.`
+      : `Nothing was ${pastVerb}.`;
+
+    openMessageDialog(this.dialog, {
+      title,
+      severity: 'error',
+      message,
+      hint: failures.length === 1 ? failures[0].reason : undefined,
+      details: failures.map(failure => `${failure.name}: ${failure.reason}`).join('\n'),
+    });
+  }
+
   /** Confirms a created snapshot by name and id, not by dumping the response. */
   showSnapshotCreatedDialog(snapshot: SnapshotSummary) {
     const folderName = snapshot?.rootOnlyFolder?.fullPath ?? this.selectedFolder?.fullPath;
@@ -286,4 +705,29 @@ export class FilePanelComponent implements OnInit, OnDestroy {
 
     openMessageDialog(this.dialog, dialogData);
   }
+}
+
+/** "the folder \"backup\"", "3 items" - the subject of a confirmation question. */
+function describeItems(items: FsItemUi[]): string {
+  if (items.length !== 1) {
+    return `${items.length} items`;
+  }
+
+  const [onlyItem] = items;
+
+  return `the ${onlyItem.isFile ? 'file' : 'folder'} "${fullNameOf(onlyItem)}"`;
+}
+
+/**
+ * The names in a list of failures, as a phrase. A long list is cut short rather
+ * than filling the popup - the full list is always in the technical details.
+ */
+function describeNames(failures: FsItemFailure[]): string {
+  const maximumNamesShown = 3;
+  const names = failures.slice(0, maximumNamesShown).map(failure => `"${failure.name}"`);
+  const remainingCount = failures.length - names.length;
+
+  return remainingCount > 0
+    ? `${names.join(', ')} and ${remainingCount} more`
+    : names.join(', ');
 }

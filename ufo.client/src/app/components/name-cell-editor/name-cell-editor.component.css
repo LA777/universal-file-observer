@@ -1,0 +1,60 @@
+/* No colour is named here: every value is a theme token, so the name box follows
+   the app between the dark and light palettes like the rest of the chrome. */
+:host {
+  display: block;
+  /* The grid's overlay does not hand a popup the cell's width, so the box states
+     its own - wide enough for a file name, and free to grow with the column. */
+  min-width: 260px;
+}
+
+.name-editor {
+  position: relative;
+  width: 100%;
+}
+
+.name-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  /* Matches the row it sits over, so opening the box does not shift the line. */
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--ufo-accent-strong);
+  border-radius: 3px;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text);
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+
+.name-input.invalid {
+  border-color: var(--ufo-danger-border);
+  background-color: var(--ufo-danger-tint);
+}
+
+/*
+ * The reason hangs below the box rather than pushing it open: the grid sizes
+ * every row before the editor exists, so anything that grows the cell is clipped.
+ * Sitting over the row underneath is what makes it readable at all.
+ */
+.validation-message {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  min-width: 100%;
+  width: max-content;
+  max-width: 320px;
+  margin-top: 1px;
+  padding: 4px 8px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 3px;
+  background-color: var(--ufo-bg-surface);
+  color: var(--ufo-danger-text);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: 0 2px 6px var(--ufo-shadow-soft);
+}

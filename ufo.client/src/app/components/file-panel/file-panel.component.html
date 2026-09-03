@@ -1,4 +1,4 @@
-<div class="file-panel" [class.active]="isActive" (click)="onPanelClick()">
+<div class="file-panel" [class.active]="isActive" (click)="onPanelClick()" (keydown)="onPanelKeyDown($event)">
   @if (!selectedFolder) {
     <p><em>Loading... Please refresh once the ASP.NET backend has started.</em></p>
   }
@@ -28,6 +28,26 @@
         <button (click)="navigateToPath(selectedFolder.parentFolderPath)" [disabled]="!selectedFolder.hasParent" title="Upward">
           <mat-icon>arrow_upward</mat-icon>
         </button>
+
+        <span class="nav-label">Edit:</span>
+        <button (click)="startRename()" [disabled]="!canRename" title="Rename (F2)">
+          <mat-icon>drive_file_rename_outline</mat-icon>
+        </button>
+        <button (click)="startNewFile()" [disabled]="!canCreate" title="New file">
+          <mat-icon>note_add</mat-icon>
+        </button>
+        <button (click)="startNewFolder()" [disabled]="!canCreate" title="New folder">
+          <mat-icon>create_new_folder</mat-icon>
+        </button>
+        <button (click)="copySelection()" [disabled]="!canTransfer" [title]="transferTitle('Copy', 'F5')">
+          <mat-icon>content_copy</mat-icon>
+        </button>
+        <button (click)="moveSelection()" [disabled]="!canTransfer" [title]="transferTitle('Move', 'F6')">
+          <mat-icon>drive_file_move</mat-icon>
+        </button>
+        <button (click)="deleteSelection()" [disabled]="!hasSelection" class="destructive" title="Delete (Del)">
+          <mat-icon>delete</mat-icon>
+        </button>
       </div>
       <div class="current-folder">
         <mat-icon class="folder-icon">folder</mat-icon>
@@ -52,7 +72,13 @@
       [isFilesView]="isFilesView"
       [isVideosView]="isVideosView"
       [isImagesView]="isImagesView"
-      (rowDoubleClick)="onRowDoubleClick($event)">
+      [nameRules]="nameRules"
+      [draftItem]="draftItem"
+      (rowDoubleClick)="onRowDoubleClick($event)"
+      (selectionChanged)="onSelectionChanged($event)"
+      (renameRequested)="onRenameRequested($event)"
+      (draftCommitted)="onDraftCommitted($event)"
+      (draftCancelled)="onDraftCancelled()">
     </app-folder-details>
   }
 </div>

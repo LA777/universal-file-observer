@@ -1,0 +1,16 @@
+<div class="name-editor">
+  <input
+    #nameInput
+    class="name-input"
+    [class.invalid]="validationError()"
+    type="text"
+    spellcheck="false"
+    autocomplete="off"
+    [value]="name()"
+    (input)="onInput(nameInput.value)"
+    (keydown)="onKeyDown($event)" />
+
+  @if (validationError(); as message) {
+    <div class="validation-message" role="alert">{{message}}</div>
+  }
+</div>

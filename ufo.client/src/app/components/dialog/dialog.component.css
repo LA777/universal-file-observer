@@ -101,6 +101,7 @@
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   padding-top: 12px;
 }
 
@@ -119,6 +120,31 @@
 .action-button:hover {
   background-color: var(--ufo-bg-control-hover);
   border-color: var(--ufo-border-control-hover);
+}
+
+/* The choice that goes ahead, so a question does not read as two equal options. */
+.action-button.primary {
+  background-color: var(--ufo-accent-strong);
+  border-color: var(--ufo-accent);
+  color: var(--ufo-text-on-accent);
+  font-weight: 600;
+}
+
+.action-button.primary:hover {
+  background-color: var(--ufo-accent);
+  border-color: var(--ufo-accent);
+}
+
+/* Deleting is not undoable here, so the button that does it says so. */
+.action-button.primary.destructive {
+  background-color: var(--ufo-danger-tint);
+  border-color: var(--ufo-danger-border);
+  color: var(--ufo-danger-text);
+}
+
+.action-button.primary.destructive:hover {
+  background-color: var(--ufo-danger-border);
+  color: var(--ufo-text-on-accent);
 }
 
 .icon-button {
