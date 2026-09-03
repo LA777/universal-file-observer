@@ -139,6 +139,26 @@ public class FolderTabsApiFactory : WebApplicationFactory<Program>
 
         return base.DisposeAsync();
     }
+
+    /// <summary>
+    /// The synchronous path matters as much as the asynchronous one.
+    /// </summary>
+    /// <remarks>
+    /// A test written as <c>using var factory = ...</c> disposes through here,
+    /// not through <see cref="DisposeAsync"/> - so a factory that only overrode
+    /// the async one would hold its shared in-memory database open for the whole
+    /// run. The database lives exactly as long as a connection to it does, which
+    /// is what makes the leak invisible until the run is long enough to matter.
+    /// </remarks>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _sqLiteConnection?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 }
 
 #endregion
@@ -175,8 +195,11 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
-    private static FolderTabsRequest RequestFor(string panelId, params string[] folderPaths) =>
-        new() { PanelId = panelId, FolderPaths = folderPaths };
+    private const string LockEndpoint = "/api/foldertabs/lock";
+    private const string UnlockEndpoint = "/api/foldertabs/unlock";
+
+    private static FolderTabRequest RequestFor(string panelId, string folderPath) =>
+        new() { PanelId = panelId, FolderPath = folderPath };
 
     [Fact]
     public async Task GetFolderTabs_WhenNoneAreLocked_ReturnsNothing()
@@ -193,16 +216,17 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PutFolderTabs_ThenGet_ReturnsThemInOrder()
+    public async Task Lock_ThenGet_ReturnsThemInOrder()
     {
         using var factory = new FolderTabsApiFactory();
         var (client, _) = await factory.CreateAuthenticatedClientAsync();
 
-        var saveResponse = await client.PutAsJsonAsync(
-            Endpoint,
-            RequestFor("left", _secondFolder, _firstFolder));
-
-        Assert.Equal(HttpStatusCode.OK, saveResponse.StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PostAsJsonAsync(LockEndpoint, RequestFor("left", _secondFolder))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await client.PostAsJsonAsync(LockEndpoint, RequestFor("left", _firstFolder))).StatusCode);
 
         var folderTabs = await (await client.GetAsync(Endpoint)).Content.ReadFromJsonAsync<List<FolderTabDto>>();
 
@@ -213,16 +237,15 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PutFolderTabs_ReplacesOnlyTheNamedPanel()
+    public async Task Lock_TouchesOnlyThePanelItNames()
     {
         using var factory = new FolderTabsApiFactory();
         var (client, _) = await factory.CreateAuthenticatedClientAsync();
 
-        await client.PutAsJsonAsync(Endpoint, RequestFor("left", _firstFolder));
-        await client.PutAsJsonAsync(Endpoint, RequestFor("right", _secondFolder));
+        await client.PostAsJsonAsync(LockEndpoint, RequestFor("left", _firstFolder));
+        await client.PostAsJsonAsync(LockEndpoint, RequestFor("right", _secondFolder));
 
-        // The panes save independently. Were the save account-wide, the second
-        // call would have deleted the first pane's tab.
+        // The panes save independently, and one lock never touches another tab.
         var folderTabs = await (await client.GetAsync(Endpoint)).Content.ReadFromJsonAsync<List<FolderTabDto>>();
 
         Assert.Equal(2, folderTabs!.Count);
@@ -231,13 +254,13 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PutFolderTabs_WithAnEmptyList_UnlocksThePanelsLastTab()
+    public async Task Unlock_RemovesTheTab()
     {
         using var factory = new FolderTabsApiFactory();
         var (client, _) = await factory.CreateAuthenticatedClientAsync();
 
-        await client.PutAsJsonAsync(Endpoint, RequestFor("left", _firstFolder));
-        var response = await client.PutAsJsonAsync(Endpoint, RequestFor("left"));
+        await client.PostAsJsonAsync(LockEndpoint, RequestFor("left", _firstFolder));
+        var response = await client.PostAsJsonAsync(UnlockEndpoint, RequestFor("left", _firstFolder));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -246,25 +269,25 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PutFolderTabs_WithAFolderThatIsNotThere_IsRefused()
+    public async Task Lock_WithAFolderThatIsNotThere_IsRefused()
     {
         using var factory = new FolderTabsApiFactory();
         var (client, _) = await factory.CreateAuthenticatedClientAsync();
 
-        var response = await client.PutAsJsonAsync(
-            Endpoint,
+        var response = await client.PostAsJsonAsync(
+            LockEndpoint,
             RequestFor("left", Path.Combine(_testRoot, "never-existed")));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
-    public async Task PutFolderTabs_WithAPanelThatDoesNotExist_IsRefused()
+    public async Task Lock_WithAPanelThatDoesNotExist_IsRefused()
     {
         using var factory = new FolderTabsApiFactory();
         var (client, _) = await factory.CreateAuthenticatedClientAsync();
 
-        var response = await client.PutAsJsonAsync(Endpoint, RequestFor("middle", _firstFolder));
+        var response = await client.PostAsJsonAsync(LockEndpoint, RequestFor("middle", _firstFolder));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -276,7 +299,7 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
         var (firstClient, _) = await factory.CreateAuthenticatedClientAsync();
         var (secondClient, _) = await factory.CreateAuthenticatedClientAsync();
 
-        await firstClient.PutAsJsonAsync(Endpoint, RequestFor("left", _firstFolder));
+        await firstClient.PostAsJsonAsync(LockEndpoint, RequestFor("left", _firstFolder));
 
         var secondUsersTabs = await (await secondClient.GetAsync(Endpoint))
             .Content.ReadFromJsonAsync<List<FolderTabDto>>();
@@ -293,7 +316,10 @@ public class FolderTabsControllerFunctionalTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync(Endpoint)).StatusCode);
         Assert.Equal(
             HttpStatusCode.Unauthorized,
-            (await client.PutAsJsonAsync(Endpoint, RequestFor("left", _firstFolder))).StatusCode);
+            (await client.PostAsJsonAsync(LockEndpoint, RequestFor("left", _firstFolder))).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            (await client.PostAsJsonAsync(UnlockEndpoint, RequestFor("left", _firstFolder))).StatusCode);
     }
 }
 

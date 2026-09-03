@@ -553,12 +553,28 @@ public class SqlScripts
     public const string SelectFolderTabsSql =
         "SELECT * FROM FolderTabs WHERE UserId = @UserId ORDER BY PanelId, Position;";
 
-    public const string DeleteFolderTabsForPanelSql =
-        "DELETE FROM FolderTabs WHERE UserId = @UserId AND PanelId = @PanelId;";
-
+    /// <summary>
+    /// Locks one folder, and does nothing if it was locked already.
+    /// </summary>
+    /// <remarks>
+    /// One row at a time, deliberately. A statement that replaced a panel's whole
+    /// set would be driven by whatever the client believed the other tabs to be -
+    /// and a client that failed to load them believes there are none, so the next
+    /// padlock click would delete every locked tab the user had.
+    ///
+    /// Position is read off the end of the panel rather than passed in, so the
+    /// caller never has to know what the other rows are.
+    /// </remarks>
     public const string InsertFolderTabSql =
         "INSERT INTO FolderTabs (Id, PanelId, FolderPath, Position, UserId) " +
-        "VALUES (@Id, @PanelId, @FolderPath, @Position, @UserId);";
+        "VALUES (@Id, @PanelId, @FolderPath, " +
+        "(SELECT COALESCE(MAX(Position) + 1, 0) FROM FolderTabs WHERE UserId = @UserId AND PanelId = @PanelId), " +
+        "@UserId) " +
+        "ON CONFLICT (UserId, PanelId, FolderPath) DO NOTHING;";
+
+    public const string DeleteFolderTabSql =
+        "DELETE FROM FolderTabs " +
+        "WHERE UserId = @UserId AND PanelId = @PanelId AND FolderPath = @FolderPath;";
 
     public const string SelectUserKeyBindingsSql =
         "SELECT * FROM UserKeyBindings WHERE UserId = @UserId;";

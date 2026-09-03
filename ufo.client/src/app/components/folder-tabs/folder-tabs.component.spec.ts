@@ -8,6 +8,7 @@ describe('FolderTabsComponent', () => {
       folderPath: `/library/${name}`,
       name,
       isLocked,
+      isAvailable: true,
       history: [`/library/${name}`],
       historyIndex: 0,
     };

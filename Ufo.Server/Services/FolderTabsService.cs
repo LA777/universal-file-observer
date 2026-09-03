@@ -9,14 +9,20 @@ namespace Ufo.Server.Services;
 public interface IFolderTabsService
 {
     /// <summary>
-    /// The user's locked tabs, in display order, with anything the server may no
-    /// longer read left out.
+    /// The user's locked tabs, in display order, each flagged with whether its
+    /// folder is there right now.
     /// </summary>
     Task<IReadOnlyList<FolderTabDto>> GetFolderTabsAsync(Ulid userId, CancellationToken cancellationToken);
 
-    /// <summary>Replaces one panel's locked tabs.</summary>
-    Task<ServerResult> SaveFolderTabsAsync(
-        FolderTabsRequest request,
+    /// <summary>Locks one tab. Locking one already locked is not an error.</summary>
+    Task<ServerResult> LockFolderTabAsync(
+        FolderTabRequest request,
+        Ulid userId,
+        CancellationToken cancellationToken);
+
+    /// <summary>Unlocks one tab. Unlocking one that is not locked is not an error.</summary>
+    Task<ServerResult> UnlockFolderTabAsync(
+        FolderTabRequest request,
         Ulid userId,
         CancellationToken cancellationToken);
 }
@@ -28,13 +34,6 @@ public class FolderTabsService : IFolderTabsService
     /// panes - an id outside this set is a row nothing would ever restore.
     /// </summary>
     private static readonly string[] KnownPanelIds = ["left", "right"];
-
-    /// <summary>
-    /// As many tabs as one pane will keep. Not a limit anybody should reach by
-    /// hand; it is here so a scripted caller cannot turn the table into a place
-    /// to store arbitrary amounts of text.
-    /// </summary>
-    private const int MaximumTabsPerPanel = 50;
 
     private readonly IFolderTabsRepository _folderTabsRepository;
     private readonly IPathGuard _pathGuard;
@@ -66,78 +65,96 @@ public class FolderTabsService : IFolderTabsService
             {
                 PanelId = savedTab.PanelId,
                 FolderPath = savedTab.FolderPath,
-                Position = savedTab.Position
+                Position = savedTab.Position,
+                // Reported rather than acted on. A missing folder is usually a
+                // drive that is not plugged in, and silently dropping the tab
+                // would discard a pin the user set deliberately.
+                IsAvailable = Directory.Exists(savedTab.FolderPath)
             })
             .ToList();
     }
 
-    public async Task<ServerResult> SaveFolderTabsAsync(
-        FolderTabsRequest request,
+    public async Task<ServerResult> LockFolderTabAsync(
+        FolderTabRequest request,
         Ulid userId,
         CancellationToken cancellationToken)
     {
-        if (request?.FolderPaths is null || string.IsNullOrWhiteSpace(request.PanelId))
+        if (DescribeInvalidRequest(request) is { } rejection)
         {
-            return Rejected("No folder tabs were given.");
+            return Rejected(rejection);
         }
 
-        if (!KnownPanelIds.Contains(request.PanelId, StringComparer.Ordinal))
+        if (!_pathGuard.TryResolve(request!.FolderPath, out var resolvedPath))
         {
-            return Rejected($"'{request.PanelId}' is not a panel this version of UFO has.");
+            return Rejected($"'{request.FolderPath}' is not a folder this server is allowed to open.");
         }
 
-        if (request.FolderPaths.Count > MaximumTabsPerPanel)
+        if (!Directory.Exists(resolvedPath))
         {
-            return Rejected($"A panel may keep at most {MaximumTabsPerPanel} locked tabs.");
+            return Rejected($"'{request.FolderPath}' is not a folder that exists.");
         }
 
-        var folderTabs = new List<FolderTabEntity>();
-        var seenPaths = new HashSet<string>(PathComparer);
+        _logger.LogInformation("LockFolderTabAsync - UserId: {UserId}, Panel: {PanelId}", userId, request.PanelId);
 
-        foreach (var requestedPath in request.FolderPaths)
-        {
-            if (!_pathGuard.TryResolve(requestedPath, out var resolvedPath))
-            {
-                return Rejected($"'{requestedPath}' is not a folder this server is allowed to open.");
-            }
-
-            if (!Directory.Exists(resolvedPath))
-            {
-                return Rejected($"'{requestedPath}' is not a folder that exists.");
-            }
-
-            // Two locked tabs on one folder in one pane are the same tab twice.
-            // Dropped rather than rejected: it is a duplicate, not a mistake
-            // worth stopping the whole save for.
-            if (!seenPaths.Add(resolvedPath))
-            {
-                continue;
-            }
-
-            folderTabs.Add(new FolderTabEntity
+        return await _folderTabsRepository.LockFolderTabAsync(
+            new FolderTabEntity
             {
                 PanelId = request.PanelId,
                 FolderPath = resolvedPath,
-                Position = folderTabs.Count,
                 UserId = userId
-            });
-        }
-
-        _logger.LogInformation(
-            "SaveFolderTabsAsync - UserId: {UserId}, Panel: {PanelId}, Count: {Count}",
-            userId,
-            request.PanelId,
-            folderTabs.Count);
-
-        return await _folderTabsRepository.SaveFolderTabsAsync(
-            folderTabs,
-            userId,
-            request.PanelId,
+            },
             cancellationToken);
     }
 
-    private static StringComparer PathComparer =>
-        OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+    public async Task<ServerResult> UnlockFolderTabAsync(
+        FolderTabRequest request,
+        Ulid userId,
+        CancellationToken cancellationToken)
+    {
+        if (DescribeInvalidRequest(request) is { } rejection)
+        {
+            return Rejected(rejection);
+        }
+
+        // Unlocking is the way out of a tab whose folder has gone, so neither the
+        // guard nor the file system gets a say here. Refusing to remove a row
+        // because the folder it names is unreachable would leave the user with a
+        // locked tab they cannot close and cannot unlock.
+        _pathGuard.TryResolveQuietly(request!.FolderPath, out var resolvedPath);
+
+        _logger.LogInformation("UnlockFolderTabAsync - UserId: {UserId}, Panel: {PanelId}", userId, request.PanelId);
+
+        // Both spellings: the row holds the resolved path, but a caller sending
+        // the path as it was given should still be able to let go of it.
+        var result = await _folderTabsRepository.UnlockFolderTabAsync(
+            userId,
+            request.PanelId,
+            request.FolderPath,
+            cancellationToken);
+
+        if (!string.IsNullOrEmpty(resolvedPath) && resolvedPath != request.FolderPath)
+        {
+            result = await _folderTabsRepository.UnlockFolderTabAsync(
+                userId,
+                request.PanelId,
+                resolvedPath,
+                cancellationToken);
+        }
+
+        return result;
+    }
+
+    private static string? DescribeInvalidRequest(FolderTabRequest? request)
+    {
+        if (request is null || string.IsNullOrWhiteSpace(request.PanelId) || string.IsNullOrWhiteSpace(request.FolderPath))
+        {
+            return "No folder tab was given.";
+        }
+
+        return KnownPanelIds.Contains(request.PanelId, StringComparer.Ordinal)
+            ? null
+            : $"'{request.PanelId}' is not a panel this version of UFO has.";
+    }
 
     private static ServerResult Rejected(string message) =>
         new()

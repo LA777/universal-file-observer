@@ -90,6 +90,19 @@ public class FolderTabDto
 
     [JsonPropertyOrder(3)]
     public int Position { get; set; }
+
+    /// <summary>
+    /// Whether the folder is there right now.
+    /// </summary>
+    /// <remarks>
+    /// A tab on a missing folder is still restored, and deliberately: an
+    /// unplugged drive or an unmounted share is a temporary condition, and
+    /// dropping the tab would throw away a pin the user set on purpose. It is
+    /// flagged instead, so the strip can show it as unavailable and not open it
+    /// on arrival - which is what made every login start with an error.
+    /// </remarks>
+    [JsonPropertyOrder(4)]
+    public bool IsAvailable { get; set; }
 }
 
 /// <summary>

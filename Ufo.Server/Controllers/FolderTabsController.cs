@@ -48,20 +48,44 @@ public class FolderTabsController : ControllerBase
     }
 
     /// <summary>
-    /// Replaces one panel's locked tabs. Sending an empty list is how the last
-    /// tab in a pane is unlocked.
+    /// Locks one tab. Locking one already locked changes nothing and still succeeds.
     /// </summary>
-    [HttpPut]
+    /// <remarks>
+    /// One tab per call, not a panel's whole set. A wholesale replace has to be
+    /// told what every other tab is, which makes the caller's picture of them
+    /// authoritative - and a caller whose read failed pictures none, so its next
+    /// lock would delete every tab the user had kept.
+    /// </remarks>
+    [HttpPost("lock")]
     [ProducesResponseType(typeof(ServerResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> SaveFolderTabsAsync(
-        [FromBody] FolderTabsRequest request,
+    public async Task<IActionResult> LockFolderTabAsync(
+        [FromBody] FolderTabRequest request,
         CancellationToken cancellationToken)
     {
-        _logger.LogInformation("SaveFolderTabsAsync - Panel: {PanelId}", request?.PanelId);
+        _logger.LogInformation("LockFolderTabAsync - Panel: {PanelId}", request?.PanelId);
         var userId = HttpContext.GetUserIdAsUlid();
 
-        var serverResult = await _folderTabsService.SaveFolderTabsAsync(request!, userId, cancellationToken);
+        var serverResult = await _folderTabsService.LockFolderTabAsync(request!, userId, cancellationToken);
+
+        return serverResult.Result == Result.Success ? Ok(serverResult) : BadRequest(serverResult);
+    }
+
+    /// <summary>
+    /// Unlocks one tab. Unlocking one that is not locked is the end state the
+    /// caller asked for, so it succeeds too.
+    /// </summary>
+    [HttpPost("unlock")]
+    [ProducesResponseType(typeof(ServerResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> UnlockFolderTabAsync(
+        [FromBody] FolderTabRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("UnlockFolderTabAsync - Panel: {PanelId}", request?.PanelId);
+        var userId = HttpContext.GetUserIdAsUlid();
+
+        var serverResult = await _folderTabsService.UnlockFolderTabAsync(request!, userId, cancellationToken);
 
         return serverResult.Result == Result.Success ? Ok(serverResult) : BadRequest(serverResult);
     }

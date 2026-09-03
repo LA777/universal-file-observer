@@ -278,6 +278,8 @@ export interface PersistedFolderTab {
   panelId: string;
   folderPath: string;
   position: number;
+  /** False when the folder is not there right now - an unplugged drive, say. */
+  isAvailable: boolean;
 }
 
 /**
@@ -295,6 +297,12 @@ export interface FolderTab {
   /** The last segment of the path, or the path itself for a root. */
   name: string;
   isLocked: boolean;
+  /**
+   * False for a restored tab whose folder is currently missing. Shown as
+   * unavailable and not opened on arrival: a pinned tab on an unplugged drive
+   * should not make every login start with an error dialog.
+   */
+  isAvailable: boolean;
   /** This tab's own browsing history, so Back does not cross between tabs. */
   history: string[];
   historyIndex: number;

@@ -12,6 +12,7 @@ import {
   FsBatchResult,
   FsItemFailure,
   FolderTab,
+  PersistedFolderTab,
   FsItemUi,
   SnapshotSummary,
 } from '../../models/models';
@@ -23,7 +24,7 @@ import { KeyBindingsService } from '../../services/key-bindings.service';
 import { FolderTabsService } from '../../services/folder-tabs.service';
 import { FolderTabsComponent } from '../folder-tabs/folder-tabs.component';
 import { KeyBindingActions } from '../../shared/key-binding-actions';
-import { Subscription } from 'rxjs';
+import { Subscription, forkJoin, of, catchError } from 'rxjs';
 import {
   DraftCommit,
   FolderDetailsComponent,
@@ -88,8 +89,6 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   private subscriptionFolder: Subscription;
   private subscriptionCreateSnapshot: Subscription;
   private subscriptionWrite: Subscription;
-  private subscriptionTabs: Subscription;
-  private subscriptionSaveTabs: Subscription;
 
   /**
    * The tabs of this panel, left to right. Never empty once the panel has loaded:
@@ -123,8 +122,6 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.subscriptionFolder?.unsubscribe();
     this.subscriptionCreateSnapshot?.unsubscribe();
     this.subscriptionWrite?.unsubscribe();
-    this.subscriptionTabs?.unsubscribe();
-    this.subscriptionSaveTabs?.unsubscribe();
   }
 
   /**
@@ -148,21 +145,42 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Loads the starting folder and the saved tabs together.
+   *
+   * Together rather than one after the other, because the tab strip is built
+   * from both. Restoring tabs once the panel was already usable meant replacing
+   * whatever the user had done in the meantime - destroying a tab they had just
+   * opened and cancelling the listing they were waiting for.
+   */
   getRoot() {
-    this.subscriptionRoot = this.fileService.getRoot().subscribe({
-      next: (result) => {
-        if (!result?.folder) {
+    this.subscriptionRoot = forkJoin({
+      root: this.fileService.getRoot(),
+      // A panel with no saved tabs is still a working file browser, so a failure
+      // here degrades to "nothing was locked" rather than taking the panel with
+      // it. Safe to swallow now only because locking adds one row: it can no
+      // longer be mistaken for an instruction to delete the others.
+      persistedTabs: this.folderTabsService.load().pipe(catchError(() => of([] as PersistedFolderTab[])))
+    }).subscribe({
+      next: ({ root, persistedTabs }) => {
+        if (!root?.folder) {
           this.showEmptyResponseDialog('open the starting folder');
           return;
         }
 
-        this.fileSystemRoot = result;
-        this.selectedFolder = result.folder;
+        this.fileSystemRoot = root;
+        this.selectedFolder = root.folder;
         // Sent with the root because it is the one call every panel makes before
         // it can show anything, so the name box is never opened without them.
-        this.nameRules = result.nameRules ?? STRICT_FILE_NAME_RULES;
-        this.restoreTabs(result.folder.fullPath);
-        this.initiateFolder(result.folder);
+        this.nameRules = root.nameRules ?? STRICT_FILE_NAME_RULES;
+
+        const openingFolderPath = this.buildTabs(root.folder.fullPath, persistedTabs);
+
+        if (openingFolderPath === root.folder.fullPath) {
+          this.initiateFolder(root.folder);
+        } else {
+          this.loadFolder(openingFolderPath, false);
+        }
       },
       error: (error) => {
         this.showErrorDialog(error, 'open the starting folder');
@@ -391,39 +409,49 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   // ---------------------------------------------------------------------------
 
   /**
-   * Puts the panel's tabs back as the user left them.
+   * Builds the panel's tab strip from the saved tabs and the folder it would
+   * have opened on anyway.
    *
-   * Locked tabs first, in the order they were saved, then the folder the panel
-   * would have opened on anyway - so somebody who locked nothing sees exactly
-   * what they saw before tabs existed, and somebody who locked something lands
-   * in it rather than having to click.
+   * Locked tabs first, in the order they were saved; the starting folder is
+   * added only when nothing was restored, so somebody who locked nothing sees
+   * exactly what they saw before tabs existed.
    */
-  private restoreTabs(startingFolderPath: string) {
-    this.tabs = [this.createTab(startingFolderPath)];
-    this.activeTabId = this.tabs[0].id;
+  /** @returns the folder the panel should open. */
+  private buildTabs(startingFolderPath: string, persistedTabs: PersistedFolderTab[]): string {
+    const lockedTabs = persistedTabs
+      .filter(persistedTab => persistedTab.panelId === this.panelId)
+      .sort((left, right) => left.position - right.position)
+      .map(persistedTab => this.createTab(persistedTab.folderPath, true, persistedTab.isAvailable));
 
-    this.subscriptionTabs = this.folderTabsService.load().subscribe({
-      next: (persistedTabs) => {
-        const lockedTabs = persistedTabs
-          .filter(persistedTab => persistedTab.panelId === this.panelId)
-          .sort((left, right) => left.position - right.position)
-          .map(persistedTab => this.createTab(persistedTab.folderPath, true));
+    if (lockedTabs.length === 0) {
+      this.tabs = [this.createTab(startingFolderPath)];
+      this.activeTabId = this.tabs[0].id;
 
-        if (lockedTabs.length === 0) {
-          return;
-        }
+      return startingFolderPath;
+    }
 
-        this.tabs = lockedTabs;
-        this.activeTabId = lockedTabs[0].id;
-        this.loadFolder(lockedTabs[0].folderPath, false);
-      },
-      // A panel whose tabs could not be restored is still a working file
-      // browser, and it already has the one tab it opened with.
-      error: () => undefined
-    });
+    this.tabs = lockedTabs;
+
+    // A tab whose folder is missing is not opened on arrival: an unplugged
+    // drive would otherwise greet the user with an error dialog every login.
+    // The tab stays in the strip, marked unavailable, and one click will still
+    // try it once the drive is back.
+    const openingTab = lockedTabs.find(tab => tab.isAvailable);
+
+    if (!openingTab) {
+      const startingTab = this.createTab(startingFolderPath);
+      this.tabs = [...lockedTabs, startingTab];
+      this.activeTabId = startingTab.id;
+
+      return startingFolderPath;
+    }
+
+    this.activeTabId = openingTab.id;
+
+    return openingTab.folderPath;
   }
 
-  private createTab(folderPath: string, isLocked = false): FolderTab {
+  private createTab(folderPath: string, isLocked = false, isAvailable = true): FolderTab {
     return {
       // Local to the panel and to this session. A locked tab's identity on the
       // server is its path; this only has to tell two open tabs apart.
@@ -431,6 +459,7 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       folderPath,
       name: folderNameOf(folderPath),
       isLocked,
+      isAvailable,
       history: [folderPath],
       historyIndex: 0
     };
@@ -505,25 +534,28 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    tab.isLocked = !tab.isLocked;
+    const wasLocked = tab.isLocked;
+    tab.isLocked = !wasLocked;
 
     if (tab.isLocked) {
       tab.history = [tab.folderPath];
       tab.historyIndex = 0;
     }
 
-    this.saveLockedTabs();
-  }
+    const write = wasLocked
+      ? this.folderTabsService.unlock(this.panelId, tab.folderPath)
+      : this.folderTabsService.lock(this.panelId, tab.folderPath);
 
-  private saveLockedTabs() {
-    const lockedPaths = this.tabs.filter(tab => tab.isLocked).map(tab => tab.folderPath);
-
-    this.subscriptionSaveTabs?.unsubscribe();
-    this.subscriptionSaveTabs = this.folderTabsService.save(this.panelId, lockedPaths).subscribe({
+    // Deliberately not held in a subscription ngOnDestroy tears down: leaving
+    // the Files tab straight after clicking the padlock would abort the request
+    // and leave the padlock showing a state nothing had stored.
+    write.subscribe({
       error: (error) => {
-        // Told about, because the whole point of the padlock is that the tab
-        // will still be here tomorrow - and silently it would not be.
-        this.showErrorDialog(error, 'save the locked tabs');
+        // Put back. A padlock that reads closed over a tab the server never
+        // accepted is the one thing this feature must not do - it is a promise
+        // that the tab will still be here tomorrow.
+        tab.isLocked = wasLocked;
+        this.showErrorDialog(error, wasLocked ? 'unlock the tab' : 'lock the tab', tab.name);
       }
     });
   }

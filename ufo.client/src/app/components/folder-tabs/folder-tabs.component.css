@@ -121,3 +121,16 @@
   background-color: var(--ufo-bg-control-hover);
   color: var(--ufo-text-strong);
 }
+
+/* A locked tab whose folder is not there right now - an unplugged drive, an
+   unmounted share. Kept in the strip rather than dropped, because the pin was
+   deliberate and the drive will probably be back. */
+.folder-tab.unavailable .tab-name {
+  font-style: italic;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.folder-tab.unavailable .tab-icon {
+  color: var(--ufo-text-muted);
+}

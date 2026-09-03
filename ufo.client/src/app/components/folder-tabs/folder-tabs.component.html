@@ -5,8 +5,9 @@
       role="tab"
       [class.active]="tab.id === activeTabId"
       [class.locked]="tab.isLocked"
+      [class.unavailable]="!tab.isAvailable"
       [attr.aria-selected]="tab.id === activeTabId"
-      [title]="tab.folderPath"
+      [title]="tab.isAvailable ? tab.folderPath : tab.folderPath + ' - not available right now'"
       (click)="tabSelected.emit(tab.id)">
       <mat-icon class="tab-icon">folder</mat-icon>
       <span class="tab-name">{{ tab.name }}</span>

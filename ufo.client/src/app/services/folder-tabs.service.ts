@@ -32,14 +32,22 @@ export class FolderTabsService {
   }
 
   /**
-   * Replaces one panel's locked tabs. An empty list is how the last one is
-   * unlocked, so it is sent rather than skipped.
+   * Locks one tab.
+   *
+   * One tab per call. An endpoint that replaced the panel's whole set would be
+   * driven by what this client believes the other tabs to be - and a client
+   * whose load failed believes there are none, so the next padlock click would
+   * delete every tab the user had kept.
    */
-  save(panelId: string, folderPaths: string[]): Observable<void> {
-    // What the panels hold has moved on already; the next reader should ask
-    // rather than be handed a list from before this save.
+  lock(panelId: string, folderPath: string): Observable<void> {
     this.request = undefined;
 
-    return this.http.put<void>('/api/foldertabs', { panelId, folderPaths });
+    return this.http.post<void>('/api/foldertabs/lock', { panelId, folderPath });
+  }
+
+  unlock(panelId: string, folderPath: string): Observable<void> {
+    this.request = undefined;
+
+    return this.http.post<void>('/api/foldertabs/unlock', { panelId, folderPath });
   }
 }

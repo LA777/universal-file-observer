@@ -54,25 +54,38 @@ public class FolderTabsServiceTests : BaseTest, IDisposable
             .Setup(repository => repository.GetFolderTabsAsync(_userId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tabs);
 
-    private List<FolderTabEntity> CaptureSavedTabs()
+    private List<FolderTabEntity> CaptureLockedTabs()
     {
-        var savedTabs = new List<FolderTabEntity>();
+        var lockedTabs = new List<FolderTabEntity>();
 
         _repositoryMock
-            .Setup(repository => repository.SaveFolderTabsAsync(
-                It.IsAny<IReadOnlyList<FolderTabEntity>>(),
-                _userId,
-                It.IsAny<string>(),
+            .Setup(repository => repository.LockFolderTabAsync(
+                It.IsAny<FolderTabEntity>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<IReadOnlyList<FolderTabEntity>, Ulid, string, CancellationToken>(
-                (tabs, _, _, _) => savedTabs.AddRange(tabs))
+            .Callback<FolderTabEntity, CancellationToken>((tab, _) => lockedTabs.Add(tab))
             .ReturnsAsync(new ServerResult { Result = Result.Success });
 
-        return savedTabs;
+        return lockedTabs;
     }
 
-    private static FolderTabsRequest RequestFor(string panelId, params string[] folderPaths) =>
-        new() { PanelId = panelId, FolderPaths = folderPaths };
+    private List<string> CaptureUnlockedPaths()
+    {
+        var unlockedPaths = new List<string>();
+
+        _repositoryMock
+            .Setup(repository => repository.UnlockFolderTabAsync(
+                It.IsAny<Ulid>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<Ulid, string, string, CancellationToken>((_, _, path, _) => unlockedPaths.Add(path))
+            .ReturnsAsync(new ServerResult { Result = Result.Success });
+
+        return unlockedPaths;
+    }
+
+    private static FolderTabRequest RequestFor(string panelId, string folderPath) =>
+        new() { PanelId = panelId, FolderPath = folderPath };
 
     #region Reading
 
@@ -102,71 +115,71 @@ public class FolderTabsServiceTests : BaseTest, IDisposable
             .Which.FolderPath.Should().Be(_allowedFolder);
     }
 
+    [Fact]
+    public async Task GetFolderTabsAsync_KeepsATabWhoseFolderIsMissingButFlagsIt()
+    {
+        var missingFolder = Path.Combine(_testRoot, "unplugged");
+
+        GivenSavedTabs(
+            new FolderTabEntity { PanelId = "left", FolderPath = _allowedFolder, Position = 0, UserId = _userId },
+            new FolderTabEntity { PanelId = "left", FolderPath = missingFolder, Position = 1, UserId = _userId });
+
+        var folderTabs = await CreateSut().GetFolderTabsAsync(_userId, CancellationToken.None);
+
+        // Kept, because a missing folder is usually a drive that is not plugged
+        // in - dropping the tab would throw away a pin set on purpose. Flagged,
+        // so the strip can show it as unavailable and not open it on arrival,
+        // which is what made every login begin with an error.
+        folderTabs.Should().HaveCount(2);
+        folderTabs.Single(tab => tab.FolderPath == _allowedFolder).IsAvailable.Should().BeTrue();
+        folderTabs.Single(tab => tab.FolderPath == missingFolder).IsAvailable.Should().BeFalse();
+    }
+
     #endregion
 
-    #region Saving
+    #region Locking
 
     [Fact]
-    public async Task SaveFolderTabsAsync_KeepsTheOrderItWasGiven()
+    public async Task LockFolderTabAsync_StoresTheResolvedFolder()
     {
-        var savedTabs = CaptureSavedTabs();
-        var secondFolder = Path.Combine(_testRoot, "second");
-        Directory.CreateDirectory(secondFolder);
+        var lockedTabs = CaptureLockedTabs();
 
-        var result = await CreateSut().SaveFolderTabsAsync(
-            RequestFor("left", secondFolder, _allowedFolder),
+        var result = await CreateSut().LockFolderTabAsync(
+            RequestFor("left", _allowedFolder),
             _userId,
             CancellationToken.None);
 
         result.Result.Should().Be(Result.Success);
-        savedTabs.Select(tab => tab.FolderPath).Should().Equal(secondFolder, _allowedFolder);
-        savedTabs.Select(tab => tab.Position).Should().Equal(0, 1);
+        lockedTabs.Should().ContainSingle().Which.FolderPath.Should().Be(_allowedFolder);
     }
 
     [Fact]
-    public async Task SaveFolderTabsAsync_AcceptsAnEmptyListAsUnlockingTheLastTab()
+    public async Task LockFolderTabAsync_TouchesOnlyTheTabItWasGiven()
     {
-        var savedTabs = CaptureSavedTabs();
+        CaptureLockedTabs();
 
-        var result = await CreateSut().SaveFolderTabsAsync(
-            RequestFor("left"),
+        await CreateSut().LockFolderTabAsync(
+            RequestFor("left", _allowedFolder),
             _userId,
             CancellationToken.None);
 
-        // Sent rather than skipped: it is the only way to say "keep nothing".
-        result.Result.Should().Be(Result.Success);
-        savedTabs.Should().BeEmpty();
-
+        // The whole point of one row at a time: locking must be incapable of
+        // removing another tab, however wrong the caller is about the others.
         _repositoryMock.Verify(
-            repository => repository.SaveFolderTabsAsync(
-                It.IsAny<IReadOnlyList<FolderTabEntity>>(),
-                _userId,
-                "left",
+            repository => repository.UnlockFolderTabAsync(
+                It.IsAny<Ulid>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
-            Times.Once);
+            Times.Never);
     }
 
     [Fact]
-    public async Task SaveFolderTabsAsync_DropsTheSameFolderTwice()
+    public async Task LockFolderTabAsync_RefusesAFolderOutsideTheAllowedRoots()
     {
-        var savedTabs = CaptureSavedTabs();
+        CaptureLockedTabs();
 
-        var result = await CreateSut().SaveFolderTabsAsync(
-            RequestFor("left", _allowedFolder, _allowedFolder),
-            _userId,
-            CancellationToken.None);
-
-        // A duplicate, not a mistake worth failing the whole save for.
-        result.Result.Should().Be(Result.Success);
-        savedTabs.Should().ContainSingle();
-    }
-
-    [Fact]
-    public async Task SaveFolderTabsAsync_RefusesAFolderOutsideTheAllowedRoots()
-    {
-        CaptureSavedTabs();
-
-        var result = await CreateSut(_allowedFolder).SaveFolderTabsAsync(
+        var result = await CreateSut(_allowedFolder).LockFolderTabAsync(
             RequestFor("left", _outsideFolder),
             _userId,
             CancellationToken.None);
@@ -174,20 +187,18 @@ public class FolderTabsServiceTests : BaseTest, IDisposable
         result.Result.Should().Be(Result.Error);
 
         _repositoryMock.Verify(
-            repository => repository.SaveFolderTabsAsync(
-                It.IsAny<IReadOnlyList<FolderTabEntity>>(),
-                It.IsAny<Ulid>(),
-                It.IsAny<string>(),
+            repository => repository.LockFolderTabAsync(
+                It.IsAny<FolderTabEntity>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
     [Fact]
-    public async Task SaveFolderTabsAsync_RefusesAFolderThatIsNotThere()
+    public async Task LockFolderTabAsync_RefusesAFolderThatIsNotThere()
     {
-        CaptureSavedTabs();
+        CaptureLockedTabs();
 
-        var result = await CreateSut().SaveFolderTabsAsync(
+        var result = await CreateSut().LockFolderTabAsync(
             RequestFor("left", Path.Combine(_testRoot, "never-existed")),
             _userId,
             CancellationToken.None);
@@ -196,54 +207,82 @@ public class FolderTabsServiceTests : BaseTest, IDisposable
     }
 
     [Fact]
-    public async Task SaveFolderTabsAsync_RefusesAPanelThatDoesNotExist()
+    public async Task LockFolderTabAsync_RefusesAPanelThatDoesNotExist()
     {
-        CaptureSavedTabs();
+        CaptureLockedTabs();
 
-        var result = await CreateSut().SaveFolderTabsAsync(
+        var result = await CreateSut().LockFolderTabAsync(
             RequestFor("middle", _allowedFolder),
             _userId,
             CancellationToken.None);
 
-        // A row for a panel nothing renders is a row nothing would ever restore.
         result.Result.Should().Be(Result.Error);
         result.Message.Should().Contain("middle");
     }
 
+    #endregion
+
+    #region Unlocking
+
     [Fact]
-    public async Task SaveFolderTabsAsync_RefusesMoreTabsThanAPanelWillKeep()
+    public async Task UnlockFolderTabAsync_RemovesTheTab()
     {
-        CaptureSavedTabs();
+        var unlockedPaths = CaptureUnlockedPaths();
 
-        var manyPaths = Enumerable.Range(0, 51).Select(_ => _allowedFolder).ToArray();
+        var result = await CreateSut().UnlockFolderTabAsync(
+            RequestFor("left", _allowedFolder),
+            _userId,
+            CancellationToken.None);
 
-        var result = await CreateSut().SaveFolderTabsAsync(
-            RequestFor("left", manyPaths),
+        result.Result.Should().Be(Result.Success);
+        unlockedPaths.Should().Contain(_allowedFolder);
+    }
+
+    [Fact]
+    public async Task UnlockFolderTabAsync_WorksOnAFolderThatIsNoLongerThere()
+    {
+        // Unlocking is the way out of a tab whose folder has gone. Refusing
+        // because the folder is unreachable would leave the user with a locked
+        // tab they can neither close nor unlock.
+        var unlockedPaths = CaptureUnlockedPaths();
+        var missingFolder = Path.Combine(_testRoot, "unplugged");
+
+        var result = await CreateSut().UnlockFolderTabAsync(
+            RequestFor("left", missingFolder),
+            _userId,
+            CancellationToken.None);
+
+        result.Result.Should().Be(Result.Success);
+        unlockedPaths.Should().Contain(missingFolder);
+    }
+
+    [Fact]
+    public async Task UnlockFolderTabAsync_WorksOnAFolderOutsideTheAllowedRoots()
+    {
+        // Same reasoning: the roots may have been tightened since the tab was
+        // locked, and the row still has to be removable.
+        var unlockedPaths = CaptureUnlockedPaths();
+
+        var result = await CreateSut(_allowedFolder).UnlockFolderTabAsync(
+            RequestFor("left", _outsideFolder),
+            _userId,
+            CancellationToken.None);
+
+        result.Result.Should().Be(Result.Success);
+        unlockedPaths.Should().Contain(_outsideFolder);
+    }
+
+    [Fact]
+    public async Task UnlockFolderTabAsync_RefusesAPanelThatDoesNotExist()
+    {
+        CaptureUnlockedPaths();
+
+        var result = await CreateSut().UnlockFolderTabAsync(
+            RequestFor("middle", _allowedFolder),
             _userId,
             CancellationToken.None);
 
         result.Result.Should().Be(Result.Error);
-    }
-
-    [Fact]
-    public async Task SaveFolderTabsAsync_TouchesOnlyThePanelItWasGiven()
-    {
-        CaptureSavedTabs();
-
-        await CreateSut().SaveFolderTabsAsync(
-            RequestFor("right", _allowedFolder),
-            _userId,
-            CancellationToken.None);
-
-        // The two panes save independently. A whole-account replace would have
-        // each one deleting the other's tabs every time it saved.
-        _repositoryMock.Verify(
-            repository => repository.SaveFolderTabsAsync(
-                It.IsAny<IReadOnlyList<FolderTabEntity>>(),
-                _userId,
-                "right",
-                It.IsAny<CancellationToken>()),
-            Times.Once);
     }
 
     #endregion
