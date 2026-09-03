@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, of, shareReplay, tap, catchError } from 'rxjs';
+import { Observable, shareReplay, tap, catchError, throwError } from 'rxjs';
 import { KeyBinding, KeyBindingUpdate } from '../models/models';
 import { eventMatchesChord } from '../shared/key-chord';
 
@@ -34,10 +34,17 @@ export class KeyBindingsService {
   load(): Observable<KeyBinding[]> {
     this.request ??= this.http.get<KeyBinding[]>('/api/settings/shortcuts').pipe(
       tap(keyBindings => this.keyBindings.set(keyBindings ?? [])),
-      // A pane whose shortcuts failed to load is still a working file browser -
-      // every button remains clickable - so this degrades to "no shortcuts"
-      // rather than taking the Files tab down with it.
-      catchError(() => of([] as KeyBinding[])),
+      catchError((error: unknown) => {
+        // The cache is dropped before the failure is passed on. A replayed
+        // observable would otherwise hand every later caller the same failure
+        // for the rest of the session: one bad moment on startup and no
+        // shortcut works again until the page is reloaded - with F5 hard
+        // reloading the SPA rather than copying anything, because that is
+        // exactly the binding that stopped resolving.
+        this.request = undefined;
+
+        return throwError(() => error);
+      }),
       shareReplay({ bufferSize: 1, refCount: false }),
     );
 
@@ -61,7 +68,9 @@ export class KeyBindingsService {
   /** Discards the cached list so the next load asks the server again. */
   reload(): void {
     this.request = undefined;
-    this.load().subscribe();
+    // The caller of save() reports its own failure; this is the refresh behind
+    // it, and an error here must not surface as an unhandled rejection.
+    this.load().subscribe({ error: () => undefined });
   }
 
   /**

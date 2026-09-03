@@ -133,10 +133,17 @@ export class KeyboardShortcutsComponent implements OnInit {
     return this.conflictingChords().has(chord);
   }
 
-  /** Arms a slot. The next keypress anywhere in it becomes the binding. */
-  startCapturing(actionId: string, slot: BindingSlot): void {
+  /**
+   * Arms a slot. The next keypress becomes the binding.
+   *
+   * Focus is taken explicitly rather than left to the click. Safari and Firefox
+   * on macOS do not focus a button when it is clicked, and an armed slot that
+   * never receives a keydown is a page where recording silently does nothing.
+   */
+  startCapturing(event: Event, actionId: string, slot: BindingSlot): void {
     this.savedMessage.set('');
     this.capturingSlot.set({ actionId, slot });
+    (event.currentTarget as HTMLElement | null)?.focus();
   }
 
   stopCapturing(): void {
@@ -146,11 +153,20 @@ export class KeyboardShortcutsComponent implements OnInit {
   /**
    * Records a keypress into the armed slot.
    *
-   * Everything is swallowed while a slot is listening, including Tab and the
-   * function keys the browser has its own ideas about - a shortcuts page that
-   * let F5 through would reload itself instead of capturing it.
+   * Only while that slot is the one listening. The slot keeps focus after it has
+   * recorded something, so a handler that swallowed everything would rebind the
+   * action to Tab the moment the user tried to leave, and there would be no way
+   * out of the table at all. Unarmed, every key is left to the browser - which is
+   * also what lets Enter and Space arm the slot, since they reach it as a click.
    */
   onSlotKeyDown(event: KeyboardEvent, actionId: string, slot: BindingSlot): void {
+    if (!this.isCapturing(actionId, slot)) {
+      return;
+    }
+
+    // Armed, everything is swallowed - including Tab and the function keys the
+    // browser has its own ideas about. A shortcuts page that let F5 through
+    // would reload itself instead of recording it.
     event.preventDefault();
     event.stopPropagation();
 

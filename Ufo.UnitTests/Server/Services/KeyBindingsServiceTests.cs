@@ -213,6 +213,62 @@ public class KeyBindingsServiceTests : BaseTest
     }
 
     [Fact]
+    public async Task SaveKeyBindingsAsync_JudgesConflictsAgainstTheTableTheSaveProduces()
+    {
+        CaptureSavedRows();
+
+        // Delete is absent, so the save puts it back on its default of F8 - and
+        // this hands F8 to Copy as well. Checked against the request alone the
+        // clash cannot be seen; checked against the resulting table it is plain.
+        var result = await CreateSut().SaveKeyBindingsAsync(
+            RequestFor((KeyBindingActions.Copy, "F8", "")),
+            _userId,
+            CancellationToken.None);
+
+        result.Result.Should().Be(Result.Error);
+        result.Message.Should().Contain("more than one action");
+    }
+
+    [Fact]
+    public async Task SaveKeyBindingsAsync_AllowsTakingAKeyAnActionIsBeingMovedOffInTheSameSave()
+    {
+        var savedRows = CaptureSavedRows();
+
+        // Delete gives up F8 in the same request that Copy claims it. Judged
+        // against the resulting table there is no clash, and refusing this would
+        // make the key impossible to hand over at all.
+        var result = await CreateSut().SaveKeyBindingsAsync(
+            RequestFor(
+                (KeyBindingActions.Copy, "F8", ""),
+                (KeyBindingActions.Delete, "F9", "")),
+            _userId,
+            CancellationToken.None);
+
+        result.Result.Should().Be(Result.Success);
+        savedRows.Should().HaveCount(2);
+    }
+
+    [Theory]
+    [InlineData("Ctrl+.")]
+    [InlineData("Ctrl+/")]
+    [InlineData("Shift+!")]
+    [InlineData("Ctrl+Plus")]
+    [InlineData("Ctrl+Space")]
+    public async Task SaveKeyBindingsAsync_AcceptsThePunctuationKeysABrowserReports(string chord)
+    {
+        CaptureSavedRows();
+
+        // The browser reports Ctrl+. as ".". Refusing it would fail the whole
+        // save and discard every other edit in the table alongside it.
+        var result = await CreateSut().SaveKeyBindingsAsync(
+            RequestFor((KeyBindingActions.Copy, chord, "")),
+            _userId,
+            CancellationToken.None);
+
+        result.Result.Should().Be(Result.Success);
+    }
+
+    [Fact]
     public async Task SaveKeyBindingsAsync_TreatsTheSameChordInBothSlotsAsOneBinding()
     {
         var savedRows = CaptureSavedRows();

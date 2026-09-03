@@ -464,9 +464,14 @@ public class SettingsControllerFunctionalTests
     #region Keyboard shortcuts
 
     /// <summary>
-    /// Sends one action's slots, leaving every other action at whatever the
-    /// server currently has for it.
+    /// Builds a request naming only the actions given.
     /// </summary>
+    /// <remarks>
+    /// The endpoint <b>replaces</b> the table rather than merging into it, so
+    /// every action left out of the list goes back to its default. That is the
+    /// point of several tests below, and the reason this says so plainly - a
+    /// caller who read it as a merge would quietly reset everything else.
+    /// </remarks>
     private static KeyBindingsRequest ShortcutsRequest(
         params (string ActionId, string Primary, string Secondary)[] bindings) =>
         new()
@@ -587,6 +592,51 @@ public class SettingsControllerFunctionalTests
 
         Assert.Equal("F6", keyBindings!.Single(k => k.ActionId == KeyBindingActions.Copy).PrimaryKey);
         Assert.Equal("F5", keyBindings.Single(k => k.ActionId == KeyBindingActions.Move).PrimaryKey);
+    }
+
+    [Fact]
+    public async Task PutShortcuts_ClashingWithAnActionLeftOutOfTheRequest_IsRefused()
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        // Delete is not named, so it goes back to its default of F8 - and this
+        // hands F8 to Copy as well. Judged against the request alone the clash is
+        // invisible; judged against the table the save produces, it is the whole
+        // point. Left through, F8 would resolve to Copy and Delete's key would
+        // simply stop working with nothing on screen to say why.
+        var response = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, "F8", "")));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("more than one action", await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
+    [InlineData("Ctrl+.")]
+    [InlineData("Ctrl+/")]
+    [InlineData("Shift+!")]
+    [InlineData("Ctrl+Plus")]
+    [InlineData("Ctrl+Space")]
+    public async Task PutShortcuts_AcceptsThePunctuationKeysABrowserReports(string chord)
+    {
+        using var factory = new SettingsApiFactory();
+        var (client, _) = await factory.CreateAuthenticatedClientAsync();
+
+        // The browser reports Ctrl+. as ".", and the capture box records and
+        // displays it quite happily. A server that refused it would fail the
+        // whole save and discard every other edit in the table alongside it.
+        var response = await client.PutAsJsonAsync(
+            TestConstants.ShortcutsEndpoint,
+            ShortcutsRequest((KeyBindingActions.Copy, chord, "")));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var keyBindings = await Json.ReadAsync<List<KeyBindingDto>>(
+            await client.GetAsync(TestConstants.ShortcutsEndpoint));
+
+        Assert.Equal(chord, keyBindings!.Single(k => k.ActionId == KeyBindingActions.Copy).PrimaryKey);
     }
 
     [Fact]

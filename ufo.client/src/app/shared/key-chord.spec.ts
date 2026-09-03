@@ -36,6 +36,22 @@ describe('key chords', () => {
       expect(chordFromEvent(keyDown(' '))).toBe('Space');
     });
 
+    it('names the plus key, which cannot be written as itself', () => {
+      // '+' separates the parts of a chord, so "Ctrl++" would read as a chord
+      // with no key at all - and the server would refuse the whole save.
+      expect(chordFromEvent(keyDown('+', { ctrlKey: true }))).toBe('Ctrl+Plus');
+      expect(describeChord('Ctrl+Plus')).toBe('Ctrl++');
+    });
+
+    it('keeps the punctuation keys a browser reports verbatim', () => {
+      // These are what event.key actually is for those keys. The server's chord
+      // pattern has to accept every one of them, or recording Ctrl+. here would
+      // fail the save and discard every other edit in the table with it.
+      expect(chordFromEvent(keyDown('.', { ctrlKey: true }))).toBe('Ctrl+.');
+      expect(chordFromEvent(keyDown('/', { ctrlKey: true }))).toBe('Ctrl+/');
+      expect(chordFromEvent(keyDown('!', { shiftKey: true }))).toBe('Shift+!');
+    });
+
     it('refuses a modifier held on its own', () => {
       // Bound to Shift alone, an action would fire on every capital letter typed.
       expect(chordFromEvent(keyDown('Shift', { shiftKey: true }))).toBeNull();

@@ -34,7 +34,7 @@
                     [class.conflicting]="isConflicting($any(binding)[slot])"
                     [class.unset]="!$any(binding)[slot]"
                     [attr.aria-label]="binding.label + ' ' + (slot === 'primaryKey' ? 'key' : 'alternative key')"
-                    (click)="startCapturing(binding.actionId, $any(slot))"
+                    (click)="startCapturing($event, binding.actionId, $any(slot))"
                     (blur)="stopCapturing()"
                     (keydown)="onSlotKeyDown($event, binding.actionId, $any(slot))">
                     {{ isCapturing(binding.actionId, $any(slot)) ? 'Press a key…' : describe($any(binding)[slot]) }}

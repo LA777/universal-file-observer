@@ -32,13 +32,26 @@ public partial class KeyBindingsService : IKeyBindingsService
     /// The shape of a chord: any number of modifiers, then exactly one key.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Deliberately a shape rather than a list of every key that exists. Browsers
     /// disagree about names for the long tail - and keyboards disagree with the
     /// browsers - so an allow-list would refuse chords that work perfectly well on
     /// somebody else's machine. What matters is that the string is one line, has
     /// no separators to confuse the comparison, and cannot be a modifier alone.
+    /// </para>
+    /// <para>
+    /// The final key is either a name - "F5", "ArrowLeft", "Space" - or a single
+    /// character that is not whitespace and not the separator. Letters and digits
+    /// alone were too narrow: the browser reports Ctrl+. as ".", which the client
+    /// would record and display quite happily and this would then refuse, taking
+    /// every other edit in the table down with it on the same failed save. The
+    /// plus key arrives as "Plus" for the same reason it cannot arrive as "+" -
+    /// it is what separates the parts.
+    /// </para>
     /// </remarks>
-    [GeneratedRegex(@"^(?:(?:Ctrl|Alt|Shift|Meta)\+)*[A-Za-z0-9]{1,20}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(
+        @"^(?:(?:Ctrl|Alt|Shift|Meta)\+)*(?:[A-Za-z0-9]{1,20}|[^\s+])$",
+        RegexOptions.CultureInvariant)]
     private static partial Regex ChordPattern { get; }
 
     /// <summary>
@@ -88,8 +101,7 @@ public partial class KeyBindingsService : IKeyBindingsService
             return Rejected("No key bindings were given.");
         }
 
-        var entities = new List<UserKeyBindingEntity>();
-        var claimedChords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var requestedSlots = new Dictionary<string, (string PrimaryKey, string SecondaryKey)>(StringComparer.Ordinal);
 
         foreach (var binding in request.Bindings)
         {
@@ -115,32 +127,46 @@ public partial class KeyBindingsService : IKeyBindingsService
                 secondaryKey = string.Empty;
             }
 
-            if (DescribeConflict(claimedChords, binding.ActionId!, primaryKey) is { } primaryConflict)
-            {
-                return Rejected(primaryConflict);
-            }
-
-            if (DescribeConflict(claimedChords, binding.ActionId!, secondaryKey) is { } secondaryConflict)
-            {
-                return Rejected(secondaryConflict);
-            }
-
-            // Only what differs from the build is worth a row. An action saved
-            // back to its default is stored as no row at all, so a later release
-            // that re-keys that default reaches this user too.
-            if (IsDefaultFor(binding.ActionId!, primaryKey, secondaryKey))
-            {
-                continue;
-            }
-
-            entities.Add(new UserKeyBindingEntity
-            {
-                ActionId = binding.ActionId!,
-                PrimaryKey = primaryKey,
-                SecondaryKey = secondaryKey,
-                UserId = userId
-            });
+            requestedSlots[binding.ActionId!] = (primaryKey, secondaryKey);
         }
+
+        // Judged against the table this save will produce, not against the rows
+        // that happen to be in the request. The save replaces everything, so an
+        // action left out is not left alone - it goes back to its default, and a
+        // request naming only Copy could hand it F8 and silently kill Delete.
+        var effectiveSlots = KeyBindingActions.All.ToDictionary(
+            action => action.ActionId,
+            action => requestedSlots.TryGetValue(action.ActionId, out var requested)
+                ? requested
+                : (PrimaryKey: action.DefaultPrimaryKey, SecondaryKey: action.DefaultSecondaryKey),
+            StringComparer.Ordinal);
+
+        var claimedChords = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (actionId, slots) in effectiveSlots)
+        {
+            var conflict = DescribeConflict(claimedChords, actionId, slots.PrimaryKey)
+                ?? DescribeConflict(claimedChords, actionId, slots.SecondaryKey);
+
+            if (conflict is not null)
+            {
+                return Rejected(conflict);
+            }
+        }
+
+        // Only what differs from the build is worth a row. An action saved back
+        // to its default is stored as no row at all, so a later release that
+        // re-keys that default reaches this user too.
+        var entities = requestedSlots
+            .Where(requested => !IsDefaultFor(requested.Key, requested.Value.PrimaryKey, requested.Value.SecondaryKey))
+            .Select(requested => new UserKeyBindingEntity
+            {
+                ActionId = requested.Key,
+                PrimaryKey = requested.Value.PrimaryKey,
+                SecondaryKey = requested.Value.SecondaryKey,
+                UserId = userId
+            })
+            .ToList();
 
         _logger.LogInformation(
             "SaveKeyBindingsAsync - UserId: {UserId}, non-default rows: {Count}",

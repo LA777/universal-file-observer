@@ -29,6 +29,7 @@ const DISPLAY_NAMES: Readonly<Record<string, string>> = {
   ArrowDown: '↓',
   ' ': 'Space',
   Space: 'Space',
+  Plus: '+',
 };
 
 /**
@@ -83,10 +84,18 @@ export function describeChord(chord: string): string {
  * A letter is upper-cased so that "a" and Shift+"A" do not become two different
  * bindings - the Shift is already recorded as a modifier, and recording it twice
  * would mean a chord that can never match.
+ *
+ * The two named keys are the ones that cannot be written as themselves: a space
+ * would be invisible in the middle of a chord, and a plus is what separates the
+ * parts, so "Ctrl++" would read as a chord with no key at all.
  */
 function normaliseKey(key: string): string {
-  if (key === ' ') {
+  if (key === ' ' || key === 'Space' || key === 'Spacebar') {
     return 'Space';
+  }
+
+  if (key === '+') {
+    return 'Plus';
   }
 
   return key.length === 1 ? key.toUpperCase() : key;

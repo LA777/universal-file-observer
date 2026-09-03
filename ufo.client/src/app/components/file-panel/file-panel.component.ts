@@ -92,8 +92,11 @@ export class FilePanelComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.getRoot();
-    // Shared and replayed, so the second panel asking costs nothing.
-    this.keyBindingsService.load().subscribe();
+    // Shared and replayed, so the second panel asking costs nothing. A failure
+    // is swallowed here on purpose: a pane with no shortcuts is still a working
+    // file browser, every button remains clickable, and the Settings page is
+    // where the problem is worth reporting.
+    this.keyBindingsService.load().subscribe({ error: () => undefined });
   }
 
   ngOnDestroy() {
