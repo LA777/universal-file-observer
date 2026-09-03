@@ -157,14 +157,34 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
 
         var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
 
+        // The names here are the names on disk. They used to read "inner..txt" and
+        // "a..txt", because the hash joined the stem to an extension that already
+        // carried its own dot - and this test was written to match, which is how a
+        // bug ends up with a test defending it.
         var childHash = ExpectedFolderHash(
-            [("inner..txt", ExpectedFileHash("inner"))],
+            [("inner.txt", ExpectedFileHash("inner"))],
             []);
 
         rootFolder.ChildFolders.Single().Sha256Hash.Should().Be(childHash);
         rootFolder.Sha256Hash.Should().Be(ExpectedFolderHash(
-            [("a..txt", ExpectedFileHash("first")), ("b..txt", ExpectedFileHash("second"))],
+            [("a.txt", ExpectedFileHash("first")), ("b.txt", ExpectedFileHash("second"))],
             [("child", childHash)]));
+    }
+
+    [Fact]
+    public async Task BuildAsync_HashesAFileWithNoExtensionUnderItsRealName()
+    {
+        // The case that separates the two spellings most sharply: with nothing to
+        // append, the old formula still added a dot and hashed "README." - a name
+        // that exists nowhere on the disk being indexed.
+        WriteFile("README", "readme");
+        var sut = CreateSut();
+
+        var rootFolder = await sut.BuildAsync(_rootPath, _snapshot, _user);
+
+        rootFolder.Sha256Hash.Should().Be(ExpectedFolderHash(
+            [("README", ExpectedFileHash("readme"))],
+            []));
     }
 
     [Fact]

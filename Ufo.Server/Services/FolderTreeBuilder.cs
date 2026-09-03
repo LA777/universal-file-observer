@@ -396,7 +396,16 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
         foreach (var file in orderedFiles)
         {
-            var fileNameWithExtension = $"{file.Name}.{file.FileExtension}";
+            // Concatenated, not joined with a dot: FileExtension is stored the way
+            // FileInfo.Extension gives it, with the dot already on the front. Adding
+            // another produced "notes..txt", so every folder hash was taken over a
+            // name that was not on disk. It was wrong consistently, which is why
+            // comparison still worked - but a hash that no other tool can reproduce
+            // is not the identity it claims to be.
+            var fileNameWithExtension = file.Name + file.FileExtension;
+
+            // Now that the string is not guaranteed to contain a dot, this can
+            // catch what it was always meant to: a file with no name at all.
             if (string.IsNullOrWhiteSpace(fileNameWithExtension))
             {
                 throw new ArgumentException(nameof(fileNameWithExtension));
