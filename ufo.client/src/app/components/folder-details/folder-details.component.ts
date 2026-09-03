@@ -18,12 +18,12 @@ import { gridThemeFor } from '../../shared/grid-theme';
 import { ThemeService } from '../../services/theme.service';
 import { NameCellEditorComponent, NameCellEditorParams } from '../name-cell-editor/name-cell-editor.component';
 import { STRICT_FILE_NAME_RULES } from '../../shared/file-name-validation';
-import { fileExtensionOf, fullNameOf, isParentRow } from '../../shared/fs-item';
+import { fullNameOf, isParentRow } from '../../shared/fs-item';
 
 /** A name the user typed over an existing entry's. */
 export interface RenameRequest {
   item: FsItemUi;
-  /** The new value of the Name cell - a stem for a file, a whole name for a folder. */
+  /** The whole new name, extension included - ready to send as it stands. */
   newName: string;
 }
 
@@ -124,7 +124,7 @@ export class FolderDetailsComponent implements OnChanges {
       cellEditorParams: (params: ICellEditorParams<FsItemUi>): NameCellEditorParams => ({
         rules: this.nameRules,
         siblingNames: () => this.siblingNames(),
-        nameSuffix: fileExtensionOf(params.data),
+        fullName: params.data ? fullNameOf(params.data) : '',
       }),
       // The grid must not write the typed name into the row. Nothing is renamed
       // until the server says it was, and until then the listing should go on
@@ -211,7 +211,10 @@ export class FolderDetailsComponent implements OnChanges {
 
     const item = event.data;
 
-    if (item && typedName && typedName !== item.name) {
+    // Compared against the whole name, since that is what the box was holding.
+    // Against `name` alone, renaming "notes.txt" to "notes.md" would look like
+    // no change at all and be dropped.
+    if (item && typedName && typedName !== fullNameOf(item)) {
       this.renameRequested.emit({ item, newName: typedName });
     }
   }

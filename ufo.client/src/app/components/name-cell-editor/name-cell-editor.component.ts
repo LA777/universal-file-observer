@@ -15,14 +15,15 @@ export interface NameCellEditorParams {
    */
   siblingNames: () => string[];
   /**
-   * The extension the typed text is put back together with.
+   * The name to edit, as the file system holds it.
    *
-   * The Name column holds a file's stem, because the server splits the extension
-   * off into its own column - so the box shows "report" for "report.pdf". The
-   * suffix is what makes the difference invisible: the user edits the stem, and
-   * everything judged here is judged against the whole name it will become.
+   * Not the cell's own value: the Name column shows a file's stem, because the
+   * server splits the extension off into its own column, so the cell says
+   * "report" for "report.pdf". The box has to show the whole thing - an
+   * extension the user cannot see is an extension they cannot change, and
+   * renaming "notes.txt" to "notes.md" is an ordinary thing to want.
    */
-  nameSuffix: string;
+  fullName: string;
 }
 
 /**
@@ -58,25 +59,24 @@ export class NameCellEditorComponent implements ICellEditorAngularComp {
 
   private rules: FileNameRules = STRICT_FILE_NAME_RULES;
   private siblingNames: () => string[] = () => [];
-  private nameSuffix = '';
   private originalName = '';
+  private isFile = false;
   private isCancelled = false;
 
   agInit(params: ICellEditorParams<FsItemUi> & NameCellEditorParams): void {
     this.rules = params.rules ?? STRICT_FILE_NAME_RULES;
     this.siblingNames = params.siblingNames ?? (() => []);
-    this.nameSuffix = params.nameSuffix ?? '';
     this.isDraft.set(params.data?.isDraft === true);
-    this.originalName = params.data?.isDraft ? '' : (params.value ?? '');
+    this.isFile = params.data?.isFile === true;
+    this.originalName = params.data?.isDraft ? '' : (params.fullName ?? '');
 
     this.name.set(this.originalName);
     this.revalidate();
   }
 
   /**
-   * The grid reads this once editing stops. It is the stem the user typed, not
-   * the whole name - reattaching the extension is the caller's job, since only
-   * the caller knows which entry it belonged to.
+   * The grid reads this once editing stops. It is the whole name, extension and
+   * all, ready to be sent as it stands.
    *
    * Null for anything that must not become a name - an empty draft, or text that
    * failed validation - because the callers upstream treat a null as "nothing was
@@ -106,11 +106,12 @@ export class NameCellEditorComponent implements ICellEditorAngularComp {
       return;
     }
 
-    // A file's extension is already outside the box, so the whole of what is in
-    // it is what a rename means to change. A folder with a dot in its name is the
-    // one case worth being careful about: "v1.2 backup" selects down to the dot,
-    // the way VS Code does, rather than losing the rest to the first keystroke.
-    const lastDotIndex = this.nameSuffix ? -1 : this.originalName.lastIndexOf('.');
+    // The extension is in the box now, but a rename usually means changing the
+    // part before it, so that is what starts selected - typing replaces the stem
+    // and leaves ".pdf" alone, while the extension is still right there to edit.
+    // This is VS Code's rule: stem for a file, whole name for a folder, and a
+    // dot-file like ".gitignore" has no stem so it is selected entire.
+    const lastDotIndex = this.isFile ? this.originalName.lastIndexOf('.') : -1;
 
     if (lastDotIndex > 0) {
       input.setSelectionRange(0, lastDotIndex);
@@ -168,13 +169,13 @@ export class NameCellEditorComponent implements ICellEditorAngularComp {
       return;
     }
 
-    // Judged as the name it will become on disk, extension and all: "report"
-    // typed over "notes" in a folder that already holds "report.pdf" is a
-    // collision, and the stems alone do not show that.
+    // Judged as the whole name, which is also what is in the box: "report.pdf"
+    // typed into a folder that already holds one is a collision, and the stem
+    // on its own would not show that.
     this.validationError.set(
-      validateFileName(typedName + this.nameSuffix, this.rules, {
+      validateFileName(typedName, this.rules, {
         existingNames: this.siblingNames(),
-        currentName: this.isDraft() ? undefined : this.originalName + this.nameSuffix,
+        currentName: this.isDraft() ? undefined : this.originalName,
       }),
     );
   }

@@ -25,7 +25,7 @@ import {
   RenameRequest,
 } from '../folder-details/folder-details.component';
 import { STRICT_FILE_NAME_RULES } from '../../shared/file-name-validation';
-import { fileExtensionOf, fullNameOf, isParentRow, FOLDER_EXTENSION_LABEL } from '../../shared/fs-item';
+import { fullNameOf, isParentRow, FOLDER_EXTENSION_LABEL } from '../../shared/fs-item';
 
 @Component({
   selector: 'app-file-panel',
@@ -471,15 +471,13 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   /**
    * A name was typed over an existing one.
    *
-   * The Name column holds a file's stem, so the extension is put back before the
-   * server is asked - renaming "report" to "summary" must not turn "report.pdf"
-   * into an extensionless "summary".
+   * The name box holds the whole name, extension and all, so what comes back is
+   * sent as it stands. The extension is the user's to change: "notes.txt" to
+   * "notes.md" is a rename like any other.
    */
   onRenameRequested(request: RenameRequest) {
-    const newFullName = request.newName + fileExtensionOf(request.item);
-
     this.subscriptionWrite?.unsubscribe();
-    this.subscriptionWrite = this.fileService.renameEntry(request.item.fullPath, newFullName).subscribe({
+    this.subscriptionWrite = this.fileService.renameEntry(request.item.fullPath, request.newName).subscribe({
       next: () => this.refresh(),
       error: (error) => {
         this.showErrorDialog(error, 'rename', fullNameOf(request.item));
