@@ -1,4 +1,4 @@
-﻿using Cysharp.Serialization.Json;
+using Cysharp.Serialization.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
 using Microsoft.Data.Sqlite;
@@ -197,6 +197,10 @@ public static class UfoHost
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
+        // Both read the host's own rules once and hold no per-request state, so
+        // they are shared for the same reason the path guard is.
+        builder.Services.AddSingleton<IFileNameValidator, FileNameValidator>();
+        builder.Services.AddSingleton<IFileSystemOperationService, FileSystemOperationService>();
         // The version is read out of the assembly metadata once and never changes
         // while the process lives, so there is nothing per-request about it.
         builder.Services.AddSingleton<IApplicationVersionService, ApplicationVersionService>();

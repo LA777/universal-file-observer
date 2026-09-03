@@ -14,11 +14,20 @@ public class FileSystemController : ControllerBase
     // TODO LA - Cover with Functional tests
     private readonly ILogger<FileSystemController> _logger;
     private readonly IPathGuard _pathGuard;
+    private readonly IFileSystemOperationService _fileSystemOperationService;
+    private readonly IFileNameValidator _fileNameValidator;
 
-    public FileSystemController(ILogger<FileSystemController> logger, IPathGuard pathGuard)
+    public FileSystemController(
+        ILogger<FileSystemController> logger,
+        IPathGuard pathGuard,
+        IFileSystemOperationService fileSystemOperationService,
+        IFileNameValidator fileNameValidator)
     {
         _logger = logger;
         _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
+        _fileSystemOperationService = fileSystemOperationService
+            ?? throw new ArgumentNullException(nameof(fileSystemOperationService));
+        _fileNameValidator = fileNameValidator ?? throw new ArgumentNullException(nameof(fileNameValidator));
     }
 
     [HttpGet("root")]
@@ -50,6 +59,7 @@ public class FileSystemController : ControllerBase
         }
 
         fileSystemRoot.Folder = folderEntity;
+        fileSystemRoot.NameRules = _fileNameValidator.Rules;
 
         return Ok(fileSystemRoot);
     }
@@ -568,4 +578,149 @@ public class FileSystemController : ControllerBase
 
         return GetFolderInfo(new PathRequest { Path = parent }, cancellationToken);
     }
+
+    #region Write operations
+
+    /// <summary>
+    /// Creates one empty file or folder. The client shows a blank row in the
+    /// listing and calls this once a name has been typed into it.
+    /// </summary>
+    [HttpPost("create")]
+    [ProducesResponseType(typeof(FileSystemOperationResult), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public IActionResult CreateEntry([FromBody] FileSystemCreateRequest request)
+    {
+        _logger.LogInformation("CreateEntry - IsFile: {IsFile}", request?.IsFile);
+
+        if (request is null)
+        {
+            return BadRequest("No entry to create was given.");
+        }
+
+        var result = _fileSystemOperationService.Create(request.ParentPath, request.Name, request.IsFile);
+
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, result)
+            : StatusCode(StatusFor(result.Status), result.Message);
+    }
+
+    /// <summary>Renames one entry in place. The name field in the listing calls this.</summary>
+    [HttpPost("rename")]
+    [ProducesResponseType(typeof(FileSystemOperationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public IActionResult RenameEntry([FromBody] FileSystemRenameRequest request)
+    {
+        _logger.LogInformation("RenameEntry");
+
+        if (request is null)
+        {
+            return BadRequest("No entry to rename was given.");
+        }
+
+        var result = _fileSystemOperationService.Rename(request.Path, request.NewName);
+
+        return result.IsSuccess
+            ? Ok(result)
+            : StatusCode(StatusFor(result.Status), result.Message);
+    }
+
+    /// <summary>Copies entries into another folder - in the UI, the other panel's.</summary>
+    [HttpPost("copy")]
+    [ProducesResponseType(typeof(FileSystemBatchResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult CopyEntries([FromBody] FileSystemTransferRequest request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("CopyEntries - Count: {Count}", request?.Paths?.Count);
+
+        if (DescribeInvalidTransfer(request) is { } rejection)
+        {
+            return BadRequest(rejection);
+        }
+
+        return Ok(_fileSystemOperationService.Copy(
+            request!.Paths,
+            request.DestinationFolderPath,
+            request.Overwrite,
+            cancellationToken));
+    }
+
+    /// <summary>Moves entries into another folder - in the UI, the other panel's.</summary>
+    [HttpPost("move")]
+    [ProducesResponseType(typeof(FileSystemBatchResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult MoveEntries([FromBody] FileSystemTransferRequest request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("MoveEntries - Count: {Count}", request?.Paths?.Count);
+
+        if (DescribeInvalidTransfer(request) is { } rejection)
+        {
+            return BadRequest(rejection);
+        }
+
+        return Ok(_fileSystemOperationService.Move(
+            request!.Paths,
+            request.DestinationFolderPath,
+            request.Overwrite,
+            cancellationToken));
+    }
+
+    /// <summary>
+    /// Deletes entries permanently, folders with their contents. There is no
+    /// recycle bin behind this - the client confirms before it calls.
+    /// </summary>
+    [HttpPost("delete")]
+    [ProducesResponseType(typeof(FileSystemBatchResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public IActionResult DeleteEntries([FromBody] FileSystemDeleteRequest request, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("DeleteEntries - Count: {Count}", request?.Paths?.Count);
+
+        if (request?.Paths is not { Count: > 0 })
+        {
+            return BadRequest("No items to delete were given.");
+        }
+
+        return Ok(_fileSystemOperationService.Delete(request.Paths, cancellationToken));
+    }
+
+    /// <summary>
+    /// Why a copy or move request is not worth attempting, or null when it is.
+    /// </summary>
+    /// <remarks>
+    /// Only the shape of the request is judged here. Whether the destination is
+    /// reachable, and whether each entry can actually be transferred, are answers
+    /// that belong per-entry in the batch result - one locked file is not a bad
+    /// request.
+    /// </remarks>
+    private static string? DescribeInvalidTransfer(FileSystemTransferRequest? request)
+    {
+        if (request?.Paths is not { Count: > 0 })
+        {
+            return "No items to transfer were given.";
+        }
+
+        return string.IsNullOrWhiteSpace(request.DestinationFolderPath)
+            ? "No destination folder was given."
+            : null;
+    }
+
+    /// <summary>The HTTP status that says the same thing as an operation status.</summary>
+    private static int StatusFor(FileSystemOperationStatus status) => status switch
+    {
+        FileSystemOperationStatus.InvalidName => StatusCodes.Status400BadRequest,
+        FileSystemOperationStatus.Forbidden => StatusCodes.Status403Forbidden,
+        FileSystemOperationStatus.NotFound => StatusCodes.Status404NotFound,
+        FileSystemOperationStatus.Conflict => StatusCodes.Status409Conflict,
+        _ => StatusCodes.Status500InternalServerError
+    };
+
+    #endregion
 }

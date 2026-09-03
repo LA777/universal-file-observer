@@ -19,6 +19,7 @@ using Ufo.Abstractions.Requests;
 using Ufo.Database.Contexts;
 using Ufo.FunctionalTests.Extensions;
 using Ufo.Server.Extensions;
+using Ufo.Server.Models;
 
 namespace Ufo.FunctionalTests.FileSystemController;
 
@@ -639,6 +640,313 @@ public class FileSystemControllerFunctionalTests : IAsyncLifetime
 
     #endregion
 
+    #region Write Operation Tests
+
+    /// <summary>
+    /// Authenticates the shared client. The write tests all need a token, and
+    /// adding the same header in each of them is how one of them ends up testing
+    /// the unauthenticated path by accident.
+    /// </summary>
+    private void Authenticate()
+    {
+        var token = GenerateToken(FileSystemTestConstants.TestUserId, FileSystemTestConstants.TestUserName);
+        _client.DefaultRequestHeaders.Remove("Authorization");
+        _client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+    }
+
+    [Fact]
+    public async Task GetFileSystemRoot_PublishesTheHostsNamingRules()
+    {
+        Authenticate();
+
+        var response = await _client.GetAsync("/api/filesystem/root");
+        var fileSystemRoot = await response.Content.ReadFromJsonAsync<FileSystemRoot>();
+
+        // The client applies these while the user types, so a root response
+        // without them leaves the name box guessing.
+        Assert.NotNull(fileSystemRoot);
+        Assert.Equal(255, fileSystemRoot!.NameRules.MaximumLength);
+        Assert.Contains('/', fileSystemRoot.NameRules.InvalidCharacters);
+    }
+
+    [Fact]
+    public async Task CreateEntry_CreatesAnEmptyFile()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _testDir, Name = "created.txt", IsFile = true });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var createdPath = Path.Combine(_testDir, "created.txt");
+        Assert.True(File.Exists(createdPath));
+        Assert.Equal(0, new FileInfo(createdPath).Length);
+    }
+
+    [Fact]
+    public async Task CreateEntry_CreatesAFolder()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _testDir, Name = "created-folder", IsFile = false });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        Assert.True(Directory.Exists(Path.Combine(_testDir, "created-folder")));
+    }
+
+    [Fact]
+    public async Task CreateEntry_RejectsANameThatWouldEscapeTheFolder()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _nestedDir, Name = "../escaped.txt", IsFile = true });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(File.Exists(Path.Combine(_testDir, "escaped.txt")));
+    }
+
+    [Fact]
+    public async Task CreateEntry_ReportsANameAlreadyTakenAsAConflict()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _testDir, Name = "test-file.txt", IsFile = true });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        // A create is never a truncation of what was already there.
+        Assert.Equal("Test content", await File.ReadAllTextAsync(_testFile));
+    }
+
+    [Fact]
+    public async Task RenameEntry_ChangesTheNameAndKeepsTheContents()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/rename",
+            new FileSystemRenameRequest { Path = _testFile, NewName = "renamed.txt" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(File.Exists(_testFile));
+        Assert.Equal("Test content", await File.ReadAllTextAsync(Path.Combine(_testDir, "renamed.txt")));
+    }
+
+    [Fact]
+    public async Task RenameEntry_ReportsACollisionAsAConflict()
+    {
+        Authenticate();
+        var otherFilePath = Path.Combine(_testDir, "taken.txt");
+        await File.WriteAllTextAsync(otherFilePath, "theirs");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/rename",
+            new FileSystemRenameRequest { Path = _testFile, NewName = "taken.txt" });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("theirs", await File.ReadAllTextAsync(otherFilePath));
+        Assert.True(File.Exists(_testFile));
+    }
+
+    [Fact]
+    public async Task RenameEntry_ReportsAnEntryThatIsNoLongerThere()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/rename",
+            new FileSystemRenameRequest { Path = Path.Combine(_testDir, "gone.txt"), NewName = "after.txt" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CopyEntries_LeavesTheSourceWhereItIs()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest { Paths = [_testFile], DestinationFolderPath = _nestedDir });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.Empty(result.Failures);
+        Assert.True(File.Exists(_testFile));
+        Assert.Equal("Test content", await File.ReadAllTextAsync(Path.Combine(_nestedDir, "test-file.txt")));
+    }
+
+    [Fact]
+    public async Task CopyEntries_ReportsAPartialFailureWithoutFailingTheRequest()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest
+            {
+                Paths = [Path.Combine(_testDir, "gone.txt"), _testFile],
+                DestinationFolderPath = _nestedDir
+            });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        // One bad path among many is not a bad request: the good ones went
+        // through, and the answer has to be able to say both things at once.
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.Equal("gone.txt", Assert.Single(result.Failures).Name);
+    }
+
+    [Fact]
+    public async Task CopyEntries_ReportsACollisionAsSomethingTheUserCanAnswer()
+    {
+        Authenticate();
+        var destinationFilePath = Path.Combine(_nestedDir, "test-file.txt");
+        await File.WriteAllTextAsync(destinationFilePath, "theirs");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest { Paths = [_testFile], DestinationFolderPath = _nestedDir });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.True(Assert.Single(result.Failures).IsConflict);
+        Assert.Equal("theirs", await File.ReadAllTextAsync(destinationFilePath));
+    }
+
+    [Fact]
+    public async Task CopyEntries_ReplacesWhatIsThereOnceOverwriteIsAsked()
+    {
+        Authenticate();
+        var destinationFilePath = Path.Combine(_nestedDir, "test-file.txt");
+        await File.WriteAllTextAsync(destinationFilePath, "theirs");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest
+            {
+                Paths = [_testFile],
+                DestinationFolderPath = _nestedDir,
+                Overwrite = true
+            });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.Equal("Test content", await File.ReadAllTextAsync(destinationFilePath));
+    }
+
+    [Fact]
+    public async Task CopyEntries_RejectsARequestWithNothingToCopy()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest { Paths = [], DestinationFolderPath = _nestedDir });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MoveEntries_TakesTheEntryOutOfTheSourceFolder()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/move",
+            new FileSystemTransferRequest { Paths = [_testFile], DestinationFolderPath = _nestedDir });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.False(File.Exists(_testFile));
+        Assert.Equal("Test content", await File.ReadAllTextAsync(Path.Combine(_nestedDir, "test-file.txt")));
+    }
+
+    [Fact]
+    public async Task MoveEntries_TakesAFolderWithEverythingUnderIt()
+    {
+        Authenticate();
+        var destinationFolder = Path.Combine(_testDir, "destination");
+        Directory.CreateDirectory(destinationFolder);
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/move",
+            new FileSystemTransferRequest { Paths = [_nestedDir], DestinationFolderPath = destinationFolder });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.False(Directory.Exists(_nestedDir));
+        Assert.Equal(
+            "Nested content",
+            await File.ReadAllTextAsync(Path.Combine(destinationFolder, "nested-folder", "nested-file.txt")));
+    }
+
+    [Fact]
+    public async Task DeleteEntries_RemovesAFileForGood()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [_testFile] });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.False(File.Exists(_testFile));
+    }
+
+    [Fact]
+    public async Task DeleteEntries_RemovesAFolderWithEverythingUnderIt()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [_nestedDir] });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(1, result!.SucceededCount);
+        Assert.False(Directory.Exists(_nestedDir));
+    }
+
+    [Fact]
+    public async Task DeleteEntries_ReportsAnEntryThatIsAlreadyGone()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [Path.Combine(_testDir, "gone.txt")] });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.Single(result.Failures);
+    }
+
+    [Fact]
+    public async Task DeleteEntries_RejectsARequestWithNothingToDelete()
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [] });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    #endregion
+
     #region Authorization and Edge Cases
 
     [Fact]
@@ -656,6 +964,37 @@ public class FileSystemControllerFunctionalTests : IAsyncLifetime
         var parentRequest = new PathRequest { Path = _nestedDir };
         var parentResponse = await _client.PostAsJsonAsync("/api/filesystem/parent", parentRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, parentResponse.StatusCode);
+
+        // The write endpoints matter most here: an unauthenticated read leaks a
+        // listing, an unauthenticated delete takes the files with it.
+        var createResponse = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _testDir, Name = "unauthenticated.txt", IsFile = true });
+        Assert.Equal(HttpStatusCode.Unauthorized, createResponse.StatusCode);
+
+        var renameResponse = await _client.PostAsJsonAsync(
+            "/api/filesystem/rename",
+            new FileSystemRenameRequest { Path = _testFile, NewName = "unauthenticated.txt" });
+        Assert.Equal(HttpStatusCode.Unauthorized, renameResponse.StatusCode);
+
+        var copyResponse = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest { Paths = [_testFile], DestinationFolderPath = _nestedDir });
+        Assert.Equal(HttpStatusCode.Unauthorized, copyResponse.StatusCode);
+
+        var moveResponse = await _client.PostAsJsonAsync(
+            "/api/filesystem/move",
+            new FileSystemTransferRequest { Paths = [_testFile], DestinationFolderPath = _nestedDir });
+        Assert.Equal(HttpStatusCode.Unauthorized, moveResponse.StatusCode);
+
+        var deleteResponse = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [_testFile] });
+        Assert.Equal(HttpStatusCode.Unauthorized, deleteResponse.StatusCode);
+
+        // Nothing the sweep asked for actually happened.
+        Assert.True(File.Exists(_testFile));
+        Assert.False(File.Exists(Path.Combine(_testDir, "unauthenticated.txt")));
     }
 
     [Fact]

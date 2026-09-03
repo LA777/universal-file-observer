@@ -482,6 +482,141 @@ public class RestrictedFileSystemFunctionalTests : IAsyncLifetime
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    #region Write Operations
+
+    /// <summary>
+    /// The write endpoints go through the same guard as the read ones, and get
+    /// their own coverage because the consequence differs: a read that escapes the
+    /// allow-list leaks a listing, a write that escapes it changes the host.
+    /// </summary>
+    [Fact]
+    public async Task CreateEntry_OutsideTheAllowedRoot_IsForbidden()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest { ParentPath = _forbiddenRoot, Name = "planted.txt", IsFile = true });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(File.Exists(Path.Combine(_forbiddenRoot, "planted.txt")));
+    }
+
+    [Fact]
+    public async Task CreateEntry_ThroughASymlinkedDirectory_IsForbidden()
+    {
+        if (!_symbolicLinksSupported)
+        {
+            return;
+        }
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest
+            {
+                ParentPath = Path.Combine(_allowedRoot, "escape"),
+                Name = "planted.txt",
+                IsFile = true
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.False(File.Exists(Path.Combine(_forbiddenRoot, "planted.txt")));
+    }
+
+    [Fact]
+    public async Task CreateEntry_WithANameThatClimbsOutOfTheAllowedRoot_IsRejected()
+    {
+        // The guard approves the parent folder; only the name validator stands
+        // between that approval and a write one level above it.
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/create",
+            new FileSystemCreateRequest
+            {
+                ParentPath = _allowedRoot,
+                Name = "../secrets/planted.txt",
+                IsFile = true
+            });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.False(File.Exists(Path.Combine(_forbiddenRoot, "planted.txt")));
+    }
+
+    [Fact]
+    public async Task RenameEntry_OutsideTheAllowedRoot_IsForbidden()
+    {
+        var forbiddenFilePath = Path.Combine(_forbiddenRoot, "public-marker-secret.txt");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/rename",
+            new FileSystemRenameRequest { Path = forbiddenFilePath, NewName = "renamed.txt" });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.True(File.Exists(forbiddenFilePath));
+    }
+
+    [Fact]
+    public async Task CopyEntries_FromOutsideTheAllowedRoot_CopiesNothing()
+    {
+        var forbiddenFilePath = Path.Combine(_forbiddenRoot, "public-marker-secret.txt");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest { Paths = [forbiddenFilePath], DestinationFolderPath = _allowedRoot });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        // Copying into the allow-list is how a restricted host's own contents
+        // would be read out through an endpoint that only lists what it may see.
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.Single(result.Failures);
+        Assert.False(File.Exists(Path.Combine(_allowedRoot, "public-marker-secret.txt")));
+    }
+
+    [Fact]
+    public async Task CopyEntries_ToOutsideTheAllowedRoot_CopiesNothing()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/copy",
+            new FileSystemTransferRequest
+            {
+                Paths = [Path.Combine(_allowedRoot, "public-marker.txt")],
+                DestinationFolderPath = _forbiddenRoot
+            });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.False(File.Exists(Path.Combine(_forbiddenRoot, "public-marker.txt")));
+    }
+
+    [Fact]
+    public async Task DeleteEntries_OutsideTheAllowedRoot_DeletesNothing()
+    {
+        var forbiddenFilePath = Path.Combine(_forbiddenRoot, "public-marker-secret.txt");
+
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [forbiddenFilePath] });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.Single(result.Failures);
+        Assert.True(File.Exists(forbiddenFilePath));
+    }
+
+    [Fact]
+    public async Task DeleteEntries_TheAllowedRootItself_DeletesNothing()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/filesystem/delete",
+            new FileSystemDeleteRequest { Paths = [_allowedRoot] });
+        var result = await response.Content.ReadFromJsonAsync<FileSystemBatchResult>();
+
+        // Inside the allow-list, and still refused: this is everything the user
+        // can see, and no confirmation dialog makes it a reasonable thing to lose.
+        Assert.Equal(0, result!.SucceededCount);
+        Assert.True(Directory.Exists(_allowedRoot));
+        Assert.True(File.Exists(Path.Combine(_allowedRoot, "public-marker.txt")));
+    }
+
+    #endregion
 }
 
 #endregion

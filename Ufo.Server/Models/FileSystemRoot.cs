@@ -9,4 +9,11 @@ public class FileSystemRoot
     public IList<string> Roots { get; set; } = [];
 
     public FsFolder? Folder { get; set; }
+
+    /// <summary>
+    /// What this host will accept as a name, so the client can reject a bad one
+    /// while it is still being typed. Sent with the root because that is the one
+    /// call every panel already makes before it can show anything.
+    /// </summary>
+    public FileNameRules NameRules { get; set; } = new();
 }
