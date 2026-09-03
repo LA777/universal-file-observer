@@ -1,0 +1,123 @@
+/* No colour is named here: every value is a theme token, so the strip follows
+   the app between the dark and light palettes like the rest of the chrome. */
+.folder-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  margin-top: 6px;
+}
+
+.folder-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 220px;
+  height: 26px;
+  padding: 0 4px 0 8px;
+  border: 1px solid var(--ufo-border-control);
+  border-bottom-color: transparent;
+  border-radius: 4px 4px 0 0;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.12s ease-in-out, color 0.12s ease-in-out;
+}
+
+.folder-tab:hover {
+  background-color: var(--ufo-bg-control-hover);
+  color: var(--ufo-text);
+}
+
+/* The active tab reads as the front one: brighter, and joined to the listing. */
+.folder-tab.active {
+  background-color: var(--ufo-bg-surface);
+  border-color: var(--ufo-accent-strong);
+  color: var(--ufo-text-strong);
+  font-weight: 600;
+}
+
+.folder-tab .tab-icon {
+  flex: 0 0 auto;
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  color: var(--ufo-folder-icon);
+}
+
+.tab-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ufo-text-muted);
+  cursor: pointer;
+  /* Out of the way until the tab is worth acting on, so a row of tabs reads as
+     names rather than as a row of buttons. */
+  opacity: 0.45;
+  transition: opacity 0.12s ease-in-out, background-color 0.12s ease-in-out;
+}
+
+.folder-tab:hover .tab-button,
+.folder-tab.active .tab-button {
+  opacity: 1;
+}
+
+/* A closed padlock stays visible whatever the pointer is doing: it is the whole
+   difference between a tab that survives the session and one that does not. */
+.tab-button.is-locked {
+  opacity: 1;
+  color: var(--ufo-accent);
+}
+
+.tab-button:hover {
+  background-color: var(--ufo-bg-control-active);
+  color: var(--ufo-text-strong);
+}
+
+.tab-button.close:hover {
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
+}
+
+.tab-button mat-icon,
+.add-tab mat-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+}
+
+.add-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-muted);
+  cursor: pointer;
+}
+
+.add-tab:hover {
+  background-color: var(--ufo-bg-control-hover);
+  color: var(--ufo-text-strong);
+}

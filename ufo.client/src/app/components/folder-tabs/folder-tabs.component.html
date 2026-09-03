@@ -1,0 +1,39 @@
+<div class="folder-tabs" role="tablist">
+  @for (tab of tabs; track tab.id) {
+    <div
+      class="folder-tab"
+      role="tab"
+      [class.active]="tab.id === activeTabId"
+      [class.locked]="tab.isLocked"
+      [attr.aria-selected]="tab.id === activeTabId"
+      [title]="tab.folderPath"
+      (click)="tabSelected.emit(tab.id)">
+      <mat-icon class="tab-icon">folder</mat-icon>
+      <span class="tab-name">{{ tab.name }}</span>
+
+      <button
+        type="button"
+        class="tab-button"
+        [class.is-locked]="tab.isLocked"
+        [title]="lockTitle(tab)"
+        [attr.aria-pressed]="tab.isLocked"
+        (click)="lockToggled.emit(tab.id); $event.stopPropagation()">
+        <mat-icon>{{ tab.isLocked ? 'lock' : 'lock_open' }}</mat-icon>
+      </button>
+
+      @if (canClose(tab)) {
+        <button
+          type="button"
+          class="tab-button close"
+          title="Close this tab"
+          (click)="tabClosed.emit(tab.id); $event.stopPropagation()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </div>
+  }
+
+  <button type="button" class="add-tab" title="New tab on this folder" (click)="tabAdded.emit()">
+    <mat-icon>add</mat-icon>
+  </button>
+</div>

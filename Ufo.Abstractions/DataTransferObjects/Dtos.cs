@@ -73,6 +73,26 @@ public class UserSettingsDto : DtoWithUserIdAndIdBase
 }
 
 /// <summary>
+/// One locked folder tab, as restored into a panel on load.
+/// </summary>
+/// <remarks>
+/// The tab's label is not carried: it is the last segment of the path, and a
+/// name stored beside the path is a second thing that can disagree with it after
+/// the folder is renamed on disk.
+/// </remarks>
+public class FolderTabDto
+{
+    [JsonPropertyOrder(1)]
+    public string PanelId { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(2)]
+    public string FolderPath { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(3)]
+    public int Position { get; set; }
+}
+
+/// <summary>
 /// One row of the Settings page's keyboard-shortcuts table: what the action is
 /// called, what it is bound to now, and what it would go back to on a reset.
 /// </summary>

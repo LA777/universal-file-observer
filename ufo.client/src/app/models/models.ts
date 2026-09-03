@@ -273,6 +273,33 @@ export interface DialogData {
   isDestructive?: boolean;
 }
 
+/** One locked folder tab, as the server stores it. */
+export interface PersistedFolderTab {
+  panelId: string;
+  folderPath: string;
+  position: number;
+}
+
+/**
+ * A tab in a file panel.
+ *
+ * Locking does two things at once, and both matter: the tab is kept for next
+ * session, and it is pinned to its folder - navigating inside it opens a new tab
+ * rather than moving it. That is why a locked tab's history holds exactly one
+ * entry and its Back and Forward buttons are dead: there is nowhere for it to go.
+ */
+export interface FolderTab {
+  /** Client-side only; a locked tab's identity on the server is its path. */
+  id: string;
+  folderPath: string;
+  /** The last segment of the path, or the path itself for a root. */
+  name: string;
+  isLocked: boolean;
+  /** This tab's own browsing history, so Back does not cross between tabs. */
+  history: string[];
+  historyIndex: number;
+}
+
 /**
  * One row of the keyboard-shortcuts table.
  *

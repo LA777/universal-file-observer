@@ -197,6 +197,25 @@ public class SqlScripts
             CONSTRAINT FK_UserKeyBindings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
         );
 
+        -- Locked folder tabs, one row each. An ordinary tab is somewhere the user
+        -- happens to be looking and belongs to the session; locking is how they
+        -- say this one is worth keeping, and the row is what keeping it means.
+        --
+        -- A panel's tabs are replaced wholesale on every save, so Position is a
+        -- plain ordering column rather than something that has to be patched.
+        -- The UNIQUE is on the folder instead: two locked tabs on the same folder
+        -- in the same pane are the same tab twice.
+        CREATE TABLE IF NOT EXISTS FolderTabs (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_FolderTabs PRIMARY KEY,
+            PanelId                   TEXT NOT NULL,
+            FolderPath                TEXT NOT NULL,
+            Position                  INTEGER NOT NULL DEFAULT 0,
+            UserId                    TEXT NOT NULL,
+
+            CONSTRAINT UQ_FolderTabs_User_Panel_Folder UNIQUE (UserId, PanelId, FolderPath),
+            CONSTRAINT FK_FolderTabs_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
         -- Server-scoped configuration: exactly one row for the whole installation.
         -- Deliberately the only table without a UserId. A TLS certificate belongs
         -- to the listener, not to a user: Kestrel presents one certificate to
@@ -530,6 +549,16 @@ public class SqlScripts
     // whatever its sliding deadline says, so nothing is lost by dropping it.
     public const string DeleteExpiredRefreshTokensSql =
         "DELETE FROM RefreshTokens WHERE AbsoluteExpiresAt < @UtcNow;";
+
+    public const string SelectFolderTabsSql =
+        "SELECT * FROM FolderTabs WHERE UserId = @UserId ORDER BY PanelId, Position;";
+
+    public const string DeleteFolderTabsForPanelSql =
+        "DELETE FROM FolderTabs WHERE UserId = @UserId AND PanelId = @PanelId;";
+
+    public const string InsertFolderTabSql =
+        "INSERT INTO FolderTabs (Id, PanelId, FolderPath, Position, UserId) " +
+        "VALUES (@Id, @PanelId, @FolderPath, @Position, @UserId);";
 
     public const string SelectUserKeyBindingsSql =
         "SELECT * FROM UserKeyBindings WHERE UserId = @UserId;";

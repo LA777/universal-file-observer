@@ -11,6 +11,7 @@ import {
   FileNameRules,
   FsBatchResult,
   FsItemFailure,
+  FolderTab,
   FsItemUi,
   SnapshotSummary,
 } from '../../models/models';
@@ -19,6 +20,8 @@ import { describeHttpError, describeInfo } from '../../shared/http-error';
 import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { KeyBindingsService } from '../../services/key-bindings.service';
+import { FolderTabsService } from '../../services/folder-tabs.service';
+import { FolderTabsComponent } from '../folder-tabs/folder-tabs.component';
 import { KeyBindingActions } from '../../shared/key-binding-actions';
 import { Subscription } from 'rxjs';
 import {
@@ -35,7 +38,14 @@ import { fullNameOf, isParentRow, FOLDER_EXTENSION_LABEL } from '../../shared/fs
   templateUrl: './file-panel.component.html',
   styleUrl: './file-panel.component.css',
   changeDetection: ChangeDetectionStrategy.Eager,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatProgressBarModule, FolderDetailsComponent]
+  imports: [
+    CommonModule,
+    MatButtonModule,
+    MatIconModule,
+    MatProgressBarModule,
+    FolderDetailsComponent,
+    FolderTabsComponent
+  ]
 })
 export class FilePanelComponent implements OnInit, OnDestroy {
   @Input() panelId: string = 'panel';
@@ -78,16 +88,25 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   private subscriptionFolder: Subscription;
   private subscriptionCreateSnapshot: Subscription;
   private subscriptionWrite: Subscription;
+  private subscriptionTabs: Subscription;
+  private subscriptionSaveTabs: Subscription;
 
-  /** Browser-style navigation history of visited folder paths. */
-  private history: string[] = [];
-  private historyIndex = -1;
+  /**
+   * The tabs of this panel, left to right. Never empty once the panel has loaded:
+   * closing is refused for the last one, so there is always somewhere to be.
+   */
+  tabs: FolderTab[] = [];
+
+  activeTabId = '';
+
+  private nextTabNumber = 0;
 
   constructor(
     public dialog: MatDialog,
     private fileService: FileService,
     private snapshotService: SnapshotService,
-    private keyBindingsService: KeyBindingsService
+    private keyBindingsService: KeyBindingsService,
+    private folderTabsService: FolderTabsService
   ) {}
 
   ngOnInit() {
@@ -104,6 +123,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.subscriptionFolder?.unsubscribe();
     this.subscriptionCreateSnapshot?.unsubscribe();
     this.subscriptionWrite?.unsubscribe();
+    this.subscriptionTabs?.unsubscribe();
+    this.subscriptionSaveTabs?.unsubscribe();
   }
 
   /**
@@ -140,8 +161,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         // Sent with the root because it is the one call every panel makes before
         // it can show anything, so the name box is never opened without them.
         this.nameRules = result.nameRules ?? STRICT_FILE_NAME_RULES;
+        this.restoreTabs(result.folder.fullPath);
         this.initiateFolder(result.folder);
-        this.recordHistory(result.folder.fullPath);
       },
       error: (error) => {
         this.showErrorDialog(error, 'open the starting folder');
@@ -158,6 +179,16 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     this.selectedItems = [];
     this.draftItem = null;
     this.pathChanged.emit(folder.fullPath);
+
+    // The tab follows the listing rather than the request: a navigation that was
+    // redirected, or one that landed somewhere other than it asked, must not
+    // leave the tab labelled with a folder nobody is looking at.
+    const activeTab = this.activeTab;
+
+    if (activeTab && !activeTab.isLocked) {
+      activeTab.folderPath = folder.fullPath;
+      activeTab.name = folderNameOf(folder.fullPath);
+    }
 
     if (folder.hasParent) {
       this.folderData.push({
@@ -211,8 +242,30 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Opens a folder in this panel.
+   *
+   * A locked tab does not move. It opens the folder in a new tab beside it
+   * instead, which is what locking is for: the tab stays where it was put, and
+   * the user still gets where they were going.
+   */
   navigateToPath(path?: string) {
+    if (!path) {
+      return;
+    }
+
+    const activeTab = this.activeTab;
+
+    if (activeTab?.isLocked && path !== activeTab.folderPath) {
+      this.openInNewTab(path);
+      return;
+    }
+
     this.loadFolder(path, true);
+  }
+
+  get activeTab(): FolderTab | undefined {
+    return this.tabs.find(tab => tab.id === this.activeTabId);
   }
 
   /** Path typed into the location bar; Enter applies it. */
@@ -245,22 +298,35 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Drop any forward entries and append the new location, skipping consecutive duplicates. */
+  /**
+   * Drop any forward entries and append the new location, skipping consecutive
+   * duplicates. Recorded against the active tab, not the panel: Back inside one
+   * tab must not walk into somewhere another tab happened to visit.
+   */
   private recordHistory(path: string) {
-    if (this.history[this.historyIndex] === path) {
+    const activeTab = this.activeTab;
+
+    if (!activeTab || activeTab.history[activeTab.historyIndex] === path) {
       return;
     }
-    this.history = this.history.slice(0, this.historyIndex + 1);
-    this.history.push(path);
-    this.historyIndex = this.history.length - 1;
+
+    activeTab.history = activeTab.history.slice(0, activeTab.historyIndex + 1);
+    activeTab.history.push(path);
+    activeTab.historyIndex = activeTab.history.length - 1;
   }
 
+  // Both dead in a locked tab, and correctly so: locking collapses its history
+  // to the one folder it is pinned to, so there is nowhere to go back to.
   get canNavigateBackward(): boolean {
-    return this.historyIndex > 0;
+    const activeTab = this.activeTab;
+
+    return !!activeTab && activeTab.historyIndex > 0;
   }
 
   get canNavigateForward(): boolean {
-    return this.historyIndex < this.history.length - 1;
+    const activeTab = this.activeTab;
+
+    return !!activeTab && activeTab.historyIndex < activeTab.history.length - 1;
   }
 
   createSnapshot() {
@@ -299,19 +365,167 @@ export class FilePanelComponent implements OnInit, OnDestroy {
   }
 
   navigateBackward() {
-    if (!this.canNavigateBackward) {
+    const activeTab = this.activeTab;
+
+    if (!this.canNavigateBackward || !activeTab) {
       return;
     }
-    this.historyIndex--;
-    this.loadFolder(this.history[this.historyIndex], false);
+
+    activeTab.historyIndex--;
+    this.loadFolder(activeTab.history[activeTab.historyIndex], false);
   }
 
   navigateForward() {
-    if (!this.canNavigateForward) {
+    const activeTab = this.activeTab;
+
+    if (!this.canNavigateForward || !activeTab) {
       return;
     }
-    this.historyIndex++;
-    this.loadFolder(this.history[this.historyIndex], false);
+
+    activeTab.historyIndex++;
+    this.loadFolder(activeTab.history[activeTab.historyIndex], false);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Folder tabs
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Puts the panel's tabs back as the user left them.
+   *
+   * Locked tabs first, in the order they were saved, then the folder the panel
+   * would have opened on anyway - so somebody who locked nothing sees exactly
+   * what they saw before tabs existed, and somebody who locked something lands
+   * in it rather than having to click.
+   */
+  private restoreTabs(startingFolderPath: string) {
+    this.tabs = [this.createTab(startingFolderPath)];
+    this.activeTabId = this.tabs[0].id;
+
+    this.subscriptionTabs = this.folderTabsService.load().subscribe({
+      next: (persistedTabs) => {
+        const lockedTabs = persistedTabs
+          .filter(persistedTab => persistedTab.panelId === this.panelId)
+          .sort((left, right) => left.position - right.position)
+          .map(persistedTab => this.createTab(persistedTab.folderPath, true));
+
+        if (lockedTabs.length === 0) {
+          return;
+        }
+
+        this.tabs = lockedTabs;
+        this.activeTabId = lockedTabs[0].id;
+        this.loadFolder(lockedTabs[0].folderPath, false);
+      },
+      // A panel whose tabs could not be restored is still a working file
+      // browser, and it already has the one tab it opened with.
+      error: () => undefined
+    });
+  }
+
+  private createTab(folderPath: string, isLocked = false): FolderTab {
+    return {
+      // Local to the panel and to this session. A locked tab's identity on the
+      // server is its path; this only has to tell two open tabs apart.
+      id: `${this.panelId}-${this.nextTabNumber++}`,
+      folderPath,
+      name: folderNameOf(folderPath),
+      isLocked,
+      history: [folderPath],
+      historyIndex: 0
+    };
+  }
+
+  /** The + button: another tab on the folder this panel is already showing. */
+  onTabAdded() {
+    if (this.selectedFolder?.fullPath) {
+      this.openInNewTab(this.selectedFolder.fullPath);
+    }
+  }
+
+  private openInNewTab(folderPath: string) {
+    const newTab = this.createTab(folderPath);
+
+    // Beside the tab it came from rather than at the end, so a tab opened out of
+    // a locked one appears where the user was looking.
+    const activeIndex = this.tabs.findIndex(tab => tab.id === this.activeTabId);
+    this.tabs.splice(activeIndex + 1, 0, newTab);
+
+    this.activeTabId = newTab.id;
+    this.loadFolder(folderPath, false);
+  }
+
+  onTabSelected(tabId: string) {
+    const tab = this.tabs.find(candidate => candidate.id === tabId);
+
+    if (!tab || tab.id === this.activeTabId) {
+      return;
+    }
+
+    this.activeTabId = tabId;
+    // Not recorded: the tab is already standing here, and adding it to its own
+    // history would put a duplicate behind every switch away and back.
+    this.loadFolder(tab.folderPath, false);
+  }
+
+  onTabClosed(tabId: string) {
+    const closingIndex = this.tabs.findIndex(tab => tab.id === tabId);
+
+    // The last tab stays, and a locked one is not closable at all - unlocking is
+    // the way to be rid of it, and it is one click.
+    if (closingIndex < 0 || this.tabs.length === 1 || this.tabs[closingIndex].isLocked) {
+      return;
+    }
+
+    const wasActive = this.tabs[closingIndex].id === this.activeTabId;
+    this.tabs.splice(closingIndex, 1);
+
+    if (!wasActive) {
+      return;
+    }
+
+    // The neighbour to the left, or the first one - whichever the closed tab
+    // left behind, so focus lands somewhere adjacent rather than jumping.
+    const nextTab = this.tabs[Math.max(0, closingIndex - 1)];
+    this.activeTabId = nextTab.id;
+    this.loadFolder(nextTab.folderPath, false);
+  }
+
+  /**
+   * Locks or unlocks a tab.
+   *
+   * Locking does two things, and they belong together: the tab is kept for next
+   * session, and it stops following the user around. Its history collapses to
+   * the one folder it is pinned to, because that is now the only place it goes.
+   */
+  onLockToggled(tabId: string) {
+    const tab = this.tabs.find(candidate => candidate.id === tabId);
+
+    if (!tab) {
+      return;
+    }
+
+    tab.isLocked = !tab.isLocked;
+
+    if (tab.isLocked) {
+      tab.history = [tab.folderPath];
+      tab.historyIndex = 0;
+    }
+
+    this.saveLockedTabs();
+  }
+
+  private saveLockedTabs() {
+    const lockedPaths = this.tabs.filter(tab => tab.isLocked).map(tab => tab.folderPath);
+
+    this.subscriptionSaveTabs?.unsubscribe();
+    this.subscriptionSaveTabs = this.folderTabsService.save(this.panelId, lockedPaths).subscribe({
+      error: (error) => {
+        // Told about, because the whole point of the padlock is that the tab
+        // will still be here tomorrow - and silently it would not be.
+        this.showErrorDialog(error, 'save the locked tabs');
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -771,4 +985,16 @@ function describeNames(failures: FsItemFailure[]): string {
   return remainingCount > 0
     ? `${names.join(', ')} and ${remainingCount} more`
     : names.join(', ');
+}
+
+/**
+ * The label a tab carries: the last segment of its path.
+ *
+ * A root has no last segment - "C:\\" and "/" both split to nothing - so it is
+ * shown as itself rather than as an empty tab.
+ */
+function folderNameOf(folderPath: string): string {
+  const segments = folderPath.split(/[\\/]+/).filter(segment => segment.length > 0);
+
+  return segments.length > 0 ? segments[segments.length - 1] : folderPath;
 }
