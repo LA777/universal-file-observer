@@ -156,6 +156,20 @@ public class FileSystemOperationService : IFileSystemOperationService
                 $"'{path}' no longer exists. It may have been renamed, moved, or deleted.");
         }
 
+        // A rename writes into the entry's parent, and the parent of an allowed
+        // root is outside every allowed root there is.
+        if (IsProtectedRoot(resolvedPath))
+        {
+            return FileSystemOperationResult.Rejected(
+                FileSystemOperationStatus.Forbidden,
+                "A drive or top-level location cannot be renamed.");
+        }
+
+        if (IsSymbolicLink(path))
+        {
+            return FileSystemOperationResult.Rejected(FileSystemOperationStatus.Forbidden, SymbolicLinkRefusal);
+        }
+
         var trimmedName = newName?.Trim() ?? string.Empty;
 
         if (!_fileNameValidator.TryValidate(trimmedName, out var rejectionReason))
@@ -171,6 +185,16 @@ public class FileSystemOperationService : IFileSystemOperationService
         }
 
         var targetPath = Path.Combine(parentPath, trimmedName);
+
+        // The name is a single segment and the parent is already inside an allowed
+        // root, so this should be redundant. "Should be" is not the standard for
+        // the check that decides where a write lands.
+        if (!_pathGuard.TryResolveQuietly(targetPath, out _))
+        {
+            return FileSystemOperationResult.Rejected(
+                FileSystemOperationStatus.Forbidden,
+                $"'{trimmedName}' is not somewhere this server is allowed to write.");
+        }
 
         // Nothing to do, and going ahead would report a conflict against itself.
         if (string.Equals(targetPath, resolvedPath, StringComparison.Ordinal))
@@ -304,9 +328,18 @@ public class FileSystemOperationService : IFileSystemOperationService
 
         var name = Path.GetFileName(resolvedSource);
 
-        if (string.IsNullOrEmpty(name))
+        if (string.IsNullOrEmpty(name) || (isMove && IsProtectedRoot(resolvedSource)))
         {
-            return Failure(path, "A drive or top-level location cannot be transferred.");
+            // Only a move is refused outright: it takes the root away, whereas
+            // copying one somewhere writable is an ordinary thing to want.
+            return Failure(path, "A drive or top-level location cannot be moved.");
+        }
+
+        // A copy reads the link's target, which is harmless and probably what was
+        // meant. A move would take the target away from wherever it really lives.
+        if (isMove && IsSymbolicLink(path))
+        {
+            return Failure(path, SymbolicLinkRefusal);
         }
 
         var targetPath = Path.Combine(resolvedDestinationFolder, name);
@@ -333,29 +366,56 @@ public class FileSystemOperationService : IFileSystemOperationService
 
         try
         {
-            if (targetExists)
+            // Only a change of kind forces the destination to be removed first:
+            // neither Copy nor Move will write a file over a folder or the other
+            // way round. Everything else is overwritten in place, because
+            // deleting first and then failing - a full disk, a locked source -
+            // leaves the user with neither the old file nor the new one.
+            if (targetExists && Directory.Exists(targetPath) != isDirectory)
             {
-                // Replacing a folder with a file, or the other way round, is not
-                // something Copy or Move will do over the top of what is there.
                 DeleteEntry(targetPath);
+                targetExists = false;
             }
+
+            var transferredEverything = true;
 
             if (isMove)
             {
-                MoveEntry(resolvedSource, targetPath, isDirectory, cancellationToken);
+                transferredEverything = MoveEntry(
+                    resolvedSource, targetPath, isDirectory, targetExists, overwrite, cancellationToken);
             }
             else if (isDirectory)
             {
-                CopyDirectory(resolvedSource, targetPath, cancellationToken);
+                transferredEverything = CopyDirectory(resolvedSource, targetPath, cancellationToken);
             }
             else
             {
                 File.Copy(resolvedSource, targetPath, overwrite: true);
             }
 
+            if (!transferredEverything)
+            {
+                // Reported rather than counted as a success. The source is still
+                // there, which is the half that matters - a move that deleted it
+                // would have taken the skipped entries with it.
+                return Failure(
+                    path,
+                    "Part of it is outside the folders this server may read and was left behind, "
+                    + "so nothing was removed from the original.");
+            }
+
             _logger.LogInformation("{Verb} {Source} to {Target}.", isMove ? "Moved" : "Copied", resolvedSource, targetPath);
 
             return null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Never allowed to unwind past the batch loop: the entries already
+            // handled are a real outcome, and losing the whole result to report
+            // a cancellation tells the user nothing about what did happen.
+            _logger.LogInformation("Transfer of {Source} was cancelled.", resolvedSource);
+
+            return Failure(path, "It was not finished - the request was cancelled.");
         }
         catch (Exception exception) when (IsExpectedFileSystemFailure(exception))
         {
@@ -371,40 +431,70 @@ public class FileSystemOperationService : IFileSystemOperationService
     }
 
     /// <summary>
-    /// Moves an entry, falling back to copy-then-delete when the two paths are on
-    /// different volumes.
+    /// Moves an entry, falling back to copy-then-delete where a rename cannot reach.
     /// </summary>
     /// <remarks>
-    /// <see cref="Directory.Move(string, string)"/> is a rename, and a rename
-    /// cannot cross a volume boundary - which is exactly what dragging a folder
-    /// from C: to D: in the two panes asks for. The framework reports that as a
-    /// plain <see cref="IOException"/>, so the fallback runs only once the target
-    /// is known not to exist, and the source is removed only after the copy
-    /// finished.
+    /// <see cref="Directory.Move(string, string)"/> is a rename, and a rename can
+    /// neither cross a volume boundary - exactly what dragging a folder from C: to
+    /// D: in the two panes asks for - nor write into a folder that is already
+    /// there. Both end in the same fallback: copy the tree across, then drop the
+    /// original, and only ever in that order.
     /// </remarks>
-    private void MoveEntry(string sourcePath, string targetPath, bool isDirectory, CancellationToken cancellationToken)
+    /// <returns>
+    /// False when the copy left something behind, and then the source has
+    /// deliberately not been deleted. Deleting it would take the skipped entries
+    /// with it, which is the one outcome a move must never produce.
+    /// </returns>
+    private bool MoveEntry(
+        string sourcePath,
+        string targetPath,
+        bool isDirectory,
+        bool targetExists,
+        bool overwrite,
+        CancellationToken cancellationToken)
     {
         if (!isDirectory)
         {
-            File.Move(sourcePath, targetPath, overwrite: false);
-            return;
+            // The caller has already turned a collision into a conflict unless
+            // the user agreed to replace, so by here overwriting is the answer.
+            File.Move(sourcePath, targetPath, overwrite: true);
+            return true;
         }
 
-        try
+        if (!targetExists)
         {
-            Directory.Move(sourcePath, targetPath);
-        }
-        catch (IOException exception)
-        {
-            _logger.LogInformation(
-                exception,
-                "Falling back to copy-and-delete for {Source}; a rename could not reach {Target}.",
-                sourcePath,
-                targetPath);
+            try
+            {
+                Directory.Move(sourcePath, targetPath);
+                return true;
+            }
+            catch (IOException exception)
+            {
+                _logger.LogInformation(
+                    exception,
+                    "Falling back to copy-and-delete for {Source}; a rename could not reach {Target}.",
+                    sourcePath,
+                    targetPath);
+            }
 
-            CopyDirectory(sourcePath, targetPath, cancellationToken);
-            Directory.Delete(sourcePath, recursive: true);
+            // Something arrived at the destination between the check and the
+            // move. Merging into it would write over what another writer just
+            // put there, which is not what an un-overwritten move agreed to.
+            if (Exists(targetPath) && !overwrite)
+            {
+                throw new IOException(
+                    $"'{Path.GetFileName(targetPath)}' appeared in the destination while it was being moved.");
+            }
         }
+
+        if (!CopyDirectory(sourcePath, targetPath, cancellationToken))
+        {
+            return false;
+        }
+
+        Directory.Delete(sourcePath, recursive: true);
+
+        return true;
     }
 
     /// <summary>
@@ -416,8 +506,14 @@ public class FileSystemOperationService : IFileSystemOperationService
     /// Symbolic links inside the tree are re-checked, so a link out of an allowed
     /// root does not become a real copy of whatever it pointed at.
     /// </remarks>
-    private void CopyDirectory(string sourcePath, string targetPath, CancellationToken cancellationToken)
+    /// <returns>
+    /// False when an entry was skipped for being outside the allowed roots. The
+    /// caller needs to know, because a move that deleted the source afterwards
+    /// would destroy exactly the entries this refused to copy.
+    /// </returns>
+    private bool CopyDirectory(string sourcePath, string targetPath, CancellationToken cancellationToken)
     {
+        var copiedEverything = true;
         var pending = new Stack<(string Source, string Target)>();
         pending.Push((sourcePath, targetPath));
 
@@ -435,6 +531,7 @@ public class FileSystemOperationService : IFileSystemOperationService
 
                 if (!_pathGuard.IsAllowedChild(childFilePath))
                 {
+                    copiedEverything = false;
                     continue;
                 }
 
@@ -445,12 +542,15 @@ public class FileSystemOperationService : IFileSystemOperationService
             {
                 if (!_pathGuard.IsAllowedChild(childFolderPath))
                 {
+                    copiedEverything = false;
                     continue;
                 }
 
                 pending.Push((childFolderPath, Path.Combine(currentTarget, Path.GetFileName(childFolderPath))));
             }
         }
+
+        return copiedEverything;
     }
 
     #endregion
@@ -496,13 +596,17 @@ public class FileSystemOperationService : IFileSystemOperationService
             return Failure(path, "It no longer exists.");
         }
 
-        // A drive root, or a root this server was configured to expose. Deleting
-        // either means deleting everything the user can see, and no confirmation
-        // dialog makes that a thing worth allowing through a file browser.
-        if (Path.GetDirectoryName(resolvedPath) is not { Length: > 0 }
-            || _pathGuard.AllowedRoots.Any(allowedRoot => resolvedPath.Equals(allowedRoot, PathComparison)))
+        // Deleting a drive or an allowed root means deleting everything the user
+        // can see, and no confirmation dialog makes that worth allowing through a
+        // file browser.
+        if (IsProtectedRoot(resolvedPath))
         {
             return Failure(path, "A drive or top-level location cannot be deleted.");
+        }
+
+        if (IsSymbolicLink(path))
+        {
+            return Failure(path, SymbolicLinkRefusal);
         }
 
         try
@@ -512,6 +616,10 @@ public class FileSystemOperationService : IFileSystemOperationService
             _logger.LogInformation("Deleted {Path}.", resolvedPath);
 
             return null;
+        }
+        catch (OperationCanceledException)
+        {
+            return Failure(path, "It was not finished - the request was cancelled.");
         }
         catch (Exception exception) when (IsExpectedFileSystemFailure(exception))
         {
@@ -539,6 +647,61 @@ public class FileSystemOperationService : IFileSystemOperationService
     #region Shared helpers
 
     private static bool Exists(string path) => Directory.Exists(path) || File.Exists(path);
+
+    /// <summary>
+    /// Whether this is a location the browser must not restructure: a drive root,
+    /// or one of the roots the server was configured to expose.
+    /// </summary>
+    /// <remarks>
+    /// The path guard cannot answer this, and that is the trap. An allowed root
+    /// resolves <i>inside</i> the allow-list, because it is the allow-list - so a
+    /// guard that only asks "may I touch this?" says yes, while renaming or moving
+    /// it writes to its parent, which is outside every root there is.
+    /// </remarks>
+    private bool IsProtectedRoot(string resolvedPath) =>
+        Path.GetDirectoryName(resolvedPath) is not { Length: > 0 }
+        || _pathGuard.AllowedRoots.Any(allowedRoot => resolvedPath.Equals(allowedRoot, PathComparison));
+
+    /// <summary>
+    /// Whether the path the caller named is itself a symbolic link.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the path as given, before the guard has been near it. The guard's
+    /// whole job is to resolve links, so what comes out the other side is the
+    /// target - and a destructive operation aimed at the target is not what the
+    /// user pointed at. Deleting it destroys the real file wherever it lives and
+    /// leaves the link behind, dangling.
+    /// </remarks>
+    private bool IsSymbolicLink(string? requestedPath)
+    {
+        if (string.IsNullOrWhiteSpace(requestedPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            // Lexical only: Path.GetFullPath does not follow links, which is the
+            // entire point of asking here rather than after the guard.
+            var lexicalPath = Path.GetFullPath(requestedPath.Trim());
+
+            FileSystemInfo entry = Directory.Exists(lexicalPath)
+                ? new DirectoryInfo(lexicalPath)
+                : new FileInfo(lexicalPath);
+
+            return entry.LinkTarget is not null;
+        }
+        catch (Exception exception) when (IsExpectedFileSystemFailure(exception) || exception is PathTooLongException)
+        {
+            _logger.LogDebug(exception, "Could not inspect {Path} for a link target.", requestedPath);
+            return false;
+        }
+    }
+
+    /// <summary>The sentence shown when a destructive operation is aimed at a link.</summary>
+    private const string SymbolicLinkRefusal =
+        "It is a symbolic link. Acting on it here would act on whatever it points at, "
+        + "somewhere else entirely, so it has been left alone.";
 
     /// <summary>Whether <paramref name="candidatePath"/> is <paramref name="root"/> or sits under it.</summary>
     private static bool IsWithin(string candidatePath, string root)

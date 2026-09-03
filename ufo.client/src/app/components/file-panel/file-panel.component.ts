@@ -577,13 +577,27 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     }
 
     const conflicts = failures.filter(failure => failure.isConflict);
+    const otherFailures = failures.filter(failure => !failure.isConflict);
+    const verb = isMove ? 'Move' : 'Copy';
+    const pastVerb = isMove ? 'moved' : 'copied';
 
-    if (!wasOverwrite && conflicts.length === failures.length) {
+    // Anything that was not a collision is reported first and separately. It is
+    // not a question the user can answer, and folding it into the Replace prompt
+    // would put entries in front of them that replacing will not help.
+    if (otherFailures.length > 0) {
+      this.showFailuresDialog(verb, result.succeededCount, otherFailures, pastVerb);
+    }
+
+    // Offered even when something else failed alongside: those two failures have
+    // nothing to do with each other, and the collisions are still worth asking
+    // about. Only the entries that actually collided are re-sent, so agreeing
+    // here cannot overwrite anything that failed for another reason.
+    if (!wasOverwrite && conflicts.length > 0) {
       openConfirmDialog(this.dialog, {
         title: 'Already exists',
         severity: 'info',
         message: `${describeNames(conflicts)} already ${conflicts.length === 1 ? 'exists' : 'exist'} in "${destinationPath}".`,
-        hint: 'Replacing overwrites what is there now, and that cannot be undone.',
+        hint: 'Files are overwritten and folders merged, and that cannot be undone.',
         confirmLabel: 'Replace',
         isDestructive: true,
       }).subscribe(isConfirmed => {
@@ -595,12 +609,11 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.showFailuresDialog(
-      isMove ? 'Move' : 'Copy',
-      result.succeededCount,
-      failures,
-      isMove ? 'moved' : 'copied',
-    );
+    // A conflict that survived an overwrite is no longer a question, so it falls
+    // in with everything else rather than prompting again.
+    if (wasOverwrite && conflicts.length > 0) {
+      this.showFailuresDialog(verb, result.succeededCount, conflicts, pastVerb);
+    }
   }
 
   /**

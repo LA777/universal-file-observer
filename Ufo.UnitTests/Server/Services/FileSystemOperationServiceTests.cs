@@ -221,6 +221,33 @@ public class FileSystemOperationServiceTests : BaseTest, IDisposable
     }
 
     [Fact]
+    public void Rename_RefusesAnAllowedRootItself()
+    {
+        // The escape this exists to stop: the root resolves inside the allow-list
+        // because it *is* the allow-list, but its parent does not - so renaming it
+        // writes one level above every root the server was configured to expose.
+        //
+        // The allowed root is a folder inside the fixture rather than the fixture
+        // itself, so that a regression relocates something Dispose still cleans up
+        // instead of stranding it in the temp directory.
+        var result = CreateSut(_sourceFolder).Rename(_sourceFolder, "escaped");
+
+        result.IsSuccess.Should().BeFalse();
+        Directory.Exists(_sourceFolder).Should().BeTrue();
+        Directory.Exists(Path.Combine(_testRoot, "escaped")).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Move_RefusesAnAllowedRootItself()
+    {
+        var result = CreateSut(_testRoot, _destinationFolder)
+            .Move([_testRoot], _destinationFolder, overwrite: false, CancellationToken.None);
+
+        result.SucceededCount.Should().Be(0);
+        Directory.Exists(_testRoot).Should().BeTrue();
+    }
+
+    [Fact]
     public void Rename_ReportsAnEntryThatIsNoLongerThere()
     {
         var result = CreateSut().Rename(Path.Combine(_sourceFolder, "gone.txt"), "after.txt");
@@ -468,6 +495,173 @@ public class FileSystemOperationServiceTests : BaseTest, IDisposable
 
         result.SucceededCount.Should().Be(0);
         Directory.Exists(parentFolder).Should().BeTrue();
+    }
+
+    #endregion
+
+    #region Failures that must not destroy anything
+
+    [Fact]
+    public void Copy_LeavesTheDestinationIntactWhenTheCopyCannotFinish()
+    {
+        // The source is a folder and the destination a file of the same name, so
+        // the destination has to go first - but if the write then fails, deleting
+        // it early would have cost the user both copies. Here the kinds match, so
+        // nothing is deleted up front and a failure is survivable.
+        var sourceFilePath = WriteFile(_sourceFolder, "notes.txt", "mine");
+        var destinationFilePath = WriteFile(_destinationFolder, "notes.txt", "theirs");
+
+        // Held open for writing, so the copy over it cannot succeed.
+        using (var lockHandle = new FileStream(destinationFilePath, FileMode.Open, FileAccess.Write, FileShare.None))
+        {
+            var result = CreateSut().Copy(
+                [sourceFilePath],
+                _destinationFolder,
+                overwrite: true,
+                CancellationToken.None);
+
+            result.SucceededCount.Should().Be(0);
+            result.Failures.Should().ContainSingle();
+        }
+
+        // The point of the test: what was there is still there.
+        File.Exists(destinationFilePath).Should().BeTrue();
+        File.ReadAllText(destinationFilePath).Should().Be("theirs");
+    }
+
+    [Fact]
+    public void Move_KeepsTheSourceWhenPartOfItCouldNotBeCopied()
+    {
+        // A link out of the allowed roots is skipped by the copy. If the move then
+        // deleted the source tree, it would delete the one thing it refused to
+        // carry across - the worst outcome the operation can produce.
+        //
+        // Reaching that path takes a destination that already exists: a move onto
+        // free space is a rename, which carries the whole tree across untouched
+        // and never consults the copy at all.
+        var outsideFolder = Path.Combine(Path.GetTempPath(), $"ufo-outside-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outsideFolder);
+        WriteFile(outsideFolder, "secret.txt");
+
+        var treeRoot = Path.Combine(_sourceFolder, "tree");
+        Directory.CreateDirectory(treeRoot);
+        WriteFile(treeRoot, "ordinary.txt", "kept");
+        Directory.CreateDirectory(Path.Combine(_destinationFolder, "tree"));
+
+        if (!TryCreateDirectorySymbolicLink(Path.Combine(treeRoot, "escape"), outsideFolder))
+        {
+            // Unprivileged Windows without developer mode; nothing to assert.
+            Directory.Delete(outsideFolder, recursive: true);
+            return;
+        }
+
+        try
+        {
+            var result = CreateSut(_testRoot).Move(
+                [treeRoot],
+                _destinationFolder,
+                overwrite: true,
+                CancellationToken.None);
+
+            result.SucceededCount.Should().Be(0);
+            result.Failures.Should().ContainSingle()
+                .Which.Reason.Should().Contain("nothing was removed");
+
+            Directory.Exists(treeRoot).Should().BeTrue();
+            File.ReadAllText(Path.Combine(treeRoot, "ordinary.txt")).Should().Be("kept");
+            File.Exists(Path.Combine(outsideFolder, "secret.txt")).Should().BeTrue();
+        }
+        finally
+        {
+            Directory.Delete(outsideFolder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Copy_ReportsATreeItCouldNotTakeWholeRatherThanCountingItDone()
+    {
+        var outsideFolder = Path.Combine(Path.GetTempPath(), $"ufo-outside-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outsideFolder);
+
+        var treeRoot = Path.Combine(_sourceFolder, "tree");
+        Directory.CreateDirectory(treeRoot);
+        WriteFile(treeRoot, "ordinary.txt");
+
+        if (!TryCreateDirectorySymbolicLink(Path.Combine(treeRoot, "escape"), outsideFolder))
+        {
+            Directory.Delete(outsideFolder, recursive: true);
+            return;
+        }
+
+        try
+        {
+            var result = CreateSut(_testRoot).Copy(
+                [treeRoot],
+                _destinationFolder,
+                overwrite: false,
+                CancellationToken.None);
+
+            // An incomplete copy counted as a success is a user told their files
+            // arrived when some of them did not.
+            result.SucceededCount.Should().Be(0);
+            result.Failures.Should().ContainSingle()
+                .Which.Reason.Should().Contain("left behind");
+        }
+        finally
+        {
+            Directory.Delete(outsideFolder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Delete_RefusesASymbolicLinkRatherThanDeletingWhatItPointsAt()
+    {
+        var targetFolder = Path.Combine(_testRoot, "real");
+        Directory.CreateDirectory(targetFolder);
+        var targetFilePath = WriteFile(targetFolder, "important.txt", "irreplaceable");
+
+        var linkPath = Path.Combine(_sourceFolder, "shortcut");
+
+        if (!TryCreateDirectorySymbolicLink(linkPath, targetFolder))
+        {
+            return;
+        }
+
+        var result = CreateSut().Delete([linkPath], CancellationToken.None);
+
+        result.SucceededCount.Should().Be(0);
+        // The file the link pointed at is what a resolved path would have deleted.
+        File.ReadAllText(targetFilePath).Should().Be("irreplaceable");
+    }
+
+    [Fact]
+    public void Delete_ReportsWhatItManagedBeforeCancellation()
+    {
+        var filePath = WriteFile(_sourceFolder, "notes.txt");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        // Cancellation escaping the batch loop would discard the whole result,
+        // leaving the caller unable to say what had already happened.
+        var result = CreateSut().Delete([filePath], cancellation.Token);
+
+        result.SucceededCount.Should().Be(0);
+        result.Failures.Should().ContainSingle().Which.Reason.Should().Contain("cancelled");
+        File.Exists(filePath).Should().BeTrue();
+    }
+
+    private static bool TryCreateDirectorySymbolicLink(string linkPath, string targetPath)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(linkPath, targetPath);
+            return true;
+        }
+        catch (Exception exception)
+            when (exception is UnauthorizedAccessException or IOException or PlatformNotSupportedException)
+        {
+            return false;
+        }
     }
 
     #endregion
