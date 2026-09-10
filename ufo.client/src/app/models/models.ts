@@ -18,6 +18,14 @@ export interface FsItem {
    * that disagreement is the point of recording it.
    */
   isFlagEnabled?: boolean;
+  /**
+   * 1 to 10, or 0 for unrated.
+   *
+   * In the Files panes this is the live rating. In a snapshot it is the rating of
+   * that snapshot's own moment, so the two can disagree - which is the point of
+   * recording it.
+   */
+  rating?: number;
 }
 
 export interface FsItemUi extends FsItem {

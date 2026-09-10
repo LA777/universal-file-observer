@@ -189,3 +189,62 @@ app-root {
   display: block;
   height: 100%;
 }
+
+/*
+ * The rating picker on the Files panes.
+ *
+ * Global rather than scoped to the panel component: Material renders an open
+ * menu into an overlay container attached to the body, so component-scoped
+ * styles never reach it.
+ */
+.rating-choices {
+  display: flex;
+  gap: 2px;
+  padding: 6px 8px;
+}
+
+/*
+ * Each choice is a mat-menu-item so the menu's key manager can reach it, which
+ * brings Material's own 48px-tall full-width item styling with it. Two classes
+ * here to out-specify .mat-mdc-menu-item and put them back in a row.
+ */
+.rating-choices .rating-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  min-width: 0;
+  height: 26px;
+  min-height: 0;
+  padding: 0;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 3px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text);
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.rating-choices .rating-choice:hover,
+.rating-choices .rating-choice:focus-visible {
+  background-color: var(--ufo-bg-control-hover);
+  border-color: var(--ufo-border-control-hover);
+}
+
+/* The keyboard has to be able to see where it is, and Material's own focus
+   treatment is built for a full-width row rather than a 24px square. */
+.rating-choices .rating-choice:focus-visible {
+  outline: 2px solid var(--ufo-accent);
+  outline-offset: 1px;
+}
+
+/* The value the selection already agrees on, so the picker says where it stands. */
+.rating-choices .rating-choice.current {
+  background-color: var(--ufo-accent-strong);
+  border-color: var(--ufo-accent);
+  color: var(--ufo-text-on-accent);
+  font-weight: 600;
+}

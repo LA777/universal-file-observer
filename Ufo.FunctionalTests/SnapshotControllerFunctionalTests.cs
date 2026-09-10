@@ -292,6 +292,18 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
             new FsItemFlagsRequest { FullPaths = fullPaths, IsFlagEnabled = isFlagEnabled });
     }
 
+    /// <summary>Rates paths as the test user, or clears them with zero.</summary>
+    private async Task<HttpResponseMessage> PostSetRatingsAsync(int rating, params string[] fullPaths)
+    {
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Bearer",
+            GenerateToken(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName));
+
+        return await _client.PostAsJsonAsync(
+            "api/fsitemratings",
+            new FsItemRatingsRequest { FullPaths = fullPaths, Rating = rating });
+    }
+
     private async Task<long> CountRowsAsync(string sql)
     {
         using var command = _connection.CreateCommand();
@@ -406,6 +418,79 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
         // Flags are off by default, which is the ordinary case.
         Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE IsFlagEnabled = 1"));
         Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders WHERE IsFlagEnabled = 1"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_RecordsTheRatingAgainstTheBindingAndNotTheSharedFileRow()
+    {
+        // The reason a rating cannot live on Files, exactly as for the flag: these
+        // two are byte-identical and share one row, so a rating column there would
+        // rate both, in every snapshot they appear in.
+        WriteSnapshotFile("left/same.txt", "identical content");
+        WriteSnapshotFile("right/same.txt", "identical content");
+
+        var ratedPath = Path.Combine(_snapshotRootPath, "left", "same.txt");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostSetRatingsAsync(9, ratedPath)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // One shared row, two bindings, and the 9 on exactly one of them.
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating = 9"));
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating = 0"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_KeepsTheRatingOfItsOwnMomentWhenTheLiveRatingChangesLater()
+    {
+        WriteSnapshotFile("data/report.txt", "report");
+        var reportPath = Path.Combine(_snapshotRootPath, "data", "report.txt");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostSetRatingsAsync(6, reportPath)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Changed afterwards. A snapshot records the moment it was taken, so this
+        // must not reach back into one already made.
+        Assert.Equal(HttpStatusCode.OK, (await PostSetRatingsAsync(2, reportPath)).StatusCode);
+
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating = 6"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating = 2"));
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FsItemRatings WHERE Rating = 2"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_RecordsARatedFolderWithoutRatingWhatIsInsideIt()
+    {
+        WriteSnapshotFile("data/one.txt", "one");
+        var dataFolderPath = Path.Combine(_snapshotRootPath, "data");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostSetRatingsAsync(10, dataFolderPath)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Rating a folder marks that folder only - the choice flags made too.
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders WHERE Rating = 10"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating > 0"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_LeavesEverythingUnratedWhenNothingIs()
+    {
+        WriteSnapshotFile("data/one.txt", "one");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Zero is unrated, which is the ordinary case.
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating > 0"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders WHERE Rating > 0"));
     }
 
     [Fact]

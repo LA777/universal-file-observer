@@ -153,3 +153,8 @@
   border-color: var(--ufo-danger-border);
   color: var(--ufo-danger-text);
 }
+
+/* The 0-10 picker. One row of ten, so the whole scale is one glance and one
+   click rather than a scrolling list. Not scoped to :host: Material renders an
+   open menu in an overlay outside this component's tree, so these rules are
+   declared globally in styles.css instead - see .rating-choices there. */

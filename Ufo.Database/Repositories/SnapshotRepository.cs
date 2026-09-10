@@ -91,10 +91,12 @@ public class SnapshotRepository : ISnapshotRepository
                         // only in memory, so it has to be copied across on the way
                         // out exactly as it was copied in on the way down.
                         fsFolderEntity.IsFlagEnabled = foldersToFoldersEntity?.IsFlagEnabled ?? false;
+                        fsFolderEntity.Rating = foldersToFoldersEntity?.Rating ?? 0;
 
                         if (fsFileEntity is not null)
                         {
                             fsFileEntity.IsFlagEnabled = filesToFoldersEntity?.IsFlagEnabled ?? false;
+                            fsFileEntity.Rating = filesToFoldersEntity?.Rating ?? 0;
                         }
 
                         folders.TryAdd(fsFolderEntity.Id, fsFolderEntity);
@@ -260,10 +262,12 @@ public class SnapshotRepository : ISnapshotRepository
                         // only in memory, so it has to be copied across on the way
                         // out exactly as it was copied in on the way down.
                         fsFolderEntity.IsFlagEnabled = foldersToFoldersEntity?.IsFlagEnabled ?? false;
+                        fsFolderEntity.Rating = foldersToFoldersEntity?.Rating ?? 0;
 
                         if (fsFileEntity is not null)
                         {
                             fsFileEntity.IsFlagEnabled = filesToFoldersEntity?.IsFlagEnabled ?? false;
+                            fsFileEntity.Rating = filesToFoldersEntity?.Rating ?? 0;
                         }
 
                         folders.TryAdd(fsFolderEntity.Id, fsFolderEntity);
@@ -878,7 +882,8 @@ public class SnapshotRepository : ISnapshotRepository
                 // Read off the entity, where the tree walk left it. The flag
                 // belongs to this association and not to the folder, whose row is
                 // shared by every identical folder in every snapshot.
-                folderBinding.ChildFolder.IsFlagEnabled
+                folderBinding.ChildFolder.IsFlagEnabled,
+                folderBinding.ChildFolder.Rating
             })
             .ToList();
 
@@ -898,7 +903,8 @@ public class SnapshotRepository : ISnapshotRepository
                 FolderId = fileBinding.ParentFolder.Id,
                 FileId = fileBinding.File.Id,
                 SnapshotId = snapshotEntity.Id,
-                fileBinding.File.IsFlagEnabled
+                fileBinding.File.IsFlagEnabled,
+                fileBinding.File.Rating
             })
             .ToList();
 

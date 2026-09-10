@@ -110,6 +110,11 @@ public class SqlScripts
             -- what reaches databases created before this column existed.
             IsFlagEnabled             INTEGER NOT NULL DEFAULT 0 CHECK (IsFlagEnabled IN (0,1)),
 
+            -- The rating as at capture, 0 meaning unrated. Beside the flag and
+            -- for the same reason: the item's own row is shared by every
+            -- identical copy of it.
+            Rating                    INTEGER NOT NULL DEFAULT 0 CHECK (Rating BETWEEN 0 AND 10),
+
             CONSTRAINT PK_FoldersToFolders                      PRIMARY KEY (SnapshotId, ParentFolderId, ChildFolderId),
             CONSTRAINT FK_FoldersToFolders_Snapshots_SnapshotId FOREIGN KEY (SnapshotId)     REFERENCES Snapshots (Id) ON DELETE NO ACTION,
             CONSTRAINT FK_FoldersToFolders_Folders_FolderId     FOREIGN KEY (ParentFolderId) REFERENCES Folders (Id)   ON DELETE NO ACTION,
@@ -137,6 +142,11 @@ public class SqlScripts
             -- See FoldersToFolders above: the flag belongs to the association,
             -- because the Files row is shared by every identical file.
             IsFlagEnabled             INTEGER NOT NULL DEFAULT 0 CHECK (IsFlagEnabled IN (0,1)),
+
+            -- The rating as at capture, 0 meaning unrated. Beside the flag and
+            -- for the same reason: the item's own row is shared by every
+            -- identical copy of it.
+            Rating                    INTEGER NOT NULL DEFAULT 0 CHECK (Rating BETWEEN 0 AND 10),
 
             CONSTRAINT PK_FilesToFolders                       PRIMARY KEY (FolderId, FileId, SnapshotId),
             CONSTRAINT FK_FilesToFolders_Folders_FolderId      FOREIGN KEY (FolderId)    REFERENCES Folders (Id)   ON DELETE NO ACTION,
@@ -203,6 +213,23 @@ public class SqlScripts
 
             CONSTRAINT UQ_UserKeyBindings_User_Action UNIQUE (UserId, ActionId),
             CONSTRAINT FK_UserKeyBindings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
+        -- Ratings, 1 to 10, keyed by path for the same reason flags are: the Files
+        -- and Folders rows are deduplicated by content and carry no path, so a
+        -- rating there would rate every identical copy at once.
+        --
+        -- A row exists only for something rated. Zero means unrated and is the
+        -- default, so it is the absence of a row rather than a value stored -
+        -- which is why the CHECK starts at 1.
+        CREATE TABLE IF NOT EXISTS FsItemRatings (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_FsItemRatings PRIMARY KEY,
+            FullPath                  TEXT NOT NULL,
+            Rating                    INTEGER NOT NULL CHECK (Rating BETWEEN 1 AND 10),
+            UserId                    TEXT NOT NULL,
+
+            CONSTRAINT UQ_FsItemRatings_User_Path UNIQUE (UserId, FullPath),
+            CONSTRAINT FK_FsItemRatings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
         );
 
         -- Flagged files and folders, keyed by path. Keyed by path because it is the
@@ -430,17 +457,17 @@ public class SqlScripts
                                                                                     "AND Sha256Hash = @Sha256Hash " +
                                                                                     "AND UserId = @UserId;";
     public const string InsertFoldersToFoldersSql = "INSERT INTO FoldersToFolders " +
-                                                    "(ParentFolderId, ChildFolderId, SnapshotId, IsFlagEnabled) " +
+                                                    "(ParentFolderId, ChildFolderId, SnapshotId, IsFlagEnabled, Rating) " +
                                                     "VALUES " +
-                                                    "(@ParentFolderId, @ChildFolderId, @SnapshotId, @IsFlagEnabled)";
+                                                    "(@ParentFolderId, @ChildFolderId, @SnapshotId, @IsFlagEnabled, @Rating)";
     public const string SelectFoldersToFoldersSql = "SELECT * FROM FoldersToFolders " +
                                                     "WHERE SnapshotId = @SnapshotId  " +
                                                     "AND ParentFolderId = @ParentFolderId " +
                                                     "AND ChildFolderId = @ChildFolderId;";
     public const string InsertFilesToFoldersSql = "INSERT INTO FilesToFolders " +
-                                                    "(FolderId, FileId, SnapshotId, IsFlagEnabled) " +
+                                                    "(FolderId, FileId, SnapshotId, IsFlagEnabled, Rating) " +
                                                     "VALUES " +
-                                                    "(@FolderId, @FileId, @SnapshotId, @IsFlagEnabled)";
+                                                    "(@FolderId, @FileId, @SnapshotId, @IsFlagEnabled, @Rating)";
     public const string SelectFilesToFoldersSql = "SELECT * FROM FilesToFolders " +
                                                     "WHERE SnapshotId = @SnapshotId  " +
                                                     "AND FolderId = @FolderId " +
@@ -573,6 +600,37 @@ public class SqlScripts
     // whatever its sliding deadline says, so nothing is lost by dropping it.
     public const string DeleteExpiredRefreshTokensSql =
         "DELETE FROM RefreshTokens WHERE AbsoluteExpiresAt < @UtcNow;";
+
+    /// <summary>
+    /// Ordered oldest first, which decides a tie the schema cannot.
+    /// </summary>
+    /// <remarks>
+    /// The UNIQUE is byte-exact, so on a case-insensitive volume two rows can
+    /// name what is really one file - "Report.pdf" and "report.pdf" - and both
+    /// survive. The reader keys them case-insensitively there, so one has to win.
+    /// Ulid ids sort by the time they were made, so ordering by Id and letting
+    /// the later row overwrite the earlier makes the most recent rating the
+    /// winner, instead of whichever row the database happened to return first.
+    /// </remarks>
+    public const string SelectFsItemRatingsSql =
+        "SELECT * FROM FsItemRatings WHERE UserId = @UserId ORDER BY Id;";
+
+    /// <summary>
+    /// Rates one path, replacing whatever it was rated before.
+    /// </summary>
+    /// <remarks>
+    /// One row per path, never a replace over the user's whole set - the same
+    /// reasoning as flags and folder tabs: a caller that failed to read the
+    /// others believes there are none.
+    /// </remarks>
+    public const string UpsertFsItemRatingSql =
+        "INSERT INTO FsItemRatings (Id, FullPath, Rating, UserId) " +
+        "VALUES (@Id, @FullPath, @Rating, @UserId) " +
+        "ON CONFLICT (UserId, FullPath) DO UPDATE SET Rating = excluded.Rating;";
+
+    /// <summary>Clears a rating. Zero is unrated, and unrated is no row.</summary>
+    public const string DeleteFsItemRatingSql =
+        "DELETE FROM FsItemRatings WHERE UserId = @UserId AND FullPath = @FullPath;";
 
     public const string SelectFsItemFlagsSql =
         "SELECT * FROM FsItemFlags WHERE UserId = @UserId;";

@@ -196,6 +196,44 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
     }
 
     [Fact]
+    public async Task BuildAsync_StampsTheRatingsAsTheyStandOnTheItemsItMeets()
+    {
+        WriteFile("rated.txt", "rated");
+        WriteFile("plain.txt", "plain");
+        WriteFile("child/inner.txt", "inner");
+
+        var ratings = new Dictionary<string, int>(
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase)
+        {
+            [Path.Combine(_rootPath, "rated.txt")] = 7,
+            [Path.Combine(_rootPath, "child")] = 10
+        };
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user, ratingsByPath: ratings);
+
+        rootFolder.Files.Single(file => file.Name == "rated").Rating.Should().Be(7);
+        rootFolder.Files.Single(file => file.Name == "plain").Rating.Should().Be(0);
+
+        // Folders are rated in their own right, and rating one does not reach the
+        // files inside it - the same choice flags made.
+        var childFolder = rootFolder.ChildFolders.Single();
+        childFolder.Rating.Should().Be(10);
+        childFolder.Files.Single().Rating.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task BuildAsync_LeavesEverythingUnratedWhenNothingIs()
+    {
+        WriteFile("a.txt", "a");
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user);
+
+        // Zero is unrated, which is the ordinary case.
+        rootFolder.Rating.Should().Be(0);
+        rootFolder.Files.Should().OnlyContain(file => file.Rating == 0);
+    }
+
+    [Fact]
     public async Task BuildAsync_LeavesEverythingUnflaggedWhenNothingIs()
     {
         WriteFile("a.txt", "a");
@@ -474,7 +512,13 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
         var sut = CreateSut();
 
         await sut.Invoking(builder =>
-                builder.BuildAsync(_rootPath, _snapshot, _user, flaggedPaths: null, cancellationTokenSource.Token))
+                builder.BuildAsync(
+                    _rootPath,
+                    _snapshot,
+                    _user,
+                    flaggedPaths: null,
+                    ratingsByPath: null,
+                    cancellationTokenSource.Token))
             .Should().ThrowAsync<OperationCanceledException>();
     }
 

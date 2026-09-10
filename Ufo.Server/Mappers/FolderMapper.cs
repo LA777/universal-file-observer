@@ -24,7 +24,8 @@ public static class FolderMapper
             FullPath = Path.Combine(entity.ParentFolders?.FirstOrDefault()?.Name ?? string.Empty, entity.Name), // TODO LA - This is a simplification. The full path should be constructed by traversing all parent folders, not just the first one.
             HasParent = entity.ParentFolders?.Count > 0,
             IsHidden = entity.IsHidden,
-            IsFlagEnabled = entity.IsFlagEnabled
+            IsFlagEnabled = entity.IsFlagEnabled,
+            Rating = entity.Rating
         };
 
         foreach (var folder in entity.ChildFolders) // TODO LA - Check this is tests
@@ -72,7 +73,8 @@ public static class FolderMapper
             FullPath = Path.Combine(entity.ParentFolders?.FirstOrDefault()?.Name ?? string.Empty, entity.Name), // TODO LA - This is a simplification. The full path should be constructed by traversing all parent folders, not just the first one.
             HasParent = entity.ParentFolders?.Count > 0,
             IsHidden = entity.IsHidden,
-            IsFlagEnabled = entity.IsFlagEnabled
+            IsFlagEnabled = entity.IsFlagEnabled,
+            Rating = entity.Rating
         };
 
         return dto;

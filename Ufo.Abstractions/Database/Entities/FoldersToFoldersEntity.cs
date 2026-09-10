@@ -29,4 +29,10 @@ public class FoldersToFoldersEntity
     /// that is unique to one item in one snapshot under one parent.
     /// </remarks>
     public bool IsFlagEnabled { get; set; }
+
+    /// <summary>
+    /// The rating when this snapshot was taken, 0 for unrated. Here rather than
+    /// on the item, whose row is shared by every identical copy of it.
+    /// </summary>
+    public int Rating { get; set; }
 }

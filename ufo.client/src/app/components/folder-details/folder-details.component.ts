@@ -142,6 +142,18 @@ export class FolderDetailsComponent implements OnChanges {
       cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderFlagCell(params),
     },
     {
+      // A number, not ten stars: ten glyphs a row is a wall of them, and the
+      // value is what the user set and wants to read back.
+      headerName: '',
+      colId: 'rating',
+      width: 44,
+      sortable: true,
+      resizable: false,
+      headerTooltip: 'Rating',
+      valueGetter: (params) => params.data?.rating ?? 0,
+      cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderRatingCell(params),
+    },
+    {
       headerName: 'Ext',
       field: 'fileExtension',
       width: 90,
@@ -339,6 +351,35 @@ export class FolderDetailsComponent implements OnChanges {
     container.className = 'material-icons flag-marker';
     container.textContent = 'flag';
     container.title = 'Flagged';
+
+    return container;
+  }
+
+  /**
+   * The rating: a small star and the number, or nothing when unrated.
+   *
+   * Nothing rather than a zero, for the reason the flag column shows nothing:
+   * the default down every row is noise, and the eye should find what was set.
+   */
+  private renderRatingCell(params: ICellRendererParams<FsItemUi>): HTMLElement {
+    const item = params.data as FsItemUi | undefined;
+    const container = document.createElement('span');
+
+    if (!item || isParentRow(item) || item.isDraft || !item.rating) {
+      return container;
+    }
+
+    container.className = 'rating-marker';
+    container.title = `Rated ${item.rating} of 10`;
+
+    const star = document.createElement('span');
+    star.className = 'material-icons rating-star';
+    star.textContent = 'star';
+    container.appendChild(star);
+
+    const value = document.createElement('span');
+    value.textContent = String(item.rating);
+    container.appendChild(value);
 
     return container;
   }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
   Folder,
@@ -23,6 +24,7 @@ import { SnapshotService } from '../../services/snapshot.service';
 import { KeyBindingsService } from '../../services/key-bindings.service';
 import { FolderTabsService } from '../../services/folder-tabs.service';
 import { FsItemFlagsService } from '../../services/fs-item-flags.service';
+import { FsItemRatingsService, RATING_CHOICES } from '../../services/fs-item-ratings.service';
 import { FolderTabsComponent } from '../folder-tabs/folder-tabs.component';
 import { KeyBindingActions } from '../../shared/key-binding-actions';
 import { Subscription, forkJoin, of, catchError } from 'rxjs';
@@ -45,6 +47,7 @@ import { fullNameOf, isParentRow, FOLDER_EXTENSION_LABEL } from '../../shared/fs
     MatButtonModule,
     MatIconModule,
     MatProgressBarModule,
+    MatMenuModule,
     FolderDetailsComponent,
     FolderTabsComponent
   ]
@@ -107,7 +110,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     private snapshotService: SnapshotService,
     private keyBindingsService: KeyBindingsService,
     private folderTabsService: FolderTabsService,
-    private fsItemFlagsService: FsItemFlagsService
+    private fsItemFlagsService: FsItemFlagsService,
+    private fsItemRatingsService: FsItemRatingsService
   ) {}
 
   ngOnInit() {
@@ -164,7 +168,9 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       // longer be mistaken for an instruction to delete the others.
       persistedTabs: this.folderTabsService.load().pipe(catchError(() => of([] as PersistedFolderTab[]))),
       // Same reasoning: a pane with no flags is still a working file browser.
-      flaggedPaths: this.fsItemFlagsService.load().pipe(catchError(() => of([] as string[])))
+      flaggedPaths: this.fsItemFlagsService.load().pipe(catchError(() => of([] as string[]))),
+      // Same reasoning again: a pane with no ratings is still a working browser.
+      ratings: this.fsItemRatingsService.load().pipe(catchError(() => of({} as Record<string, number>)))
     }).subscribe({
       next: ({ root, persistedTabs }) => {
         if (!root?.folder) {
@@ -243,7 +249,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         createdAt: element.createdAt,
         updatedAt: element.updatedAt,
         isFile: false,
-        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath)
+        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath),
+        rating: this.fsItemRatingsService.ratingFor(element.fullPath)
       });
     });
 
@@ -262,7 +269,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         updatedAt: element.updatedAt,
         isFile: true,
         // The live flag, unlike a snapshot's, which is the flag of its own moment.
-        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath)
+        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath),
+        rating: this.fsItemRatingsService.ratingFor(element.fullPath)
       });
     });
   }
@@ -806,6 +814,80 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         this.otherPanelChanged.emit();
       },
       error: (error) => this.showErrorDialog(error, isFlagEnabled ? 'flag the items' : 'clear the flag')
+    });
+  }
+
+  // --- Ratings ---
+
+  /** 1 to 10, for the picker to lay out. Zero is offered separately, as Clear. */
+  readonly ratingChoices = RATING_CHOICES;
+
+  /**
+   * The rating the selection agrees on, or null when it does not.
+   *
+   * Null for a mixed selection rather than the highest of them: there is no
+   * single current rating to show, and highlighting one would say the selection
+   * has a rating it does not share.
+   */
+  get selectedRating(): number | null {
+    if (!this.hasSelection) {
+      return null;
+    }
+
+    const [firstItem, ...rest] = this.selectedItems;
+    const firstRating = firstItem.rating ?? 0;
+
+    return rest.every(item => (item.rating ?? 0) === firstRating) ? firstRating : null;
+  }
+
+  /**
+   * The toolbar star: three states, because there are three.
+   *
+   * A half star for a mixed selection. Falsy-testing the rating drew the same
+   * outline for "mixed" and "not rated at all", which are different situations -
+   * one has ratings to overwrite and the other has none.
+   */
+  get ratingIcon(): string {
+    const rating = this.selectedRating;
+
+    if (rating === null) {
+      return 'star_half';
+    }
+
+    return rating > 0 ? 'star' : 'star_border';
+  }
+
+  get ratingTitle(): string {
+    const rating = this.selectedRating;
+
+    if (!this.hasSelection) {
+      return 'Rate selection';
+    }
+
+    return rating === null
+      ? 'Rate selection - the selected items have different ratings'
+      : rating === 0
+        ? 'Rate selection - not rated'
+        : `Rate selection - currently ${rating} of 10`;
+  }
+
+  /** Whatever is chosen applies to the whole selection, mixed or not. */
+  setRatingOnSelection(rating: number) {
+    if (!this.hasSelection) {
+      return;
+    }
+
+    const paths = this.selectedItems.map(item => item.fullPath);
+
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = this.fsItemRatingsService.setRatings(paths, rating).subscribe({
+      next: () => {
+        this.refresh();
+        // The other pane too: ratings are one set shared by both, and rows read
+        // the value when they are built rather than as the set changes.
+        this.otherPanelChanged.emit();
+      },
+      error: (error) => this.showErrorDialog(error, 'set the rating')
     });
   }
 

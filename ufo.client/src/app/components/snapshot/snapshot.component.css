@@ -217,3 +217,27 @@
   line-height: 14px;
   color: var(--ufo-danger-text);
 }
+
+/* Ratings in the grid and in the tree, matching the Files panes so a rating
+   reads the same wherever it appears. */
+:host ::ng-deep .rating-marker,
+:host ::ng-deep .tree-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 11px;
+  color: var(--ufo-accent);
+}
+
+:host ::ng-deep .tree-rating {
+  flex: 0 0 auto;
+  margin-left: 4px;
+}
+
+:host ::ng-deep .rating-star,
+:host ::ng-deep .tree-rating-star {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+}

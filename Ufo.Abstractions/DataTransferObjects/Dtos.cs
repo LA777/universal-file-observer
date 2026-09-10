@@ -39,6 +39,14 @@ public abstract class FsItemDto : DtoWithUserIdAndNameAndIdBase
     [JsonPropertyOrder(45)]
     public bool IsFlagEnabled { get; set; }
 
+    /// <summary>
+    /// The rating when the snapshot was taken, 0 for unrated. History, like the
+    /// flag beside it: rating something today does not change what a snapshot
+    /// taken yesterday says.
+    /// </summary>
+    [JsonPropertyOrder(46)]
+    public int Rating { get; set; }
+
     [JsonPropertyOrder(2)]
     public long? Size { get; set; }
 

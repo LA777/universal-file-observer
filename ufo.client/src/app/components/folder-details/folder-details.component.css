@@ -88,3 +88,21 @@
   line-height: 28px;
   color: var(--ufo-danger-text);
 }
+
+/* The rating marker: star plus number, so the value reads at a glance without
+   ten glyphs down every row. */
+:host ::ng-deep .rating-marker {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  line-height: 28px;
+  font-size: 11px;
+  color: var(--ufo-accent);
+}
+
+:host ::ng-deep .rating-star {
+  font-size: 13px;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
+}

@@ -23,6 +23,11 @@
           @if (node.isFlagEnabled) {
             <mat-icon class="tree-flag-marker" title="Flagged when this snapshot was taken">flag</mat-icon>
           }
+          @if (node.rating) {
+            <span class="tree-rating" [title]="'Rated ' + node.rating + ' of 10 when this snapshot was taken'">
+              <mat-icon class="tree-rating-star">star</mat-icon>{{ node.rating }}
+            </span>
+          }
         </div>
       </mat-nested-tree-node>
 
@@ -36,6 +41,11 @@
           <span class="tree-label">{{node.name}}</span>
           @if (node.isFlagEnabled) {
             <mat-icon class="tree-flag-marker" title="Flagged when this snapshot was taken">flag</mat-icon>
+          }
+          @if (node.rating) {
+            <span class="tree-rating" [title]="'Rated ' + node.rating + ' of 10 when this snapshot was taken'">
+              <mat-icon class="tree-rating-star">star</mat-icon>{{ node.rating }}
+            </span>
           }
         </div>
         <div class="tree-children" [class.tree-invisible]="!tree.isExpanded(node)">

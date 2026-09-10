@@ -34,4 +34,16 @@ public abstract class FsItemEntity: EntityWithUserAndNameAndIdBase
     /// </remarks>
     [Ignore]
     public bool IsFlagEnabled { get; set; }
+
+    /// <summary>
+    /// The rating this item had when the snapshot was taken, 0 for unrated.
+    /// </summary>
+    /// <remarks>
+    /// Carried exactly as <see cref="IsFlagEnabled"/> is, and for the same
+    /// reason: <b>not a column on Files or Folders</b>, whose rows are shared by
+    /// every identical item in every snapshot. It lives on the per-snapshot
+    /// association and passes through here only in memory.
+    /// </remarks>
+    [Ignore]
+    public int Rating { get; set; }
 }

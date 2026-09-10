@@ -22,6 +22,7 @@ public static class FileMapper
             HasParent = entity.ParentFolders?.Count > 0,
             IsHidden = entity.IsHidden,
             IsFlagEnabled = entity.IsFlagEnabled,
+            Rating = entity.Rating,
             FileExtension = entity.FileExtension
         };
 

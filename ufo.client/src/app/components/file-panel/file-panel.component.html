@@ -48,6 +48,30 @@
         <button (click)="toggleFlagOnSelection()" [disabled]="!hasSelection" [title]="flagTitle">
           <mat-icon>{{ willFlagSelection ? 'flag' : 'outlined_flag' }}</mat-icon>
         </button>
+        <button [matMenuTriggerFor]="ratingMenu" [disabled]="!hasSelection" [title]="ratingTitle">
+          <mat-icon>{{ ratingIcon }}</mat-icon>
+        </button>
+        <mat-menu #ratingMenu="matMenu" class="rating-menu">
+          <!-- Every choice is a mat-menu-item, the numbers included. Without that
+               the menu's key manager sees only 'Clear rating', so opening this
+               with the keyboard focused the one destructive option and the
+               numbers could not be reached at all. They are still laid out in a
+               row; the styling for that is in styles.css, because Material
+               renders an open menu into a body-level overlay. -->
+          <div class="rating-choices">
+            @for (choice of ratingChoices; track choice) {
+              <button
+                mat-menu-item
+                type="button"
+                class="rating-choice"
+                [class.current]="choice === selectedRating"
+                [attr.aria-label]="'Rate ' + choice + ' of 10'"
+                [title]="choice + ' of 10'"
+                (click)="setRatingOnSelection(choice)">{{ choice }}</button>
+            }
+          </div>
+          <button mat-menu-item (click)="setRatingOnSelection(0)">Clear rating</button>
+        </mat-menu>
         <button (click)="deleteSelection()" [disabled]="!hasSelection" class="destructive" title="Delete (Del)">
           <mat-icon>delete</mat-icon>
         </button>

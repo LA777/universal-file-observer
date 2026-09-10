@@ -55,6 +55,17 @@ export class SnapshotComponent implements OnInit, OnDestroy {
       cellRenderer: (params: ICellRendererParams<File>) => this.renderFlagCell(params),
     },
     {
+      // The rating as at capture, like the flag beside it.
+      headerName: '',
+      colId: 'rating',
+      width: 44,
+      sortable: true,
+      resizable: false,
+      headerTooltip: 'Rating when this snapshot was taken',
+      valueGetter: (params) => params.data?.rating ?? 0,
+      cellRenderer: (params: ICellRendererParams<File>) => this.renderRatingCell(params),
+    },
+    {
       headerName: 'Name',
       field: 'name',
       flex: 1,
@@ -160,6 +171,30 @@ export class SnapshotComponent implements OnInit, OnDestroy {
     container.className = 'material-icons flag-marker';
     container.textContent = 'flag';
     container.title = 'Flagged when this snapshot was taken';
+
+    return container;
+  }
+
+  /** Star plus number, or nothing when the item was unrated at capture. */
+  private renderRatingCell(params: ICellRendererParams<File>): HTMLElement {
+    const container = document.createElement('span');
+    const rating = params.data?.rating ?? 0;
+
+    if (!rating) {
+      return container;
+    }
+
+    container.className = 'rating-marker';
+    container.title = `Rated ${rating} of 10 when this snapshot was taken`;
+
+    const star = document.createElement('span');
+    star.className = 'material-icons rating-star';
+    star.textContent = 'star';
+    container.appendChild(star);
+
+    const value = document.createElement('span');
+    value.textContent = String(rating);
+    container.appendChild(value);
 
     return container;
   }

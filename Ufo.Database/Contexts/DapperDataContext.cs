@@ -34,6 +34,8 @@ public static class DapperDataContext
         // so without these the column would only ever exist on fresh installs.
         await EnsureColumnAsync(sqLiteConnection, "FilesToFolders", "IsFlagEnabled", "INTEGER NOT NULL DEFAULT 0");
         await EnsureColumnAsync(sqLiteConnection, "FoldersToFolders", "IsFlagEnabled", "INTEGER NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(sqLiteConnection, "FilesToFolders", "Rating", "INTEGER NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(sqLiteConnection, "FoldersToFolders", "Rating", "INTEGER NOT NULL DEFAULT 0");
 
         if (await EnsureColumnAsync(sqLiteConnection, "Users", "IsAdmin", "INTEGER NOT NULL DEFAULT 0"))
         {
