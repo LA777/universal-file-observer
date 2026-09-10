@@ -22,6 +22,7 @@ import { FileService } from '../../services/file.service';
 import { SnapshotService } from '../../services/snapshot.service';
 import { KeyBindingsService } from '../../services/key-bindings.service';
 import { FolderTabsService } from '../../services/folder-tabs.service';
+import { FsItemFlagsService } from '../../services/fs-item-flags.service';
 import { FolderTabsComponent } from '../folder-tabs/folder-tabs.component';
 import { KeyBindingActions } from '../../shared/key-binding-actions';
 import { Subscription, forkJoin, of, catchError } from 'rxjs';
@@ -105,7 +106,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     private fileService: FileService,
     private snapshotService: SnapshotService,
     private keyBindingsService: KeyBindingsService,
-    private folderTabsService: FolderTabsService
+    private folderTabsService: FolderTabsService,
+    private fsItemFlagsService: FsItemFlagsService
   ) {}
 
   ngOnInit() {
@@ -160,7 +162,9 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       // here degrades to "nothing was locked" rather than taking the panel with
       // it. Safe to swallow now only because locking adds one row: it can no
       // longer be mistaken for an instruction to delete the others.
-      persistedTabs: this.folderTabsService.load().pipe(catchError(() => of([] as PersistedFolderTab[])))
+      persistedTabs: this.folderTabsService.load().pipe(catchError(() => of([] as PersistedFolderTab[]))),
+      // Same reasoning: a pane with no flags is still a working file browser.
+      flaggedPaths: this.fsItemFlagsService.load().pipe(catchError(() => of([] as string[])))
     }).subscribe({
       next: ({ root, persistedTabs }) => {
         if (!root?.folder) {
@@ -238,7 +242,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         parentFolderPath: element.parentFolderPath,
         createdAt: element.createdAt,
         updatedAt: element.updatedAt,
-        isFile: false
+        isFile: false,
+        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath)
       });
     });
 
@@ -255,7 +260,9 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         parentFolderPath: element.parentFolderPath,
         createdAt: element.createdAt,
         updatedAt: element.updatedAt,
-        isFile: true
+        isFile: true,
+        // The live flag, unlike a snapshot's, which is the flag of its own moment.
+        isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath)
       });
     });
   }
@@ -763,6 +770,44 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     });
   }
 
+
+  // --- Flags ---
+
+  /**
+   * Whether the toggle would turn flags on.
+   *
+   * On unless every selected item is already flagged, so one button does both
+   * jobs and the common case - marking a few things - is always one click.
+   */
+  get willFlagSelection(): boolean {
+    return !this.selectedItems.every(item => item.isFlagEnabled);
+  }
+
+  get flagTitle(): string {
+    return this.willFlagSelection ? 'Flag selection' : 'Clear flag from selection';
+  }
+
+  toggleFlagOnSelection() {
+    if (!this.hasSelection) {
+      return;
+    }
+
+    const isFlagEnabled = this.willFlagSelection;
+    const paths = this.selectedItems.map(item => item.fullPath);
+
+    this.subscriptionWrite?.unsubscribe();
+    this.subscriptionWrite = this.fsItemFlagsService.setFlags(paths, isFlagEnabled).subscribe({
+      next: () => {
+        this.refresh();
+        // The other pane too. Rows read the flag when they are built, not as the
+        // set changes, so a pane showing the same folder would keep the old
+        // markers until something else made it reload - and flags are one set
+        // shared by both panes, not a property of the one that was clicked.
+        this.otherPanelChanged.emit();
+      },
+      error: (error) => this.showErrorDialog(error, isFlagEnabled ? 'flag the items' : 'clear the flag')
+    });
+  }
 
   // --- Copy, move and delete ---
 

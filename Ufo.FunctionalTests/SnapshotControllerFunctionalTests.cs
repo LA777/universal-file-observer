@@ -277,6 +277,21 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
             SnapshotRequestFactory.CreatePathRequest(_snapshotRootPath));
     }
 
+    /// <summary>
+    /// Flags or clears paths as the test user. The shared client carries no token
+    /// by default, so it is set here exactly as PostCreateSnapshotAsync does.
+    /// </summary>
+    private async Task<HttpResponseMessage> PostSetFlagsAsync(bool isFlagEnabled, params string[] fullPaths)
+    {
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Bearer",
+            GenerateToken(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName));
+
+        return await _client.PostAsJsonAsync(
+            "api/fsitemflags",
+            new FsItemFlagsRequest { FullPaths = fullPaths, IsFlagEnabled = isFlagEnabled });
+    }
+
     private async Task<long> CountRowsAsync(string sql)
     {
         using var command = _connection.CreateCommand();
@@ -335,6 +350,62 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
         // are told apart by their two bindings.
         Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
         Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_RecordsTheFlagAgainstTheBindingAndNotTheSharedFileRow()
+    {
+        // The reason the flag cannot live on Files. These two are byte-identical,
+        // so they share one row - a flag column there would mark both, in every
+        // snapshot they ever appear in.
+        WriteSnapshotFile("left/same.txt", "identical content");
+        WriteSnapshotFile("right/same.txt", "identical content");
+
+        var flaggedPath = Path.Combine(_snapshotRootPath, "left", "same.txt");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostSetFlagsAsync(true, flaggedPath)).StatusCode);
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // One shared row, two bindings, and exactly one of them flagged.
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE IsFlagEnabled = 1"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_KeepsTheFlagOfItsOwnMomentWhenTheLiveFlagChangesLater()
+    {
+        WriteSnapshotFile("data/report.txt", "report");
+        var reportPath = Path.Combine(_snapshotRootPath, "data", "report.txt");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostSetFlagsAsync(true, reportPath)).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Cleared afterwards. A snapshot records the moment it was taken, so this
+        // must not reach back into one already made.
+        Assert.Equal(HttpStatusCode.OK, (await PostSetFlagsAsync(false, reportPath)).StatusCode);
+
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE IsFlagEnabled = 1"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FsItemFlags"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_LeavesEverythingUnflaggedWhenNothingIs()
+    {
+        WriteSnapshotFile("data/one.txt", "one");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Flags are off by default, which is the ordinary case.
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE IsFlagEnabled = 1"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders WHERE IsFlagEnabled = 1"));
     }
 
     [Fact]

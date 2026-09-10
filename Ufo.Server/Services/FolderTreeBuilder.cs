@@ -12,7 +12,17 @@ public interface IFolderTreeBuilder
     /// Walks <paramref name="rootPath"/> and returns the folder tree for it, with every
     /// file hashed and every folder hash and size rolled up from its contents.
     /// </summary>
-    Task<FolderEntity> BuildAsync(string rootPath, SnapshotEntity snapshotEntity, UserEntity userEntity, CancellationToken cancellationToken = default);
+    /// <param name="flaggedPaths">
+    /// The paths the user has flagged right now. Copied onto each item as the
+    /// walk meets it, so the snapshot records the flags as they stood when it was
+    /// taken - flagging something tomorrow does not reach back into it.
+    /// </param>
+    Task<FolderEntity> BuildAsync(
+        string rootPath,
+        SnapshotEntity snapshotEntity,
+        UserEntity userEntity,
+        IReadOnlySet<string>? flaggedPaths = null,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -68,7 +78,12 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         _degreeOfParallelism = degreeOfParallelism;
     }
 
-    public async Task<FolderEntity> BuildAsync(string rootPath, SnapshotEntity snapshotEntity, UserEntity userEntity, CancellationToken cancellationToken = default)
+    public async Task<FolderEntity> BuildAsync(
+        string rootPath,
+        SnapshotEntity snapshotEntity,
+        UserEntity userEntity,
+        IReadOnlySet<string>? flaggedPaths = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
         ArgumentNullException.ThrowIfNull(snapshotEntity);
@@ -76,7 +91,12 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
         _logger.LogInformation("Indexing {RootPath} with a parallelism of {DegreeOfParallelism}", rootPath, _degreeOfParallelism);
 
-        var rootFolder = CreateFolderEntity(new DirectoryInfo(rootPath), snapshotEntity, parentFolder: null, userEntity);
+        // Settled once, here, so the root and every folder below it are judged
+        // against the same set - and so a walk with no flags allocates nothing.
+        var effectiveFlaggedPaths = flaggedPaths ?? EmptyFlaggedPaths;
+
+        var rootFolder = CreateFolderEntity(
+            new DirectoryInfo(rootPath), snapshotEntity, parentFolder: null, userEntity, effectiveFlaggedPaths);
 
         // Every pass is CPU and blocking-I/O work with no asynchronous API worth using,
         // so the whole walk is pushed onto the thread pool in one hop rather than
@@ -84,7 +104,8 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         var fileCount = await Task.Run(
             () =>
             {
-                var pendingFiles = EnumerateTree(rootFolder, rootPath, snapshotEntity, userEntity, cancellationToken);
+                var pendingFiles = EnumerateTree(
+                    rootFolder, rootPath, snapshotEntity, userEntity, effectiveFlaggedPaths, cancellationToken);
                 HashFiles(pendingFiles, cancellationToken);
                 CompleteFolderHashesAndSizes(rootFolder);
 
@@ -102,7 +123,13 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     /// across the thread pool. Every folder node is populated by exactly one task, so
     /// the per-node lists are only ever touched by their owner and need no locking.
     /// </summary>
-    private List<PendingFile> EnumerateTree(FolderEntity rootFolder, string rootPath, SnapshotEntity snapshotEntity, UserEntity userEntity, CancellationToken cancellationToken)
+    private List<PendingFile> EnumerateTree(
+        FolderEntity rootFolder,
+        string rootPath,
+        SnapshotEntity snapshotEntity,
+        UserEntity userEntity,
+        IReadOnlySet<string> flaggedPaths,
+        CancellationToken cancellationToken)
     {
         var parallelOptions = new ParallelOptions
         {
@@ -110,7 +137,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
             CancellationToken = cancellationToken
         };
 
-        var walkContext = new WalkContext(snapshotEntity, userEntity);
+        var walkContext = new WalkContext(snapshotEntity, userEntity, flaggedPaths);
 
         // Directory enumeration follows symbolic links and junctions, so a link that
         // points back up its own tree would otherwise be walked forever. Recording where
@@ -168,7 +195,12 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                 continue;
             }
 
-            var subFolder = CreateFolderEntity(new DirectoryInfo(subFolderPath), walkContext.Snapshot, folder, walkContext.User);
+            var subFolder = CreateFolderEntity(
+                new DirectoryInfo(subFolderPath),
+                walkContext.Snapshot,
+                folder,
+                walkContext.User,
+                walkContext.FlaggedPaths);
             folder.ChildFolders.Add(subFolder);
 
             // A directory already reached by another route - a link or junction pointing
@@ -198,6 +230,11 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                 Size = fileInfo.Length,
                 Sha256Hash = string.Empty,
                 FileExtension = fileInfo.Extension,
+                // Copied from the live flag as it stands right now. A snapshot
+                // records the moment it was taken, so this is not looked up
+                // again later - flagging something tomorrow does not reach back
+                // into a snapshot made today.
+                IsFlagEnabled = walkContext.FlaggedPaths.Contains(filePath),
                 User = walkContext.User,
                 UserId = walkContext.User.Id,
                 CreatedAt = fileInfo.CreationTimeUtc.ToString("o"),
@@ -213,12 +250,20 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         }
     }
 
-    private static FolderEntity CreateFolderEntity(DirectoryInfo directoryInfo, SnapshotEntity snapshotEntity, FolderEntity? parentFolder, UserEntity userEntity)
+    private static FolderEntity CreateFolderEntity(
+        DirectoryInfo directoryInfo,
+        SnapshotEntity snapshotEntity,
+        FolderEntity? parentFolder,
+        UserEntity userEntity,
+        IReadOnlySet<string> flaggedPaths)
     {
         var folder = new FolderEntity
         {
             Name = directoryInfo.Name,
             Sha256Hash = string.Empty,
+            // As it stands right now, like the files below it: a snapshot records
+            // the flags of the moment it was taken.
+            IsFlagEnabled = flaggedPaths.Contains(directoryInfo.FullName),
             User = userEntity,
             UserId = userEntity.Id,
             CreatedAt = directoryInfo.CreationTimeUtc.ToString("o"),
@@ -444,17 +489,32 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
     private readonly record struct PendingFile(FileEntity Entity, string Path);
 
+    /// <summary>Shared empty set, so a walk with no flags allocates nothing.</summary>
+    private static readonly IReadOnlySet<string> EmptyFlaggedPaths =
+        new HashSet<string>(OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// The state one walk shares across its levels and its worker threads. The builder
     /// itself is a singleton and so cannot hold any of this in a field.
     /// </summary>
-    private sealed class WalkContext(SnapshotEntity snapshot, UserEntity user)
+    private sealed class WalkContext(
+        SnapshotEntity snapshot,
+        UserEntity user,
+        IReadOnlySet<string>? flaggedPaths)
     {
         private int _excludedEntryCount;
 
         public SnapshotEntity Snapshot { get; } = snapshot;
 
         public UserEntity User { get; } = user;
+
+        /// <summary>
+        /// Paths the user had flagged when the walk started. Empty rather than
+        /// null so the walk never has to ask, and compared with the platform's
+        /// own idea of path equality - a flag set on "C:\\Docs" must still match
+        /// the "C:\\docs" the enumeration hands back.
+        /// </summary>
+        public IReadOnlySet<string> FlaggedPaths { get; } = flaggedPaths ?? EmptyFlaggedPaths;
 
         public ConcurrentBag<PendingFile> PendingFiles { get; } = [];
 

@@ -20,6 +20,9 @@
         <div class="tree-row leaf" [class.selected]="clickedNode === node" (click)="onNodeClick(node)">
           <mat-icon class="tree-folder-icon">folder</mat-icon>
           <span class="tree-label">{{node.name}}</span>
+          @if (node.isFlagEnabled) {
+            <mat-icon class="tree-flag-marker" title="Flagged when this snapshot was taken">flag</mat-icon>
+          }
         </div>
       </mat-nested-tree-node>
 
@@ -31,6 +34,9 @@
           </button>
           <mat-icon class="tree-folder-icon">{{tree.isExpanded(node) ? 'folder_open' : 'folder'}}</mat-icon>
           <span class="tree-label">{{node.name}}</span>
+          @if (node.isFlagEnabled) {
+            <mat-icon class="tree-flag-marker" title="Flagged when this snapshot was taken">flag</mat-icon>
+          }
         </div>
         <div class="tree-children" [class.tree-invisible]="!tree.isExpanded(node)">
           <ng-container matTreeNodeOutlet></ng-container>

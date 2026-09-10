@@ -24,6 +24,7 @@ public class SnapshotController : ControllerBase
     private readonly ISystemInfoProvider _systemInfoProvider;
     private readonly IPathGuard _pathGuard;
     private readonly IFolderTreeBuilder _folderTreeBuilder;
+    private readonly IFsItemFlagsService _fsItemFlagsService;
 
     public SnapshotController(
         ILogger<SnapshotController> logger,
@@ -31,7 +32,8 @@ public class SnapshotController : ControllerBase
         ISystemInfoProvider systemInfoProvider,
         IUserRepository userRepository,
         IPathGuard pathGuard,
-        IFolderTreeBuilder folderTreeBuilder)
+        IFolderTreeBuilder folderTreeBuilder,
+        IFsItemFlagsService fsItemFlagsService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -39,6 +41,7 @@ public class SnapshotController : ControllerBase
         _userRepository = userRepository ?? throw new ArgumentNullException(nameof(userRepository));
         _pathGuard = pathGuard ?? throw new ArgumentNullException(nameof(pathGuard));
         _folderTreeBuilder = folderTreeBuilder ?? throw new ArgumentNullException(nameof(folderTreeBuilder));
+        _fsItemFlagsService = fsItemFlagsService ?? throw new ArgumentNullException(nameof(fsItemFlagsService));
     }
 
     [HttpGet("latest")]
@@ -107,7 +110,16 @@ public class SnapshotController : ControllerBase
 
         var user = await _userRepository.GetUserByIdAsync(userId);
         var snapshot = _systemInfoProvider.GetSystemInformation(snapshotRootPath, user);
-        var folderTree = await _folderTreeBuilder.BuildAsync(snapshotRootPath, snapshot, user, cancellationToken);
+        // Read once, before the walk, and stamped onto each item as it is met.
+        // That is what makes the snapshot a record of the moment: flagging
+        // something tomorrow does not reach back into a snapshot taken today.
+        var flaggedPaths = await _fsItemFlagsService.GetFlaggedPathsAsync(userId, cancellationToken);
+        var flaggedPathSet = new HashSet<string>(
+            flaggedPaths,
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
+        var folderTree = await _folderTreeBuilder.BuildAsync(
+            snapshotRootPath, snapshot, user, flaggedPathSet, cancellationToken);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
         await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);

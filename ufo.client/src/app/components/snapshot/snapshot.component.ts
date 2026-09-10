@@ -43,6 +43,18 @@ export class SnapshotComponent implements OnInit, OnDestroy {
 
   readonly columnDefs: ColDef<File>[] = [
     {
+      // The flag as it stood when this snapshot was taken, not as it stands now.
+      // A snapshot is a record of a moment, and flagging something today does
+      // not change what a snapshot made yesterday says about it.
+      headerName: '',
+      colId: 'flag',
+      width: 34,
+      sortable: false,
+      resizable: false,
+      headerTooltip: 'Flagged when this snapshot was taken',
+      cellRenderer: (params: ICellRendererParams<File>) => this.renderFlagCell(params),
+    },
+    {
       headerName: 'Name',
       field: 'name',
       flex: 1,
@@ -132,6 +144,24 @@ export class SnapshotComponent implements OnInit, OnDestroy {
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * The flag marker: shown only when set, so the eye finds the marked few rather
+   * than reading a column of icons standing for "no".
+   */
+  private renderFlagCell(params: ICellRendererParams<File>): HTMLElement {
+    const container = document.createElement('span');
+
+    if (!params.data?.isFlagEnabled) {
+      return container;
+    }
+
+    container.className = 'material-icons flag-marker';
+    container.textContent = 'flag';
+    container.title = 'Flagged when this snapshot was taken';
+
+    return container;
   }
 
   private renderNameCell(params: ICellRendererParams<File>): HTMLElement {

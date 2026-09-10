@@ -196,6 +196,7 @@ public static class UfoHost
         builder.Services.AddScoped<IUserSettingsService, UserSettingsService>();
         builder.Services.AddScoped<IKeyBindingsService, KeyBindingsService>();
         builder.Services.AddScoped<IFolderTabsService, FolderTabsService>();
+        builder.Services.AddScoped<IFsItemFlagsService, FsItemFlagsService>();
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
@@ -218,6 +219,7 @@ public static class UfoHost
         builder.Services.AddScoped<IUserSettingsRepository, UserSettingsRepository>();
         builder.Services.AddScoped<IUserKeyBindingsRepository, UserKeyBindingsRepository>();
         builder.Services.AddScoped<IFolderTabsRepository, FolderTabsRepository>();
+        builder.Services.AddScoped<IFsItemFlagsRepository, FsItemFlagsRepository>();
         builder.Services.AddScoped<IServerSettingsRepository, ServerSettingsRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 

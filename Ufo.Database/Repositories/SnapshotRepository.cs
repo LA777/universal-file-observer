@@ -87,6 +87,16 @@ public class SnapshotRepository : ISnapshotRepository
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
                     (fsFolderEntity, foldersToFoldersEntity, filesToFoldersEntity, fsFileEntity) =>
                     {
+                        // The flag lives on the association; the item carries it
+                        // only in memory, so it has to be copied across on the way
+                        // out exactly as it was copied in on the way down.
+                        fsFolderEntity.IsFlagEnabled = foldersToFoldersEntity?.IsFlagEnabled ?? false;
+
+                        if (fsFileEntity is not null)
+                        {
+                            fsFileEntity.IsFlagEnabled = filesToFoldersEntity?.IsFlagEnabled ?? false;
+                        }
+
                         folders.TryAdd(fsFolderEntity.Id, fsFolderEntity);
 
                         // check if Folder already added
@@ -246,6 +256,16 @@ public class SnapshotRepository : ISnapshotRepository
                     SqlScripts.SelectFoldersAndFilesBySnapshotSql,
                     (fsFolderEntity, foldersToFoldersEntity, filesToFoldersEntity, fsFileEntity) =>
                     {
+                        // The flag lives on the association; the item carries it
+                        // only in memory, so it has to be copied across on the way
+                        // out exactly as it was copied in on the way down.
+                        fsFolderEntity.IsFlagEnabled = foldersToFoldersEntity?.IsFlagEnabled ?? false;
+
+                        if (fsFileEntity is not null)
+                        {
+                            fsFileEntity.IsFlagEnabled = filesToFoldersEntity?.IsFlagEnabled ?? false;
+                        }
+
                         folders.TryAdd(fsFolderEntity.Id, fsFolderEntity);
 
                         // check if Folder already added
@@ -854,7 +874,11 @@ public class SnapshotRepository : ISnapshotRepository
                 // Null for the root folder, which is how the read side finds it.
                 ParentFolderId = folderBinding.ParentFolder?.Id,
                 ChildFolderId = folderBinding.ChildFolder.Id,
-                SnapshotId = snapshotEntity.Id
+                SnapshotId = snapshotEntity.Id,
+                // Read off the entity, where the tree walk left it. The flag
+                // belongs to this association and not to the folder, whose row is
+                // shared by every identical folder in every snapshot.
+                folderBinding.ChildFolder.IsFlagEnabled
             })
             .ToList();
 
@@ -873,7 +897,8 @@ public class SnapshotRepository : ISnapshotRepository
             {
                 FolderId = fileBinding.ParentFolder.Id,
                 FileId = fileBinding.File.Id,
-                SnapshotId = snapshotEntity.Id
+                SnapshotId = snapshotEntity.Id,
+                fileBinding.File.IsFlagEnabled
             })
             .ToList();
 

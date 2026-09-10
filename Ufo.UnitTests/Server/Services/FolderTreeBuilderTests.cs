@@ -172,6 +172,42 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
     }
 
     [Fact]
+    public async Task BuildAsync_StampsTheFlagsAsTheyStandOnTheItemsItMeets()
+    {
+        WriteFile("flagged.txt", "flagged");
+        WriteFile("plain.txt", "plain");
+        WriteFile("child/inner.txt", "inner");
+
+        var flaggedPaths = new HashSet<string>(
+            [Path.Combine(_rootPath, "flagged.txt"), Path.Combine(_rootPath, "child")],
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user, flaggedPaths);
+
+        rootFolder.Files.Single(file => file.Name == "flagged").IsFlagEnabled.Should().BeTrue();
+        rootFolder.Files.Single(file => file.Name == "plain").IsFlagEnabled.Should().BeFalse();
+
+        // Folders are flagged in their own right, and flagging one does not reach
+        // the files inside it - that was the choice, and it is what makes
+        // unflagging symmetric with flagging.
+        var childFolder = rootFolder.ChildFolders.Single();
+        childFolder.IsFlagEnabled.Should().BeTrue();
+        childFolder.Files.Single().IsFlagEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task BuildAsync_LeavesEverythingUnflaggedWhenNothingIs()
+    {
+        WriteFile("a.txt", "a");
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user);
+
+        // Flags are off by default, so a walk with no flag set is the ordinary case.
+        rootFolder.IsFlagEnabled.Should().BeFalse();
+        rootFolder.Files.Should().OnlyContain(file => !file.IsFlagEnabled);
+    }
+
+    [Fact]
     public async Task BuildAsync_HashesAFileWithNoExtensionUnderItsRealName()
     {
         // The case that separates the two spellings most sharply: with nothing to
@@ -437,7 +473,8 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
         await cancellationTokenSource.CancelAsync();
         var sut = CreateSut();
 
-        await sut.Invoking(builder => builder.BuildAsync(_rootPath, _snapshot, _user, cancellationTokenSource.Token))
+        await sut.Invoking(builder =>
+                builder.BuildAsync(_rootPath, _snapshot, _user, flaggedPaths: null, cancellationTokenSource.Token))
             .Should().ThrowAsync<OperationCanceledException>();
     }
 

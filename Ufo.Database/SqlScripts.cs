@@ -104,6 +104,11 @@ public class SqlScripts
             SnapshotId                TEXT NOT NULL,
             ParentFolderId            TEXT,
             ChildFolderId             TEXT NOT NULL,
+            -- The flag as it stood when this snapshot was taken. On the
+            -- association, not on Folders: that row is shared by every identical
+            -- folder in every snapshot. Also added by EnsureColumnAsync, which is
+            -- what reaches databases created before this column existed.
+            IsFlagEnabled             INTEGER NOT NULL DEFAULT 0 CHECK (IsFlagEnabled IN (0,1)),
 
             CONSTRAINT PK_FoldersToFolders                      PRIMARY KEY (SnapshotId, ParentFolderId, ChildFolderId),
             CONSTRAINT FK_FoldersToFolders_Snapshots_SnapshotId FOREIGN KEY (SnapshotId)     REFERENCES Snapshots (Id) ON DELETE NO ACTION,
@@ -129,6 +134,9 @@ public class SqlScripts
             SnapshotId                TEXT NOT NULL,
             FolderId                  TEXT NOT NULL,
             FileId                    TEXT NOT NULL,
+            -- See FoldersToFolders above: the flag belongs to the association,
+            -- because the Files row is shared by every identical file.
+            IsFlagEnabled             INTEGER NOT NULL DEFAULT 0 CHECK (IsFlagEnabled IN (0,1)),
 
             CONSTRAINT PK_FilesToFolders                       PRIMARY KEY (FolderId, FileId, SnapshotId),
             CONSTRAINT FK_FilesToFolders_Folders_FolderId      FOREIGN KEY (FolderId)    REFERENCES Folders (Id)   ON DELETE NO ACTION,
@@ -197,14 +205,30 @@ public class SqlScripts
             CONSTRAINT FK_UserKeyBindings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
         );
 
+        -- Flagged files and folders, keyed by path. Keyed by path because it is the
+        -- only thing that identifies one: Files and Folders rows are deduplicated
+        -- by content, shared by every identical item in every snapshot, and carry
+        -- no path at all - a flag column there would flag every copy at once.
+        --
+        -- A row exists only for something flagged. Flags are off by default, so
+        -- the absence of a row is the default rather than something to store.
+        CREATE TABLE IF NOT EXISTS FsItemFlags (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_FsItemFlags PRIMARY KEY,
+            FullPath                  TEXT NOT NULL,
+            UserId                    TEXT NOT NULL,
+
+            CONSTRAINT UQ_FsItemFlags_User_Path UNIQUE (UserId, FullPath),
+            CONSTRAINT FK_FsItemFlags_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
         -- Locked folder tabs, one row each. An ordinary tab is somewhere the user
         -- happens to be looking and belongs to the session; locking is how they
         -- say this one is worth keeping, and the row is what keeping it means.
         --
-        -- A panel's tabs are replaced wholesale on every save, so Position is a
-        -- plain ordering column rather than something that has to be patched.
-        -- The UNIQUE is on the folder instead: two locked tabs on the same folder
-        -- in the same pane are the same tab twice.
+        -- Written one row at a time - lock adds, unlock removes - so Position is
+        -- read off the end of the panel rather than patched. The UNIQUE is on the
+        -- folder: two locked tabs on the same folder in one pane are the same tab
+        -- twice.
         CREATE TABLE IF NOT EXISTS FolderTabs (
             Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_FolderTabs PRIMARY KEY,
             PanelId                   TEXT NOT NULL,
@@ -406,17 +430,17 @@ public class SqlScripts
                                                                                     "AND Sha256Hash = @Sha256Hash " +
                                                                                     "AND UserId = @UserId;";
     public const string InsertFoldersToFoldersSql = "INSERT INTO FoldersToFolders " +
-                                                    "(ParentFolderId, ChildFolderId, SnapshotId) " +
+                                                    "(ParentFolderId, ChildFolderId, SnapshotId, IsFlagEnabled) " +
                                                     "VALUES " +
-                                                    "(@ParentFolderId, @ChildFolderId, @SnapshotId)";
+                                                    "(@ParentFolderId, @ChildFolderId, @SnapshotId, @IsFlagEnabled)";
     public const string SelectFoldersToFoldersSql = "SELECT * FROM FoldersToFolders " +
                                                     "WHERE SnapshotId = @SnapshotId  " +
                                                     "AND ParentFolderId = @ParentFolderId " +
                                                     "AND ChildFolderId = @ChildFolderId;";
     public const string InsertFilesToFoldersSql = "INSERT INTO FilesToFolders " +
-                                                    "(FolderId, FileId, SnapshotId) " +
+                                                    "(FolderId, FileId, SnapshotId, IsFlagEnabled) " +
                                                     "VALUES " +
-                                                    "(@FolderId, @FileId, @SnapshotId)";
+                                                    "(@FolderId, @FileId, @SnapshotId, @IsFlagEnabled)";
     public const string SelectFilesToFoldersSql = "SELECT * FROM FilesToFolders " +
                                                     "WHERE SnapshotId = @SnapshotId  " +
                                                     "AND FolderId = @FolderId " +
@@ -549,6 +573,24 @@ public class SqlScripts
     // whatever its sliding deadline says, so nothing is lost by dropping it.
     public const string DeleteExpiredRefreshTokensSql =
         "DELETE FROM RefreshTokens WHERE AbsoluteExpiresAt < @UtcNow;";
+
+    public const string SelectFsItemFlagsSql =
+        "SELECT * FROM FsItemFlags WHERE UserId = @UserId;";
+
+    /// <summary>
+    /// Flags one path, and does nothing if it was flagged already.
+    /// </summary>
+    /// <remarks>
+    /// One row per path, never a replace over the user's whole set: a replace is
+    /// driven by what the caller believes the other flags to be, and a caller
+    /// that failed to read them believes there are none.
+    /// </remarks>
+    public const string InsertFsItemFlagSql =
+        "INSERT INTO FsItemFlags (Id, FullPath, UserId) VALUES (@Id, @FullPath, @UserId) " +
+        "ON CONFLICT (UserId, FullPath) DO NOTHING;";
+
+    public const string DeleteFsItemFlagSql =
+        "DELETE FROM FsItemFlags WHERE UserId = @UserId AND FullPath = @FullPath;";
 
     public const string SelectFolderTabsSql =
         "SELECT * FROM FolderTabs WHERE UserId = @UserId ORDER BY PanelId, Position;";

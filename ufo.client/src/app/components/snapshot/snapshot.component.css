@@ -198,3 +198,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Matches the Files panes, so a flag reads the same wherever it appears. */
+:host ::ng-deep .flag-marker {
+  font-size: 16px;
+  color: var(--ufo-danger-text);
+}
+
+/* Folder flags in the tree. Captured and mapped like a file's, and shown here
+   because the grid beside the tree only lists files - without this a flagged
+   folder was recorded and then never seen. */
+:host ::ng-deep .tree-flag-marker {
+  flex: 0 0 auto;
+  margin-left: 4px;
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  color: var(--ufo-danger-text);
+}

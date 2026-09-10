@@ -45,6 +45,9 @@
         <button (click)="moveSelection()" [disabled]="!canTransfer" [title]="transferTitle('Move', 'F6')">
           <mat-icon>drive_file_move</mat-icon>
         </button>
+        <button (click)="toggleFlagOnSelection()" [disabled]="!hasSelection" [title]="flagTitle">
+          <mat-icon>{{ willFlagSelection ? 'flag' : 'outlined_flag' }}</mat-icon>
+        </button>
         <button (click)="deleteSelection()" [disabled]="!hasSelection" class="destructive" title="Delete (Del)">
           <mat-icon>delete</mat-icon>
         </button>

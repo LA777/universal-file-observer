@@ -29,6 +29,12 @@ public static class DapperDataContext
         // CREATE TABLE IF NOT EXISTS is a no-op against an existing table - so a
         // column introduced after a database was first created has to be added
         // here or it will only ever appear on fresh installations.
+        // The snapshot associations gained a flag after they had shipped. CREATE
+        // TABLE IF NOT EXISTS is a no-op against a table that is already there,
+        // so without these the column would only ever exist on fresh installs.
+        await EnsureColumnAsync(sqLiteConnection, "FilesToFolders", "IsFlagEnabled", "INTEGER NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(sqLiteConnection, "FoldersToFolders", "IsFlagEnabled", "INTEGER NOT NULL DEFAULT 0");
+
         if (await EnsureColumnAsync(sqLiteConnection, "Users", "IsAdmin", "INTEGER NOT NULL DEFAULT 0"))
         {
             await PromoteEarliestUserToAdministratorAsync(sqLiteConnection);

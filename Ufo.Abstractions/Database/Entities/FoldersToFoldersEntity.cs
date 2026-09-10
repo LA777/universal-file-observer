@@ -19,4 +19,14 @@ public class FoldersToFoldersEntity
     [JsonConverter(typeof(UlidJsonConverter))]
     [ForeignKey(typeof(FolderEntity))]
     public Ulid ChildFolderId { get; set; }
+
+    /// <summary>
+    /// Whether the item was flagged when this snapshot was taken.
+    /// </summary>
+    /// <remarks>
+    /// Here rather than on the item, because the item's row is shared by every
+    /// identical copy of it. This association is the only thing in the schema
+    /// that is unique to one item in one snapshot under one parent.
+    /// </remarks>
+    public bool IsFlagEnabled { get; set; }
 }

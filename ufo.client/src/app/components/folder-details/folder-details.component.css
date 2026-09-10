@@ -80,3 +80,11 @@
   background: transparent;
   box-shadow: none;
 }
+
+/* The flag marker. Coloured rather than merely present, so a flagged row is
+   findable by eye in a long listing without reading anything. */
+:host ::ng-deep .flag-marker {
+  font-size: 16px;
+  line-height: 28px;
+  color: var(--ufo-danger-text);
+}

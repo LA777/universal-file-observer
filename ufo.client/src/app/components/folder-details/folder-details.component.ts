@@ -132,6 +132,16 @@ export class FolderDetailsComponent implements OnChanges {
       valueSetter: () => false,
     },
     {
+      // Narrow and first: a flag is a glance, not a value to read.
+      headerName: '',
+      colId: 'flag',
+      width: 34,
+      sortable: false,
+      resizable: false,
+      headerTooltip: 'Flagged',
+      cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderFlagCell(params),
+    },
+    {
       headerName: 'Ext',
       field: 'fileExtension',
       width: 90,
@@ -308,6 +318,28 @@ export class FolderDetailsComponent implements OnChanges {
     label.className = 'name-label';
     label.textContent = item.name;
     container.appendChild(label);
+    return container;
+  }
+
+  /**
+   * The flag column: a filled marker when flagged, nothing at all when not.
+   *
+   * Nothing rather than an empty outline, because the default is unflagged and a
+   * column of hollow icons down every listing would be noise standing for
+   * "no" - the eye should find the few that are marked.
+   */
+  private renderFlagCell(params: ICellRendererParams<FsItemUi>): HTMLElement {
+    const item = params.data as FsItemUi | undefined;
+    const container = document.createElement('span');
+
+    if (!item || isParentRow(item) || item.isDraft || !item.isFlagEnabled) {
+      return container;
+    }
+
+    container.className = 'material-icons flag-marker';
+    container.textContent = 'flag';
+    container.title = 'Flagged';
+
     return container;
   }
 

@@ -28,6 +28,17 @@ public abstract class DtoWithUserIdAndNameAndIdBase : DtoWithUserIdAndIdBase
 
 public abstract class FsItemDto : DtoWithUserIdAndNameAndIdBase
 {
+    /// <summary>
+    /// Whether this item was flagged when the snapshot was taken.
+    /// </summary>
+    /// <remarks>
+    /// A snapshot records the flag of its moment, so this is history rather than
+    /// the live value: flagging something today does not change what a snapshot
+    /// taken yesterday says about it.
+    /// </remarks>
+    [JsonPropertyOrder(45)]
+    public bool IsFlagEnabled { get; set; }
+
     [JsonPropertyOrder(2)]
     public long? Size { get; set; }
 

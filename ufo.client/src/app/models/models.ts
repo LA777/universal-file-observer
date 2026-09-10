@@ -10,6 +10,14 @@ export interface FsItem {
   fullPath: string;
   hasParent: boolean;
   parentFolderPath: string;
+  /**
+   * Whether the item is flagged.
+   *
+   * In the Files panes this is the live flag. In a snapshot it is history - the
+   * flag as it stood when the snapshot was taken - so the two can disagree, and
+   * that disagreement is the point of recording it.
+   */
+  isFlagEnabled?: boolean;
 }
 
 export interface FsItemUi extends FsItem {
