@@ -426,3 +426,6 @@ _docs/
 # per-user data directory, but a run whose data directory resolves to the
 # content root would drop it here.
 jwt-signing-key
+
+# Local-only Compose overrides: host paths that exist on one machine.
+docker-compose.override.yml
