@@ -406,9 +406,22 @@ public class SqlScripts
 
         -- Join-table lookups not covered by the composite PK column order:
         -- FilesToFolders PK is (FolderId, FileId, SnapshotId) -> FileId and SnapshotId lookups need indexes
-        -- (search join ON f.Id = ftf.FileId, deletes by SnapshotId, orphan cleanup NOT IN (SELECT FileId ...)).
+        -- (search join ON f.Id = ftf.FileId, deletes by SnapshotId, orphan cleanup).
         CREATE INDEX IF NOT EXISTS IX_FilesToFolders_FileId             ON FilesToFolders (FileId);
-        CREATE INDEX IF NOT EXISTS IX_FilesToFolders_SnapshotId         ON FilesToFolders (SnapshotId);
+
+        -- (SnapshotId, FolderId) rather than SnapshotId alone. The tree read
+        -- (SelectFoldersAndFilesBySnapshotSql) asks for one snapshot's files
+        -- under one folder at a time; with SnapshotId alone SQLite found the
+        -- snapshot's rows and then walked all of them for every folder, which
+        -- made opening a snapshot quadratic in its size (measured at 9x slower
+        -- on 20 snapshots of 20,000 files). Every query that only needs
+        -- SnapshotId still gets it from the leading column, so the old index
+        -- is dropped rather than kept beside this one: on the hottest insert
+        -- path each extra index is another b-tree to maintain per file.
+        -- Both statements are idempotent, so a deployed database is upgraded
+        -- on its next start the same way a new column is.
+        CREATE INDEX IF NOT EXISTS IX_FilesToFolders_SnapshotId_FolderId ON FilesToFolders (SnapshotId, FolderId);
+        DROP INDEX IF EXISTS IX_FilesToFolders_SnapshotId;
 
         -- FoldersToFolders PK is (SnapshotId, ParentFolderId, ChildFolderId) -> ChildFolderId lookups need an index
         -- (tree reconstruction join ON fl2fl.ChildFolderId = folder.Id, orphan cleanup).
@@ -423,6 +436,13 @@ public class SqlScripts
 
         CREATE INDEX IF NOT EXISTS IX_Labels_UserId_Name                ON Labels (UserId, Name);
         CREATE INDEX IF NOT EXISTS IX_LabelsToSnapshots_SnapshotId      ON LabelsToSnapshots (SnapshotId);
+
+        -- Both snapshot-tag tables reference Tags with ON DELETE CASCADE, and
+        -- their primary keys lead with SnapshotId, so without these a Tags
+        -- delete (or the Users cascade above it) scans every assignment ever
+        -- captured to find the ones to cascade to.
+        CREATE INDEX IF NOT EXISTS IX_TagsToSnapshotFiles_TagId         ON TagsToSnapshotFiles (TagId);
+        CREATE INDEX IF NOT EXISTS IX_TagsToSnapshotFolders_TagId       ON TagsToSnapshotFolders (TagId);
     ";
 
     public const string SelectPcSql = "SELECT * FROM Pcs WHERE HardwareUuid = @HardwareUuid AND HardwareSerialNumber = @HardwareSerialNumber AND UserId = @UserId;";
@@ -562,12 +582,38 @@ public class SqlScripts
                                                 "PRAGMA foreign_keys = ON;";
 
     // Delete SQL Scripts
+
+    // Deleting a snapshot has to drop the Files and Folders rows that no other
+    // snapshot still binds - they are shared by content, so a row is only an
+    // orphan once its last binding goes. The only rows that can become orphans
+    // are the ones this snapshot bound, so those ids are written down first and
+    // the orphan check is run over them alone, rather than over every row in
+    // the database as "DELETE ... WHERE Id NOT IN (SELECT FileId FROM ...)" did.
+    // That made deleting any snapshot cost as much as the whole database.
+    //
+    // They have to be written down *before* the bindings go, because the
+    // foreign keys forbid deleting a Files row its bindings still point at,
+    // and after the bindings are gone nothing says which files were in the
+    // snapshot. A TEMP table rather than an in-memory list: it lives on this
+    // connection only, inside the transaction, and never crosses to C# and
+    // back as a hundred-thousand-element IN list. IF NOT EXISTS and the DELETE
+    // are what make it safe on a pooled connection that ran this before.
+    public const string CreateSnapshotOrphanCandidatesSql =
+        "CREATE TEMP TABLE IF NOT EXISTS SnapshotFileIds (FileId TEXT NOT NULL PRIMARY KEY);" +
+        "CREATE TEMP TABLE IF NOT EXISTS SnapshotFolderIds (FolderId TEXT NOT NULL PRIMARY KEY);" +
+        "DELETE FROM SnapshotFileIds;" +
+        "DELETE FROM SnapshotFolderIds;" +
+        "INSERT OR IGNORE INTO SnapshotFileIds (FileId) SELECT FileId FROM FilesToFolders WHERE SnapshotId = @SnapshotId;" +
+        "INSERT OR IGNORE INTO SnapshotFolderIds (FolderId) SELECT ChildFolderId FROM FoldersToFolders WHERE SnapshotId = @SnapshotId;";
+    public const string DropSnapshotOrphanCandidatesSql =
+        "DROP TABLE IF EXISTS SnapshotFileIds;" +
+        "DROP TABLE IF EXISTS SnapshotFolderIds;";
     public const string DeleteFilesToFoldersBySnapshotSql = "DELETE FROM FilesToFolders WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteFilesWithoutSnapshotsSql = "DELETE FROM Files WHERE Id NOT IN " +
-                                                          "(SELECT DISTINCT FileId FROM FilesToFolders);";
+    public const string DeleteFilesWithoutSnapshotsSql = "DELETE FROM Files WHERE Id IN (SELECT FileId FROM SnapshotFileIds) " +
+                                                          "AND NOT EXISTS (SELECT 1 FROM FilesToFolders WHERE FileId = Files.Id);";
     public const string DeleteFoldersToFoldersBySnapshotSql = "DELETE FROM FoldersToFolders WHERE SnapshotId = @SnapshotId;";
-    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id NOT IN " +
-                                                            "(SELECT DISTINCT ChildFolderId FROM FoldersToFolders);";
+    public const string DeleteFoldersWithoutSnapshotsSql = "DELETE FROM Folders WHERE Id IN (SELECT FolderId FROM SnapshotFolderIds) " +
+                                                            "AND NOT EXISTS (SELECT 1 FROM FoldersToFolders WHERE ChildFolderId = Folders.Id);";
     public const string DeletePcsToStorageDrivesBySnapshotSql = "DELETE FROM PcsToStorageDrives WHERE SnapshotId = @SnapshotId;";
     public const string DeletePcsWithoutStorageDrivesSql = "DELETE FROM Pcs WHERE Id NOT IN " +
                                                             "(SELECT DISTINCT PcId FROM PcsToStorageDrives);";

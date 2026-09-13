@@ -287,4 +287,24 @@ public class ServerSettingsRepositoryIntegrationTests : IAsyncLifetime
         columns.Should().Contain("IsAdmin");
         columns.Count(column => column == "IsAdmin").Should().Be(1);
     }
+
+    [Fact]
+    public async Task InitiateDatabaseAsync_ReplacesTheSnapshotOnlyFilesToFoldersIndexOnAnExistingDatabase()
+    {
+        // A database from before the tree read got its (SnapshotId, FolderId)
+        // index carries the SnapshotId-only one. CREATE INDEX IF NOT EXISTS adds
+        // the new index beside it; the DROP INDEX IF EXISTS in the same script
+        // is what takes the old one away, so a deployed database is not left
+        // maintaining both on every file it writes.
+        await _sqLiteConnection.ExecuteAsync(
+            "CREATE INDEX IF NOT EXISTS IX_FilesToFolders_SnapshotId ON FilesToFolders (SnapshotId);");
+
+        await DapperDataContext.InitiateDatabaseAsync(_sqLiteConnection);
+
+        var indexNames = (await _sqLiteConnection.QueryAsync<string>(
+            "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'FilesToFolders';")).ToList();
+
+        indexNames.Should().Contain("IX_FilesToFolders_SnapshotId_FolderId");
+        indexNames.Should().NotContain("IX_FilesToFolders_SnapshotId");
+    }
 }

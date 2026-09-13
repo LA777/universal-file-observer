@@ -1083,6 +1083,36 @@ public class SnapshotRepositoryIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DeleteSnapshotByIdAsync_TwiceOnOneConnection_LeavesNoCandidateTablesBehind()
+    {
+        // The orphan check is scoped through TEMP tables that live on the
+        // connection. Connections are pooled, so the same one deletes many
+        // snapshots over its life: the second delete must find the tables gone
+        // (or empty) rather than inheriting the first one's candidate ids, and
+        // a committed delete must not leave them on the connection at all.
+        var firstSnapshot = CreateSnapshotWithSystemInfo(testUser.Id);
+        var secondSnapshot = CreateSnapshotWithSystemInfo(testUser.Id);
+        await _fileSystemRepository!.AddSnapshotAsync(firstSnapshot, testUser.Id);
+        await _fileSystemRepository.AddSnapshotAsync(secondSnapshot, testUser.Id);
+
+        var firstResult = await _fileSystemRepository.DeleteSnapshotByIdAsync(firstSnapshot.Id, testUser.Id);
+        var secondResult = await _fileSystemRepository.DeleteSnapshotByIdAsync(secondSnapshot.Id, testUser.Id);
+
+        firstResult.Should().Be(DatabaseActionResult.Success);
+        secondResult.Should().Be(DatabaseActionResult.Success);
+
+        var temporaryTables = await _sqLiteConnection.QueryAsync<string>(
+            "SELECT name FROM sqlite_temp_master WHERE type = 'table';");
+        temporaryTables.Should().BeEmpty();
+
+        // Both trees were unique to their snapshot, so nothing of either is left.
+        var fileCount = await _sqLiteConnection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Files;");
+        var folderCount = await _sqLiteConnection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Folders;");
+        fileCount.Should().Be(0);
+        folderCount.Should().Be(0);
+    }
+
+    [Fact]
     public async Task AddSnapshotAsync_WithUserIsolation_SameFileNamesInDifferentUsers()
     {
         // Arrange

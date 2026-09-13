@@ -477,6 +477,17 @@ public class SnapshotRepository : ISnapshotRepository
                 return DatabaseActionResult.NotFound;
             }
 
+            // Write down which files and folders this snapshot bound while the
+            // bindings still say so. The orphan checks in steps 2 and 4 run over
+            // these alone: a row nothing else binds is only ever one this
+            // snapshot did, so there is no reason to examine the rest of the
+            // database, and before this was scoped the cost of deleting any
+            // snapshot was the size of every snapshot.
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.CreateSnapshotOrphanCandidatesSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+
             // 0. Delete this snapshot's tag assignments. Before the associations
             // they hang off, so nothing is briefly pointing at an association
             // that has gone. The Tags themselves stay: they are the user's
@@ -566,6 +577,14 @@ public class SnapshotRepository : ISnapshotRepository
                 new { SnapshotId = snapshotId, UserId = userId },
                 transaction);
             _logger.LogInformation($"Deleted snapshot: {snapshotId}");
+
+            // The candidate lists are transaction-scoped TEMP tables, so a
+            // rollback takes them with it; on the way to a commit they are
+            // dropped here so the pooled connection hands nothing on.
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DropSnapshotOrphanCandidatesSql,
+                null,
+                transaction);
 
             await transaction.CommitAsync(cancellationToken);
 

@@ -16,8 +16,10 @@ public static class DapperDataContext
 
         // WAL lets readers proceed while a snapshot is being written and makes bulk
         // inserts much faster; NORMAL sync is safe with WAL and skips an fsync per
-        // transaction. journal_mode is persisted in the db file; synchronous applies
-        // to this connection, which the factory keeps for the app's lifetime.
+        // transaction. journal_mode is persisted in the db file and reaches every
+        // later connection; synchronous is per connection and only covers the
+        // schema work done here - SqliteConnectionFactory sets it again on every
+        // connection it opens, which is where the requests actually run.
         // (In-memory test databases ignore WAL and keep their own journal mode.)
         await sqLiteConnection.ExecuteAsync("PRAGMA journal_mode = WAL;");
         await sqLiteConnection.ExecuteAsync("PRAGMA synchronous = NORMAL;");
