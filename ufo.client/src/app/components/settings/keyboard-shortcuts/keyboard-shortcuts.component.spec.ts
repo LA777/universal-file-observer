@@ -1,5 +1,7 @@
 import { KeyboardShortcutsComponent } from './keyboard-shortcuts.component';
 import { KeyBinding } from '../../../models/models';
+import { KeyBindingsService } from '../../../services/key-bindings.service';
+import { of } from 'rxjs';
 
 /**
  * Driven directly rather than through TestBed: the capture rules are all
@@ -40,6 +42,29 @@ describe('KeyboardShortcutsComponent', () => {
 
     return event;
   }
+
+  describe('reload', () => {
+    it('discards unsaved edits and takes the table from the service again', () => {
+      const served = bindingFor('files.copy', 'F5');
+      const keyBindingsService = { load: () => of([served]) } as unknown as KeyBindingsService;
+      const component = new KeyboardShortcutsComponent(keyBindingsService);
+      component.bindings.set([bindingFor('files.copy', 'F5')]);
+      component.startCapturing(clickOn(document.createElement('button')), 'files.copy', 'primaryKey');
+      component.onSlotKeyDown(keyDown('C', { ctrlKey: true }), 'files.copy', 'primaryKey');
+      component.savedMessage.set('Shortcuts saved.');
+      expect(component.hasChanges()).toBeTrue();
+
+      component.reload();
+
+      // The edit is gone with the rows behind it, not kept for a save the
+      // user would then be making by accident.
+      expect(component.bindings()[0].primaryKey).toBe('F5');
+      expect(component.hasChanges()).toBeFalse();
+      expect(component.capturingSlot()).toBeNull();
+      expect(component.savedMessage()).toBe('');
+      expect(component.isLoading()).toBeFalse();
+    });
+  });
 
   describe('capture', () => {
     it('records a chord into the armed slot', () => {

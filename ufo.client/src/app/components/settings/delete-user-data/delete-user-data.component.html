@@ -1,0 +1,39 @@
+<section class="settings-section danger-zone" aria-labelledby="danger-zone-title">
+  <h2 class="section-title" id="danger-zone-title">
+    <mat-icon>warning_amber</mat-icon>
+    Danger zone
+  </h2>
+  <p class="section-hint">
+    Delete user data. Each button below removes one kind of data from your account for good; there
+    is no undo and no recycle bin. Nothing on disk is touched.
+  </p>
+
+  <ul class="deletion-list">
+    <li class="deletion-row" *ngFor="let deletion of deletions">
+      <div class="deletion-text">
+        <span class="deletion-label">{{ deletion.label }}</span>
+        <span class="deletion-description">{{ deletion.description }}</span>
+      </div>
+      <button
+        type="button"
+        class="danger-button"
+        [attr.data-kind]="deletion.kind"
+        [disabled]="isWorking"
+        [matTooltip]="deletion.confirmTitle"
+        (click)="requestDeletion(deletion)">
+        <mat-icon>delete_forever</mat-icon>
+        {{ workingKind === deletion.kind ? 'Deleting…' : deletion.label }}
+      </button>
+    </li>
+  </ul>
+
+  <div class="status-row saved" *ngIf="message">
+    <mat-icon>check_circle</mat-icon>
+    <span>{{ message }}</span>
+  </div>
+
+  <div class="status-row error" *ngIf="errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+</section>

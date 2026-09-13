@@ -66,6 +66,15 @@ export class FsItemRatingsService {
   }
 
   /** The rating for a path, or 0 when it has none. */
+  /**
+   * Forgets everything held here, so the next load asks the server again.
+   * Called after the user deletes their file-system data.
+   */
+  reset(): void {
+    this.request = undefined;
+    this.ratingsByPath.set(new Map());
+  }
+
   ratingFor(fullPath: string): number {
     return this.ratingsByPath().get(fullPath) ?? 0;
   }

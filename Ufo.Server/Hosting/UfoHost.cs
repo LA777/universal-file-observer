@@ -201,6 +201,7 @@ public static class UfoHost
         builder.Services.AddScoped<ITagsService, TagsService>();
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
+        builder.Services.AddScoped<IUserDataService, UserDataService>();
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
         // Both read the host's own rules once and hold no per-request state, so
         // they are shared for the same reason the path guard is.
@@ -226,6 +227,7 @@ public static class UfoHost
         builder.Services.AddScoped<ITagsRepository, TagsRepository>();
         builder.Services.AddScoped<IServerSettingsRepository, ServerSettingsRepository>();
         builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        builder.Services.AddScoped<IUserDataRepository, UserDataRepository>();
 
         // TLS certificate. The provider is a singleton because Kestrel reads it
         // on every handshake and it outlives any request scope; everything that

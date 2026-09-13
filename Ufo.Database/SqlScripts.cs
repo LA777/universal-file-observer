@@ -975,4 +975,86 @@ public class SqlScripts
         LEFT JOIN Labels AS l ON lts.LabelId = l.Id
         WHERE {0}
         ORDER BY fo.Name ASC;";
+
+    #region User data deletion
+
+    // The three wholesale deletions behind the Settings page's danger zone. Each
+    // clears one kind of data for one user and nothing of anyone else's, so
+    // every statement is scoped by UserId - directly where the table carries
+    // one, and through the owning row where it does not.
+    //
+    // Snapshots first. The same order DeleteSnapshotByIdAsync uses, for the same
+    // reason: the foreign keys forbid deleting a row its bindings still point at,
+    // so bindings go before the rows they bind, and shared rows (Files, Folders,
+    // Volumes, StorageDrives, Pcs) go only once nothing else binds them. Every
+    // snapshot of the user goes, so in practice all of their content rows are
+    // orphans afterwards - but the NOT EXISTS keeps that a fact checked rather
+    // than assumed.
+    public const string DeleteTagsToSnapshotFilesByUserSql =
+        "DELETE FROM TagsToSnapshotFiles WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteTagsToSnapshotFoldersByUserSql =
+        "DELETE FROM TagsToSnapshotFolders WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteLabelsToSnapshotsByUserSql =
+        "DELETE FROM LabelsToSnapshots WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteUsersToSnapshotsByUserSql =
+        "DELETE FROM UsersToSnapshots WHERE UserId = @UserId;";
+    public const string DeleteFilesToFoldersByUserSql =
+        "DELETE FROM FilesToFolders WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteFoldersToFoldersByUserSql =
+        "DELETE FROM FoldersToFolders WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteUnboundFilesByUserSql =
+        "DELETE FROM Files WHERE UserId = @UserId " +
+        "AND NOT EXISTS (SELECT 1 FROM FilesToFolders WHERE FileId = Files.Id);";
+    public const string DeleteUnboundFoldersByUserSql =
+        "DELETE FROM Folders WHERE UserId = @UserId " +
+        "AND NOT EXISTS (SELECT 1 FROM FoldersToFolders WHERE ChildFolderId = Folders.Id);";
+    public const string DeletePcsToStorageDrivesByUserSql =
+        "DELETE FROM PcsToStorageDrives WHERE SnapshotId IN (SELECT Id FROM Snapshots WHERE UserId = @UserId);";
+    public const string DeleteVolumeInfosByUserSql =
+        "DELETE FROM VolumeInfos WHERE UserId = @UserId;";
+    public const string DeleteUnboundVolumesByUserSql =
+        "DELETE FROM Volumes WHERE UserId = @UserId " +
+        "AND NOT EXISTS (SELECT 1 FROM VolumeInfos WHERE VolumeId = Volumes.Id);";
+    public const string DeleteUnboundStorageDrivesByUserSql =
+        "DELETE FROM StorageDrives WHERE UserId = @UserId " +
+        "AND NOT EXISTS (SELECT 1 FROM Volumes WHERE StorageDriveId = StorageDrives.Id) " +
+        "AND NOT EXISTS (SELECT 1 FROM PcsToStorageDrives WHERE StorageDriveId = StorageDrives.Id);";
+    public const string DeleteUnboundPcsByUserSql =
+        "DELETE FROM Pcs WHERE UserId = @UserId " +
+        "AND NOT EXISTS (SELECT 1 FROM PcsToStorageDrives WHERE PcId = Pcs.Id);";
+    // Labels go with the snapshots: they exist to be put on snapshots and on
+    // nothing else, so a vocabulary with nothing left to label is a leftover.
+    public const string DeleteLabelsByUserSql =
+        "DELETE FROM Labels WHERE UserId = @UserId;";
+    public const string DeleteSnapshotsByUserSql =
+        "DELETE FROM Snapshots WHERE UserId = @UserId;";
+
+    // File-system data: what the user has marked on paths on disk - flags,
+    // ratings, and tags together with every place they were applied. The tag
+    // assignment tables cascade from Tags in the schema, but they are cleared
+    // here as well so the result does not depend on the connection having
+    // foreign keys switched on.
+    public const string DeleteFsItemFlagsByUserSql =
+        "DELETE FROM FsItemFlags WHERE UserId = @UserId;";
+    public const string DeleteFsItemRatingsByUserSql =
+        "DELETE FROM FsItemRatings WHERE UserId = @UserId;";
+    public const string DeleteFsItemTagsByUserSql =
+        "DELETE FROM FsItemTags WHERE TagId IN (SELECT Id FROM Tags WHERE UserId = @UserId);";
+    public const string DeleteTagsToSnapshotFilesByTagOwnerSql =
+        "DELETE FROM TagsToSnapshotFiles WHERE TagId IN (SELECT Id FROM Tags WHERE UserId = @UserId);";
+    public const string DeleteTagsToSnapshotFoldersByTagOwnerSql =
+        "DELETE FROM TagsToSnapshotFolders WHERE TagId IN (SELECT Id FROM Tags WHERE UserId = @UserId);";
+    public const string DeleteTagsByUserSql =
+        "DELETE FROM Tags WHERE UserId = @UserId;";
+
+    // Settings: everything the user has arranged about the application itself -
+    // the theme, the rebound shortcuts, and the folder tabs they locked. With the
+    // rows gone every one of them falls back to the build's default, which is
+    // exactly what "reset" means for each of these features.
+    public const string DeleteFolderTabsByUserSql =
+        "DELETE FROM FolderTabs WHERE UserId = @UserId;";
+    public const string DeleteUserSettingsByUserSql =
+        "DELETE FROM UserSettings WHERE UserId = @UserId;";
+
+    #endregion
 }

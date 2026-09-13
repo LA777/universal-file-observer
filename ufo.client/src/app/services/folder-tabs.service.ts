@@ -50,4 +50,12 @@ export class FolderTabsService {
 
     return this.http.post<void>('/api/foldertabs/unlock', { panelId, folderPath });
   }
+
+  /**
+   * Drops the cached answer, so the next load asks the server again. Called
+   * after the user deletes their settings, which takes the locked tabs.
+   */
+  reset(): void {
+    this.request = undefined;
+  }
 }

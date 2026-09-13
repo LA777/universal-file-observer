@@ -1,0 +1,146 @@
+/* ---------------------------------------------------------------------------
+   Uses the shared --ufo-* variables only, so it follows the light theme without
+   a second set of rules. The section heading styles are repeated from
+   settings.component.css for the reason server-certificate.component.css gives:
+   emulated view encapsulation keeps the parent's rules out of this template.
+   --------------------------------------------------------------------------- */
+
+.settings-section {
+  max-width: 640px;
+}
+
+/* The whole block is drawn in the danger colours, not just its buttons: the
+   user should know where they are before they read a single label. */
+.danger-zone {
+  margin-top: 28px;
+  padding: 16px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 6px;
+  background-color: var(--ufo-danger-tint);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ufo-danger-text);
+}
+
+.section-title mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+}
+
+.section-hint {
+  margin: 4px 0 16px;
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+.deletion-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.deletion-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--ufo-danger-border);
+}
+
+.deletion-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.deletion-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ufo-text-strong);
+}
+
+.deletion-description {
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+/* The same shape as the dialog's destructive button, so the button on the page
+   and the button that confirms it read as the same thing. */
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 4px;
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.12s ease-in-out, color 0.12s ease-in-out;
+}
+
+.danger-button:hover:not(:disabled) {
+  background-color: var(--ufo-danger-border);
+  color: var(--ufo-text-on-danger);
+}
+
+.danger-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.danger-button mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.status-row mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+}
+
+.status-row.saved {
+  color: var(--ufo-accent-soft);
+}
+
+.status-row.error {
+  color: var(--ufo-danger-text);
+}
+
+@media (max-width: 520px) {
+  .deletion-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

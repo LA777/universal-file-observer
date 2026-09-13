@@ -107,6 +107,26 @@ export class KeyboardShortcutsComponent implements OnInit {
   constructor(private keyBindingsService: KeyBindingsService) {}
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  /**
+   * Re-reads the table from the service, discarding any unsaved edits.
+   *
+   * Called by the Settings page after the user deletes their settings: the rows
+   * behind this table are gone, and a table still showing them would let the
+   * user "save" shortcuts they just asked to be rid of.
+   */
+  reload(): void {
+    this.stopCapturing();
+    this.hasChanges.set(false);
+    this.errorMessage.set('');
+    this.savedMessage.set('');
+    this.isLoading.set(true);
+    this.load();
+  }
+
+  private load(): void {
     this.keyBindingsService.load().subscribe({
       next: keyBindings => {
         this.bindings.set(keyBindings.map(keyBinding => ({ ...keyBinding })));

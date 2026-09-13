@@ -61,4 +61,14 @@ export class FsItemFlagsService {
   isFlagged(fullPath: string): boolean {
     return this.flaggedPaths().has(fullPath);
   }
+
+  /**
+   * Forgets everything held here, so the next load asks the server again.
+   * Called after the user deletes their file-system data: what the panes
+   * would otherwise keep drawing no longer exists.
+   */
+  reset(): void {
+    this.request = undefined;
+    this.flaggedPaths.set(new Set());
+  }
 }

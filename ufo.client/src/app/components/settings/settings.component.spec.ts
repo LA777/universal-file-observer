@@ -5,6 +5,9 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { SettingsComponent } from './settings.component';
 import { ThemeService } from '../../services/theme.service';
+import { By } from '@angular/platform-browser';
+import { DeleteUserDataComponent } from './delete-user-data/delete-user-data.component';
+import { KeyboardShortcutsComponent } from './keyboard-shortcuts/keyboard-shortcuts.component';
 
 describe('SettingsComponent', () => {
   let fixture: ComponentFixture<SettingsComponent>;
@@ -130,6 +133,26 @@ describe('SettingsComponent', () => {
 
     expect(component.savedMessage).toBe('Saved.');
     expect(component.errorMessage).toBe('');
+    httpMock.verify();
+  });
+
+  it('re-reads its theme and the shortcuts table once the danger zone has deleted the settings', () => {
+    fixture.detectChanges();
+    flushLoad('light');
+    httpMock.expectOne('/api/settings/shortcuts').flush([]);
+    expect(component.selectedTheme).toBe('light');
+    const shortcuts = fixture.debugElement.query(By.directive(KeyboardShortcutsComponent))
+      .componentInstance as KeyboardShortcutsComponent;
+    const dangerZone = fixture.debugElement.query(By.directive(DeleteUserDataComponent))
+      .componentInstance as DeleteUserDataComponent;
+    const reload = spyOn(shortcuts, 'reload');
+
+    // The child has already reset the theme by the time it announces the delete.
+    themeService.resetToDefault();
+    dangerZone.settingsDeleted.emit();
+
+    expect(component.selectedTheme).toBe('dark');
+    expect(reload).toHaveBeenCalledTimes(1);
     httpMock.verify();
   });
 

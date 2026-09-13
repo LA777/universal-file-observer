@@ -45,6 +45,10 @@
 
     <app-keyboard-shortcuts />
 
+    <!-- Per-account and destructive, so it sits below everything the user
+         merely adjusts and above the administrator block, which is not theirs. -->
+    <app-delete-user-data (settingsDeleted)="onSettingsDeleted()" />
+
     <!-- Everything in here is server-wide rather than per-account, and a user
          who cannot change any of it is shown none of it - the divider included,
          since a heading over nothing is just a locked door. Any further

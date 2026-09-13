@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, ChangeDetectionStrategy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,6 +7,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AdminSettingsDividerComponent } from './admin-settings-divider/admin-settings-divider.component';
 import { ServerCertificateComponent } from './server-certificate/server-certificate.component';
 import { KeyboardShortcutsComponent } from './keyboard-shortcuts/keyboard-shortcuts.component';
+import { DeleteUserDataComponent } from './delete-user-data/delete-user-data.component';
 import { Theme } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
@@ -28,7 +29,8 @@ interface ThemeChoice {
     MatTooltipModule,
     AdminSettingsDividerComponent,
     ServerCertificateComponent,
-    KeyboardShortcutsComponent
+    KeyboardShortcutsComponent,
+    DeleteUserDataComponent
   ],
   templateUrl: './settings.component.html',
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -42,6 +44,11 @@ export class SettingsComponent implements OnInit {
 
   selectedTheme: Theme;
   isSaving = false;
+
+  /** The shortcuts table, re-read after the settings behind it are deleted. */
+  @ViewChild(KeyboardShortcutsComponent)
+  private keyboardShortcuts?: KeyboardShortcutsComponent;
+
   savedMessage = '';
   errorMessage = '';
 
@@ -99,6 +106,18 @@ export class SettingsComponent implements OnInit {
         this.errorMessage = 'Could not save your settings. Please try again.';
       }
     });
+  }
+
+  /**
+   * The danger zone has deleted the settings and reset what the client held of
+   * them; what is drawn here has to follow, or the page would show a theme and
+   * a shortcuts table the server no longer has.
+   */
+  onSettingsDeleted(): void {
+    this.selectedTheme = this.themeService.currentTheme;
+    this.savedMessage = '';
+    this.errorMessage = '';
+    this.keyboardShortcuts?.reload();
   }
 
   goBack(): void {

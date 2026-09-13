@@ -99,6 +99,17 @@ export class TagsService {
     return ids.map(id => byId.get(id)).filter((tag): tag is Tag => tag !== undefined);
   }
 
+  /**
+   * Forgets everything held here, so the next load asks the server again.
+   * Called after the user deletes their file-system data, which takes the
+   * vocabulary and every assignment with it.
+   */
+  reset(): void {
+    this.request = undefined;
+    this.tags.set([]);
+    this.tagIdsByPath.set(new Map());
+  }
+
   private adopt(result: FsItemTags): void {
     this.tags.set(result?.tags ?? []);
     this.tagIdsByPath.set(new Map(Object.entries(result?.tagIdsByPath ?? {})));
