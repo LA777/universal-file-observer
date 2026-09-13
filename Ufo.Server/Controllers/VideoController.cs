@@ -10,7 +10,6 @@ namespace Ufo.Server.Controllers;
 [Authorize]
 public class VideoController : ControllerBase
 {
-    // TODO LA - Cover with Functional tests
     private readonly IPathGuard _pathGuard;
 
     public VideoController(IPathGuard pathGuard)

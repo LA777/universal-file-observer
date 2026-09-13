@@ -5,7 +5,6 @@ namespace Ufo.Server.Mappers;
 
 public static class SnapshotMapper
 {
-    // TODO LA - Cover with Unit tests.
     // TODO LA - consider moving to a dedicated Mapper
     public static SnapshotSummaryDto ToSummaryDto(this SnapshotEntity entity) =>
         new()
