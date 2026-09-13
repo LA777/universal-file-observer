@@ -1,0 +1,257 @@
+/* No colour is named here except the tags' own, which are the user's: every
+   other value is a theme token, so the popup follows the app between palettes. */
+.tag-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 380px;
+  max-width: 100%;
+  padding: 12px;
+  box-sizing: border-box;
+  color: var(--ufo-text);
+  text-align: left;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ufo-border);
+}
+
+.header-icon {
+  flex: 0 0 auto;
+  color: var(--ufo-accent);
+}
+
+.dialog-title {
+  flex: 1 1 auto;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ufo-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-body {
+  padding: 12px 0 4px;
+}
+
+.empty-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ufo-text-muted);
+}
+
+.tag-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-color: var(--ufo-scrollbar-thumb) var(--ufo-bg-surface);
+}
+
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ufo-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tag-row:hover:not(:disabled) {
+  background-color: var(--ufo-bg-control-hover);
+}
+
+.tag-row.applied {
+  background-color: var(--ufo-bg-subtle);
+  border-color: var(--ufo-accent-strong);
+}
+
+.tag-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.coverage-icon {
+  flex: 0 0 auto;
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--ufo-text-muted);
+}
+
+.tag-row.applied .coverage-icon {
+  color: var(--ufo-accent);
+}
+
+/* The tag's own colour, which is the whole reason a tag has one. */
+.tag-swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--ufo-border-subtle);
+}
+
+.tag-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.coverage-note {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--ufo-text-muted);
+}
+
+.new-tag {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ufo-border);
+}
+
+.new-tag-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--ufo-text-muted);
+}
+
+.new-tag-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.new-tag-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-input);
+  color: var(--ufo-text);
+  font-size: 13px;
+  outline: none;
+}
+
+.new-tag-name:focus {
+  border-color: var(--ufo-accent-strong);
+}
+
+.palette {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.palette-colour {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.palette-colour.chosen {
+  border-color: var(--ufo-text-strong);
+}
+
+.palette-colour:focus-visible {
+  outline: 2px solid var(--ufo-accent);
+  outline-offset: 1px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.action-button,
+.secondary-button {
+  height: 28px;
+  min-width: 72px;
+  padding: 0 14px;
+  border: 1px solid var(--ufo-border-control);
+  border-radius: 4px;
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.action-button:hover,
+.secondary-button:hover:not(:disabled) {
+  background-color: var(--ufo-bg-control-hover);
+  border-color: var(--ufo-border-control-hover);
+}
+
+.secondary-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ufo-text-muted);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background-color: var(--ufo-bg-control);
+  color: var(--ufo-text-strong);
+}
+
+.icon-button mat-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+}
+
+.error-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--ufo-danger-border);
+  border-radius: 4px;
+  background-color: var(--ufo-danger-tint);
+  color: var(--ufo-danger-text);
+  font-size: 12px;
+}
+
+.error-row mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}

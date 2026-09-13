@@ -28,6 +28,13 @@
               <mat-icon class="tree-rating-star">star</mat-icon>{{ node.rating }}
             </span>
           }
+          @if (node.tags?.length) {
+            <span class="tree-tags">
+              @for (tag of node.tags; track tag.id) {
+                <span class="tree-tag-swatch" [style.background-color]="tag.colorHex" [title]="tag.name"></span>
+              }
+            </span>
+          }
         </div>
       </mat-nested-tree-node>
 
@@ -45,6 +52,13 @@
           @if (node.rating) {
             <span class="tree-rating" [title]="'Rated ' + node.rating + ' of 10 when this snapshot was taken'">
               <mat-icon class="tree-rating-star">star</mat-icon>{{ node.rating }}
+            </span>
+          }
+          @if (node.tags?.length) {
+            <span class="tree-tags">
+              @for (tag of node.tags; track tag.id) {
+                <span class="tree-tag-swatch" [style.background-color]="tag.colorHex" [title]="tag.name"></span>
+              }
             </span>
           }
         </div>

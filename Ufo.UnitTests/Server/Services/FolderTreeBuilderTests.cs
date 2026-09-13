@@ -222,6 +222,72 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
     }
 
     [Fact]
+    public async Task BuildAsync_StampsTheTagsAsTheyStandOnTheItemsItMeets()
+    {
+        WriteFile("tagged.txt", "tagged");
+        WriteFile("plain.txt", "plain");
+        WriteFile("child/inner.txt", "inner");
+
+        var important = new TagEntity { Name = "Important", ColorHex = "#ff0000", UserId = _user.Id };
+        var archive = new TagEntity { Name = "Archive", ColorHex = "#0000ff", UserId = _user.Id };
+
+        var tagsByPath = new Dictionary<string, IReadOnlyList<TagEntity>>(
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase)
+        {
+            // An item may carry several, which is the whole difference from a
+            // flag or a rating.
+            [Path.Combine(_rootPath, "tagged.txt")] = [important, archive],
+            [Path.Combine(_rootPath, "child")] = [important]
+        };
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user, tagsByPath: tagsByPath);
+
+        rootFolder.Files.Single(file => file.Name == "tagged").Tags
+            .Select(tag => tag.Name).Should().BeEquivalentTo("Important", "Archive");
+        rootFolder.Files.Single(file => file.Name == "plain").Tags.Should().BeEmpty();
+
+        var childFolder = rootFolder.ChildFolders.Single();
+        childFolder.Tags.Should().ContainSingle().Which.Name.Should().Be("Important");
+        // Tagging a folder does not tag what is inside it, as with flags.
+        childFolder.Files.Single().Tags.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task BuildAsync_GivesEachItemItsOwnTagList()
+    {
+        // The entities are later deduplicated by content, and a shared list would
+        // then be shared between two items that are not the same item - so one
+        // gaining a tag would silently give it to the other.
+        WriteFile("left/same.txt", "identical");
+        WriteFile("right/same.txt", "identical");
+
+        var tag = new TagEntity { Name = "Important", ColorHex = "#ff0000", UserId = _user.Id };
+        var tagsByPath = new Dictionary<string, IReadOnlyList<TagEntity>>(
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase)
+        {
+            [Path.Combine(_rootPath, "left", "same.txt")] = [tag],
+            [Path.Combine(_rootPath, "right", "same.txt")] = [tag]
+        };
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user, tagsByPath: tagsByPath);
+
+        var files = rootFolder.ChildFolders.SelectMany(folder => folder.Files).ToList();
+        files.Should().HaveCount(2);
+        files[0].Tags.Should().NotBeSameAs(files[1].Tags);
+    }
+
+    [Fact]
+    public async Task BuildAsync_LeavesEverythingUntaggedWhenNothingIs()
+    {
+        WriteFile("a.txt", "a");
+
+        var rootFolder = await CreateSut().BuildAsync(_rootPath, _snapshot, _user);
+
+        rootFolder.Tags.Should().BeEmpty();
+        rootFolder.Files.Should().OnlyContain(file => file.Tags.Count == 0);
+    }
+
+    [Fact]
     public async Task BuildAsync_LeavesEverythingUnratedWhenNothingIs()
     {
         WriteFile("a.txt", "a");
@@ -518,6 +584,7 @@ public class FolderTreeBuilderTests : BaseTest, IDisposable
                     _user,
                     flaggedPaths: null,
                     ratingsByPath: null,
+                    tagsByPath: null,
                     cancellationTokenSource.Token))
             .Should().ThrowAsync<OperationCanceledException>();
     }

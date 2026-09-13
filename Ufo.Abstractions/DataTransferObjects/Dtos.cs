@@ -47,6 +47,13 @@ public abstract class FsItemDto : DtoWithUserIdAndNameAndIdBase
     [JsonPropertyOrder(46)]
     public int Rating { get; set; }
 
+    /// <summary>
+    /// The tags this item carried when the snapshot was taken. History, like the
+    /// flag and the rating beside it.
+    /// </summary>
+    [JsonPropertyOrder(47)]
+    public List<TagDto> Tags { get; set; } = [];
+
     [JsonPropertyOrder(2)]
     public long? Size { get; set; }
 
@@ -89,6 +96,39 @@ public class UserSettingsDto : DtoWithUserIdAndIdBase
 {
     [JsonPropertyOrder(1)]
     public string Theme { get; set; } = UiThemes.Default;
+}
+
+/// <summary>One of the user's tags: what it is called and what colour it is.</summary>
+public class TagDto
+{
+    [JsonConverter(typeof(UlidJsonConverter))]
+    [JsonPropertyOrder(0)]
+    public Ulid Id { get; set; }
+
+    [JsonPropertyOrder(1)]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyOrder(2)]
+    public string ColorHex { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Everything the panes need to draw tags: the vocabulary, and which paths carry
+/// which tag.
+/// </summary>
+/// <remarks>
+/// Sent together because they are useless apart - an assignment is a tag id, and
+/// an id without the name and colour cannot be drawn. One call rather than two
+/// also means the two halves cannot arrive out of step with each other.
+/// </remarks>
+public class FsItemTagsDto
+{
+    [JsonPropertyOrder(1)]
+    public List<TagDto> Tags { get; set; } = [];
+
+    /// <summary>Tag ids by path, for the paths that carry any.</summary>
+    [JsonPropertyOrder(2)]
+    public Dictionary<string, List<Ulid>> TagIdsByPath { get; set; } = [];
 }
 
 /// <summary>

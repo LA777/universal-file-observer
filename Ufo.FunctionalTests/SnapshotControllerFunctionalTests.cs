@@ -304,6 +304,35 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
             new FsItemRatingsRequest { FullPaths = fullPaths, Rating = rating });
     }
 
+    /// <summary>Creates a tag as the test user and returns its id.</summary>
+    private async Task<Ulid> PostCreateTagAsync(string name, string colorHex)
+    {
+        Authenticate();
+
+        var response = await _client.PostAsJsonAsync(
+            "api/tags",
+            new CreateTagRequest { Name = name, ColorHex = colorHex });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        return (await response.Content.ReadFromJsonAsync<TagDto>())!.Id;
+    }
+
+    /// <summary>Puts a tag on, or takes it off, the given paths.</summary>
+    private async Task<HttpResponseMessage> PostSetTagAsync(Ulid tagId, bool isApplied, params string[] fullPaths)
+    {
+        Authenticate();
+
+        return await _client.PostAsJsonAsync(
+            "api/tags/assign",
+            new SetFsItemTagRequest { TagId = tagId, FullPaths = fullPaths, IsApplied = isApplied });
+    }
+
+    private void Authenticate() =>
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Bearer",
+            GenerateToken(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName));
+
     private async Task<long> CountRowsAsync(string sql)
     {
         using var command = _connection.CreateCommand();
@@ -491,6 +520,81 @@ public class SnapshotControllerFunctionalTests : IAsyncLifetime
         // Zero is unrated, which is the ordinary case.
         Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders WHERE Rating > 0"));
         Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FoldersToFolders WHERE Rating > 0"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_RecordsTagsAgainstTheBindingAndNotTheSharedFileRow()
+    {
+        // The reason tags cannot hang off Files, as with the flag and the rating:
+        // these two are byte-identical and share one row.
+        WriteSnapshotFile("left/same.txt", "identical content");
+        WriteSnapshotFile("right/same.txt", "identical content");
+
+        var importantId = await PostCreateTagAsync("Important", "#ff0000");
+        var archiveId = await PostCreateTagAsync("Archive", "#0000ff");
+        var taggedPath = Path.Combine(_snapshotRootPath, "left", "same.txt");
+
+        // An item may carry several, which is what makes this a table rather
+        // than another column on the association.
+        Assert.Equal(HttpStatusCode.OK, (await PostSetTagAsync(importantId, true, taggedPath)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostSetTagAsync(archiveId, true, taggedPath)).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM Files"));
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM FilesToFolders"));
+        // Two tags, on one of the two bindings.
+        Assert.Equal(2, await CountRowsAsync("SELECT COUNT(*) FROM TagsToSnapshotFiles"));
+        Assert.Equal(
+            1,
+            await CountRowsAsync("SELECT COUNT(DISTINCT FileId || FolderId) FROM TagsToSnapshotFiles"));
+    }
+
+    [Fact]
+    public async Task CreateSnapshot_KeepsTheTagsOfItsOwnMomentWhenTheyChangeLater()
+    {
+        WriteSnapshotFile("data/report.txt", "report");
+        var reportPath = Path.Combine(_snapshotRootPath, "data", "report.txt");
+
+        var tagId = await PostCreateTagAsync("Important", "#ff0000");
+        Assert.Equal(HttpStatusCode.OK, (await PostSetTagAsync(tagId, true, reportPath)).StatusCode);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName)).StatusCode);
+
+        // Taken off afterwards. A snapshot records the moment it was taken.
+        Assert.Equal(HttpStatusCode.OK, (await PostSetTagAsync(tagId, false, reportPath)).StatusCode);
+
+        Assert.Equal(1, await CountRowsAsync("SELECT COUNT(*) FROM TagsToSnapshotFiles"));
+        Assert.Equal(0, await CountRowsAsync("SELECT COUNT(*) FROM FsItemTags"));
+    }
+
+    [Fact]
+    public async Task GetSnapshot_ReadsBackTheTagsItWasTakenWith()
+    {
+        WriteSnapshotFile("data/report.txt", "report");
+        var reportPath = Path.Combine(_snapshotRootPath, "data", "report.txt");
+
+        var tagId = await PostCreateTagAsync("Important", "#ff0000");
+        await PostSetTagAsync(tagId, true, reportPath);
+        await PostCreateSnapshotAsync(SnapshotTestConstants.TestUserId, SnapshotTestConstants.TestUserName);
+
+        Authenticate();
+        var snapshot = await (await _client.GetAsync("api/snapshot/latest"))
+            .Content.ReadFromJsonAsync<SnapshotDto>();
+
+        // The round trip that matters: written at capture against the binding,
+        // read back separately, and stitched onto the right file in the tree.
+        var taggedFile = Flatten(snapshot!.RootFolder!)
+            .SelectMany(folder => folder.Files)
+            .Single(file => file.Name == "report");
+
+        Assert.Single(taggedFile.Tags);
+        Assert.Equal("Important", taggedFile.Tags[0].Name);
+        Assert.Equal("#ff0000", taggedFile.Tags[0].ColorHex);
     }
 
     [Fact]

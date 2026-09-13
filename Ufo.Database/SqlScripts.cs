@@ -215,6 +215,59 @@ public class SqlScripts
             CONSTRAINT FK_UserKeyBindings_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
         );
 
+        -- The user's tags: a name and a colour, applied to any number of files and
+        -- folders. A vocabulary rather than free text per item, which is the
+        -- point - one tag in forty places, recoloured once. The same shape as
+        -- Labels, which does this for snapshots.
+        CREATE TABLE IF NOT EXISTS Tags (
+            Id                        TEXT NOT NULL UNIQUE CONSTRAINT PK_Tags PRIMARY KEY,
+            Name                      TEXT NOT NULL,
+            ColorHex                  TEXT NOT NULL,
+            UserId                    TEXT NOT NULL,
+
+            CONSTRAINT UQ_Tags_User_Name UNIQUE (UserId, Name),
+            CONSTRAINT FK_Tags_Users_UserId FOREIGN KEY (UserId) REFERENCES Users (Id) ON DELETE CASCADE
+        );
+
+        -- Tags on files and folders on disk, keyed by path for the reason flags
+        -- and ratings are. Deleting a tag takes its assignments with it, since an
+        -- assignment to a tag that no longer exists is nothing at all.
+        CREATE TABLE IF NOT EXISTS FsItemTags (
+            TagId                     TEXT NOT NULL,
+            FullPath                  TEXT NOT NULL,
+
+            CONSTRAINT PK_FsItemTags              PRIMARY KEY (TagId, FullPath),
+            CONSTRAINT FK_FsItemTags_Tags_TagId   FOREIGN KEY (TagId) REFERENCES Tags (Id) ON DELETE CASCADE
+        );
+
+        -- The tags a file carried when a snapshot was taken. Keyed on the whole of
+        -- FilesToFolders, the only thing unique to one file in one snapshot under
+        -- one parent. A flag and a rating fit in a column there; any number of
+        -- tags does not, which is why this is a table.
+        CREATE TABLE IF NOT EXISTS TagsToSnapshotFiles (
+            SnapshotId                TEXT NOT NULL,
+            FolderId                  TEXT NOT NULL,
+            FileId                    TEXT NOT NULL,
+            TagId                     TEXT NOT NULL,
+
+            CONSTRAINT PK_TagsToSnapshotFiles                      PRIMARY KEY (SnapshotId, FolderId, FileId, TagId),
+            CONSTRAINT FK_TagsToSnapshotFiles_Snapshots_SnapshotId FOREIGN KEY (SnapshotId) REFERENCES Snapshots (Id) ON DELETE NO ACTION,
+            CONSTRAINT FK_TagsToSnapshotFiles_Tags_TagId           FOREIGN KEY (TagId)      REFERENCES Tags (Id)      ON DELETE CASCADE
+        );
+
+        -- The same for folders, keyed on the whole of FoldersToFolders.
+        -- ParentFolderId is null for the root, exactly as it is there.
+        CREATE TABLE IF NOT EXISTS TagsToSnapshotFolders (
+            SnapshotId                TEXT NOT NULL,
+            ParentFolderId            TEXT,
+            ChildFolderId             TEXT NOT NULL,
+            TagId                     TEXT NOT NULL,
+
+            CONSTRAINT PK_TagsToSnapshotFolders                      PRIMARY KEY (SnapshotId, ParentFolderId, ChildFolderId, TagId),
+            CONSTRAINT FK_TagsToSnapshotFolders_Snapshots_SnapshotId FOREIGN KEY (SnapshotId) REFERENCES Snapshots (Id) ON DELETE NO ACTION,
+            CONSTRAINT FK_TagsToSnapshotFolders_Tags_TagId           FOREIGN KEY (TagId)      REFERENCES Tags (Id)      ON DELETE CASCADE
+        );
+
         -- Ratings, 1 to 10, keyed by path for the same reason flags are: the Files
         -- and Folders rows are deduplicated by content and carry no path, so a
         -- rating there would rate every identical copy at once.
@@ -612,6 +665,82 @@ public class SqlScripts
     /// the later row overwrite the earlier makes the most recent rating the
     /// winner, instead of whichever row the database happened to return first.
     /// </remarks>
+    #region Tags
+
+    public const string SelectTagsSql =
+        "SELECT * FROM Tags WHERE UserId = @UserId ORDER BY Name;";
+
+    /// <summary>
+    /// Creates a tag, or leaves the existing one alone when the name is taken.
+    /// </summary>
+    /// <remarks>
+    /// A tag is identified to the user by its name, so asking for one that
+    /// already exists is asking for the one that exists - not an error, and not a
+    /// second tag with the same name and a different colour.
+    /// </remarks>
+    public const string InsertTagSql =
+        "INSERT INTO Tags (Id, Name, ColorHex, UserId) VALUES (@Id, @Name, @ColorHex, @UserId) " +
+        "ON CONFLICT (UserId, Name) DO NOTHING;";
+
+    public const string SelectTagByNameSql =
+        "SELECT * FROM Tags WHERE UserId = @UserId AND Name = @Name;";
+
+    /// <summary>
+    /// Every tag assignment on disk for this user, tag and path together.
+    /// </summary>
+    /// <remarks>
+    /// Joined through Tags rather than filtered on a UserId of its own: the
+    /// assignment table has no user column, the same way LabelsToSnapshots has
+    /// none, and the tag it points at already belongs to exactly one user.
+    /// </remarks>
+    public const string SelectFsItemTagsSql =
+        "SELECT fit.TagId, fit.FullPath FROM FsItemTags AS fit " +
+        "JOIN Tags AS t ON t.Id = fit.TagId " +
+        "WHERE t.UserId = @UserId;";
+
+    public const string InsertFsItemTagSql =
+        "INSERT INTO FsItemTags (TagId, FullPath) VALUES (@TagId, @FullPath) " +
+        "ON CONFLICT (TagId, FullPath) DO NOTHING;";
+
+    public const string DeleteFsItemTagSql =
+        "DELETE FROM FsItemTags WHERE TagId = @TagId AND FullPath = @FullPath;";
+
+    public const string InsertTagsToSnapshotFileSql =
+        "INSERT INTO TagsToSnapshotFiles (SnapshotId, FolderId, FileId, TagId) " +
+        "VALUES (@SnapshotId, @FolderId, @FileId, @TagId) ON CONFLICT DO NOTHING;";
+
+    public const string InsertTagsToSnapshotFolderSql =
+        "INSERT INTO TagsToSnapshotFolders (SnapshotId, ParentFolderId, ChildFolderId, TagId) " +
+        "VALUES (@SnapshotId, @ParentFolderId, @ChildFolderId, @TagId) ON CONFLICT DO NOTHING;";
+
+    /// <summary>
+    /// The tags every file in one snapshot carried, read separately from the tree.
+    /// </summary>
+    /// <remarks>
+    /// A separate query rather than another join on
+    /// <see cref="SelectFoldersAndFilesBySnapshotSql"/>: that one is already a
+    /// four-way multi-map returning one row per file, and a many-to-many would
+    /// multiply those rows by the number of tags. Read on its own and stitched
+    /// onto the tree afterwards, the row count stays the number of assignments.
+    /// </remarks>
+    public const string SelectSnapshotFileTagsSql =
+        "SELECT tsf.FolderId, tsf.FileId, t.* FROM TagsToSnapshotFiles AS tsf " +
+        "JOIN Tags AS t ON t.Id = tsf.TagId " +
+        "WHERE tsf.SnapshotId = @SnapshotId AND t.UserId = @UserId;";
+
+    public const string SelectSnapshotFolderTagsSql =
+        "SELECT tsf.ParentFolderId, tsf.ChildFolderId, t.* FROM TagsToSnapshotFolders AS tsf " +
+        "JOIN Tags AS t ON t.Id = tsf.TagId " +
+        "WHERE tsf.SnapshotId = @SnapshotId AND t.UserId = @UserId;";
+
+    public const string DeleteTagsToSnapshotFilesBySnapshotSql =
+        "DELETE FROM TagsToSnapshotFiles WHERE SnapshotId = @SnapshotId;";
+
+    public const string DeleteTagsToSnapshotFoldersBySnapshotSql =
+        "DELETE FROM TagsToSnapshotFolders WHERE SnapshotId = @SnapshotId;";
+
+    #endregion
+
     public const string SelectFsItemRatingsSql =
         "SELECT * FROM FsItemRatings WHERE UserId = @UserId ORDER BY Id;";
 

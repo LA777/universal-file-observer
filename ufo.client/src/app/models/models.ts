@@ -26,6 +26,35 @@ export interface FsItem {
    * recording it.
    */
   rating?: number;
+  /**
+   * The tags on this item.
+   *
+   * In the Files panes these are the live tags. In a snapshot they are the tags
+   * of that snapshot's own moment, so the two can disagree - which is the point
+   * of recording them.
+   */
+  tags?: Tag[];
+}
+
+/** One of the user's tags: what it is called and what colour it is. */
+export interface Tag {
+  id: string;
+  name: string;
+  /** A CSS hex colour, "#rrggbb". */
+  colorHex: string;
+}
+
+/**
+ * Everything the panes need to draw tags.
+ *
+ * The vocabulary and the assignments arrive together because they are useless
+ * apart: an assignment is a tag id, and an id without a name and colour cannot
+ * be drawn.
+ */
+export interface FsItemTags {
+  tags: Tag[];
+  /** Tag ids by path, for the paths that carry any. */
+  tagIdsByPath: Record<string, string[]>;
 }
 
 export interface FsItemUi extends FsItem {

@@ -106,3 +106,34 @@
   height: 13px;
   line-height: 13px;
 }
+
+/* Tag chips. The colour is the user's; everything around it is a theme token. */
+:host ::ng-deep .tag-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  overflow: hidden;
+}
+
+:host ::ng-deep .tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 110px;
+  padding: 0 5px;
+  border: 1px solid var(--ufo-border-subtle);
+  border-radius: 9px;
+  background-color: var(--ufo-bg-control);
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+:host ::ng-deep .tag-chip-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}

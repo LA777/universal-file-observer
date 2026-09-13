@@ -23,6 +23,7 @@ public static class FileMapper
             IsHidden = entity.IsHidden,
             IsFlagEnabled = entity.IsFlagEnabled,
             Rating = entity.Rating,
+            Tags = entity.Tags.ToDtos(),
             FileExtension = entity.FileExtension
         };
 

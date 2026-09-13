@@ -72,6 +72,9 @@
           </div>
           <button mat-menu-item (click)="setRatingOnSelection(0)">Clear rating</button>
         </mat-menu>
+        <button (click)="openTags()" [disabled]="!hasSelection" title="Tags">
+          <mat-icon>sell</mat-icon>
+        </button>
         <button (click)="deleteSelection()" [disabled]="!hasSelection" class="destructive" title="Delete (Del)">
           <mat-icon>delete</mat-icon>
         </button>

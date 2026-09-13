@@ -1,0 +1,88 @@
+<div class="tag-dialog">
+  <div class="dialog-header">
+    <mat-icon class="header-icon">sell</mat-icon>
+    <span class="dialog-title">Tags for {{ data.description }}</span>
+    <button class="icon-button" (click)="close()" title="Close">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="dialog-body">
+    @if (rows().length === 0) {
+      <p class="empty-note">No tags yet. Make one below and it goes straight on.</p>
+    } @else {
+      <div class="tag-rows">
+        @for (row of rows(); track row.tag.id) {
+          <button
+            type="button"
+            class="tag-row"
+            [class.applied]="row.coverage === 'all'"
+            [disabled]="isSaving()"
+            [attr.aria-pressed]="row.coverage === 'all'"
+            [title]="row.coverage === 'all'
+              ? 'Remove from all ' + data.description
+              : 'Apply to all ' + data.description"
+            (click)="toggle(row)">
+            <mat-icon class="coverage-icon">{{
+              row.coverage === 'all' ? 'check_box'
+                : row.coverage === 'some' ? 'indeterminate_check_box'
+                : 'check_box_outline_blank'
+            }}</mat-icon>
+            <span class="tag-swatch" [style.background-color]="row.tag.colorHex"></span>
+            <span class="tag-name">{{ row.tag.name }}</span>
+            @if (row.coverage === 'some') {
+              <span class="coverage-note">some</span>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    <div class="new-tag">
+      <span class="new-tag-label">New tag</span>
+      <div class="new-tag-controls">
+        <input
+          #nameBox
+          class="new-tag-name"
+          type="text"
+          maxlength="256"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Name"
+          [value]="newTagName()"
+          (input)="newTagName.set(nameBox.value)"
+          (keydown.enter)="createAndApply()" />
+        <button
+          type="button"
+          class="secondary-button"
+          [disabled]="!canCreate"
+          (click)="createAndApply()">Add</button>
+      </div>
+
+      <div class="palette" role="radiogroup" aria-label="Tag colour">
+        @for (color of paletteColors; track color) {
+          <button
+            type="button"
+            class="palette-colour"
+            [class.chosen]="color === newTagColor()"
+            [style.background-color]="color"
+            [attr.aria-label]="'Colour ' + color"
+            [attr.aria-checked]="color === newTagColor()"
+            role="radio"
+            (click)="newTagColor.set(color)"></button>
+        }
+      </div>
+    </div>
+
+    @if (errorMessage()) {
+      <div class="error-row">
+        <mat-icon>error_outline</mat-icon>
+        <span class="error-text">{{ errorMessage() }}</span>
+      </div>
+    }
+  </div>
+
+  <div class="dialog-actions">
+    <button class="action-button" (click)="close()">Done</button>
+  </div>
+</div>

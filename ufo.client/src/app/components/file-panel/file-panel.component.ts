@@ -13,6 +13,7 @@ import {
   FsBatchResult,
   FsItemFailure,
   FolderTab,
+  FsItemTags,
   PersistedFolderTab,
   FsItemUi,
   SnapshotSummary,
@@ -25,6 +26,8 @@ import { KeyBindingsService } from '../../services/key-bindings.service';
 import { FolderTabsService } from '../../services/folder-tabs.service';
 import { FsItemFlagsService } from '../../services/fs-item-flags.service';
 import { FsItemRatingsService, RATING_CHOICES } from '../../services/fs-item-ratings.service';
+import { TagsService } from '../../services/tags.service';
+import { openTagDialog } from '../tag-dialog/tag-dialog.component';
 import { FolderTabsComponent } from '../folder-tabs/folder-tabs.component';
 import { KeyBindingActions } from '../../shared/key-binding-actions';
 import { Subscription, forkJoin, of, catchError } from 'rxjs';
@@ -111,7 +114,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     private keyBindingsService: KeyBindingsService,
     private folderTabsService: FolderTabsService,
     private fsItemFlagsService: FsItemFlagsService,
-    private fsItemRatingsService: FsItemRatingsService
+    private fsItemRatingsService: FsItemRatingsService,
+    private tagsService: TagsService
   ) {}
 
   ngOnInit() {
@@ -170,7 +174,9 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       // Same reasoning: a pane with no flags is still a working file browser.
       flaggedPaths: this.fsItemFlagsService.load().pipe(catchError(() => of([] as string[]))),
       // Same reasoning again: a pane with no ratings is still a working browser.
-      ratings: this.fsItemRatingsService.load().pipe(catchError(() => of({} as Record<string, number>)))
+      ratings: this.fsItemRatingsService.load().pipe(catchError(() => of({} as Record<string, number>))),
+      // Same reasoning once more: a pane with no tags is still a working browser.
+      tags: this.tagsService.load().pipe(catchError(() => of({ tags: [], tagIdsByPath: {} } as FsItemTags)))
     }).subscribe({
       next: ({ root, persistedTabs }) => {
         if (!root?.folder) {
@@ -250,7 +256,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         updatedAt: element.updatedAt,
         isFile: false,
         isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath),
-        rating: this.fsItemRatingsService.ratingFor(element.fullPath)
+        rating: this.fsItemRatingsService.ratingFor(element.fullPath),
+        tags: this.tagsService.tagsFor(element.fullPath)
       });
     });
 
@@ -270,7 +277,8 @@ export class FilePanelComponent implements OnInit, OnDestroy {
         isFile: true,
         // The live flag, unlike a snapshot's, which is the flag of its own moment.
         isFlagEnabled: this.fsItemFlagsService.isFlagged(element.fullPath),
-        rating: this.fsItemRatingsService.ratingFor(element.fullPath)
+        rating: this.fsItemRatingsService.ratingFor(element.fullPath),
+        tags: this.tagsService.tagsFor(element.fullPath)
       });
     });
   }
@@ -801,16 +809,25 @@ export class FilePanelComponent implements OnInit, OnDestroy {
     }
 
     const isFlagEnabled = this.willFlagSelection;
-    const paths = this.selectedItems.map(item => item.fullPath);
+    const items = [...this.selectedItems];
+    const paths = items.map(item => item.fullPath);
 
     this.subscriptionWrite?.unsubscribe();
     this.subscriptionWrite = this.fsItemFlagsService.setFlags(paths, isFlagEnabled).subscribe({
       next: () => {
-        this.refresh();
-        // The other pane too. Rows read the flag when they are built, not as the
-        // set changes, so a pane showing the same folder would keep the old
-        // markers until something else made it reload - and flags are one set
-        // shared by both panes, not a property of the one that was clicked.
+        // Updated in place rather than by re-reading the folder. Nothing about
+        // the folder's contents changed, and a reload would throw away the
+        // selection the user is plainly still working with - along with their
+        // scroll position and sort. These are the same objects the listing
+        // holds, so changing them changes what the grid draws.
+        for (const item of items) {
+          item.isFlagEnabled = isFlagEnabled;
+        }
+
+        this.folderDetails?.refreshMarkCells();
+
+        // The other pane still needs telling: flags are one set shared by both,
+        // and its rows read the value when they were built.
         this.otherPanelChanged.emit();
       },
       error: (error) => this.showErrorDialog(error, isFlagEnabled ? 'flag the items' : 'clear the flag')
@@ -877,17 +894,53 @@ export class FilePanelComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const paths = this.selectedItems.map(item => item.fullPath);
+    const items = [...this.selectedItems];
+    const paths = items.map(item => item.fullPath);
 
     this.subscriptionWrite?.unsubscribe();
     this.subscriptionWrite = this.fsItemRatingsService.setRatings(paths, rating).subscribe({
       next: () => {
-        this.refresh();
-        // The other pane too: ratings are one set shared by both, and rows read
-        // the value when they are built rather than as the set changes.
+        // In place, for the reason the flag is: the folder did not change, and
+        // reloading it would cost the selection the user is still working with.
+        for (const item of items) {
+          item.rating = rating;
+        }
+
+        this.folderDetails?.refreshMarkCells();
         this.otherPanelChanged.emit();
       },
       error: (error) => this.showErrorDialog(error, 'set the rating')
+    });
+  }
+
+  // --- Tags ---
+
+  /**
+   * Opens the tag popup on the selection.
+   *
+   * The rows update themselves from the service while it is open, so there is
+   * nothing to do on the way in. What matters is on the way out: the listing
+   * holds tags that were resolved when it was built, so they are re-resolved
+   * once the user is done rather than after every click inside the popup.
+   */
+  openTags() {
+    if (!this.hasSelection) {
+      return;
+    }
+
+    const items = [...this.selectedItems];
+
+    openTagDialog(this.dialog, {
+      fullPaths: items.map(item => item.fullPath),
+      description: describeItems(items)
+    }).subscribe(() => {
+      for (const item of items) {
+        item.tags = this.tagsService.tagsFor(item.fullPath);
+      }
+
+      this.folderDetails?.refreshMarkCells();
+      // Tags are one set shared by both panes, like flags and ratings.
+      this.otherPanelChanged.emit();
     });
   }
 

@@ -46,4 +46,17 @@ public abstract class FsItemEntity: EntityWithUserAndNameAndIdBase
     /// </remarks>
     [Ignore]
     public int Rating { get; set; }
+
+    /// <summary>
+    /// The tags this item carried when the snapshot was taken.
+    /// </summary>
+    /// <remarks>
+    /// Carried like the flag and the rating - <b>never a column</b>, because the
+    /// Files and Folders rows are shared by every identical item. Unlike those
+    /// two it cannot be a column on the association either, since there can be
+    /// any number of tags; they live in TagsToSnapshotFiles and
+    /// TagsToSnapshotFolders and pass through here only in memory.
+    /// </remarks>
+    [Ignore]
+    public IList<TagEntity> Tags { get; set; } = [];
 }

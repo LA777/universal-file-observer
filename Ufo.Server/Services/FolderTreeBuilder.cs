@@ -21,12 +21,18 @@ public interface IFolderTreeBuilder
     /// The ratings the user has set right now, keyed by path. Copied onto each
     /// item beside its flag, and frozen for the same reason.
     /// </param>
+    /// <param name="tagsByPath">
+    /// The tags on each path right now, copied across beside the flag and the
+    /// rating. Any number per item, so they end up in their own tables rather
+    /// than a column - but frozen at the same moment and for the same reason.
+    /// </param>
     Task<FolderEntity> BuildAsync(
         string rootPath,
         SnapshotEntity snapshotEntity,
         UserEntity userEntity,
         IReadOnlySet<string>? flaggedPaths = null,
         IReadOnlyDictionary<string, int>? ratingsByPath = null,
+        IReadOnlyDictionary<string, IReadOnlyList<TagEntity>>? tagsByPath = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -89,6 +95,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         UserEntity userEntity,
         IReadOnlySet<string>? flaggedPaths = null,
         IReadOnlyDictionary<string, int>? ratingsByPath = null,
+        IReadOnlyDictionary<string, IReadOnlyList<TagEntity>>? tagsByPath = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(rootPath);
@@ -101,6 +108,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         // against the same set - and so a walk with no flags allocates nothing.
         var effectiveFlaggedPaths = flaggedPaths ?? EmptyFlaggedPaths;
         var effectiveRatings = ratingsByPath ?? EmptyRatings;
+        var effectiveTags = tagsByPath ?? EmptyTags;
 
         var rootFolder = CreateFolderEntity(
             new DirectoryInfo(rootPath),
@@ -108,7 +116,8 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
             parentFolder: null,
             userEntity,
             effectiveFlaggedPaths,
-            effectiveRatings);
+            effectiveRatings,
+            effectiveTags);
 
         // Every pass is CPU and blocking-I/O work with no asynchronous API worth using,
         // so the whole walk is pushed onto the thread pool in one hop rather than
@@ -123,6 +132,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                     userEntity,
                     effectiveFlaggedPaths,
                     effectiveRatings,
+                    effectiveTags,
                     cancellationToken);
                 HashFiles(pendingFiles, cancellationToken);
                 CompleteFolderHashesAndSizes(rootFolder);
@@ -148,6 +158,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         UserEntity userEntity,
         IReadOnlySet<string> flaggedPaths,
         IReadOnlyDictionary<string, int> ratingsByPath,
+        IReadOnlyDictionary<string, IReadOnlyList<TagEntity>> tagsByPath,
         CancellationToken cancellationToken)
     {
         var parallelOptions = new ParallelOptions
@@ -156,7 +167,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
             CancellationToken = cancellationToken
         };
 
-        var walkContext = new WalkContext(snapshotEntity, userEntity, flaggedPaths, ratingsByPath);
+        var walkContext = new WalkContext(snapshotEntity, userEntity, flaggedPaths, ratingsByPath, tagsByPath);
 
         // Directory enumeration follows symbolic links and junctions, so a link that
         // points back up its own tree would otherwise be walked forever. Recording where
@@ -220,7 +231,8 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                 folder,
                 walkContext.User,
                 walkContext.FlaggedPaths,
-                walkContext.RatingsByPath);
+                walkContext.RatingsByPath,
+                walkContext.TagsByPath);
             folder.ChildFolders.Add(subFolder);
 
             // A directory already reached by another route - a link or junction pointing
@@ -256,6 +268,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
                 // into a snapshot made today.
                 IsFlagEnabled = walkContext.FlaggedPaths.Contains(filePath),
                 Rating = walkContext.RatingFor(filePath),
+                Tags = walkContext.TagsFor(filePath),
                 User = walkContext.User,
                 UserId = walkContext.User.Id,
                 CreatedAt = fileInfo.CreationTimeUtc.ToString("o"),
@@ -277,7 +290,8 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         FolderEntity? parentFolder,
         UserEntity userEntity,
         IReadOnlySet<string> flaggedPaths,
-        IReadOnlyDictionary<string, int> ratingsByPath)
+        IReadOnlyDictionary<string, int> ratingsByPath,
+        IReadOnlyDictionary<string, IReadOnlyList<TagEntity>> tagsByPath)
     {
         var folder = new FolderEntity
         {
@@ -287,6 +301,7 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
             // the flags of the moment it was taken.
             IsFlagEnabled = flaggedPaths.Contains(directoryInfo.FullName),
             Rating = ratingsByPath.TryGetValue(directoryInfo.FullName, out var folderRating) ? folderRating : 0,
+            Tags = tagsByPath.TryGetValue(directoryInfo.FullName, out var folderTags) ? [.. folderTags] : [],
             User = userEntity,
             UserId = userEntity.Id,
             CreatedAt = directoryInfo.CreationTimeUtc.ToString("o"),
@@ -520,6 +535,11 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
     private static readonly IReadOnlyDictionary<string, int> EmptyRatings =
         new Dictionary<string, int>(OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>And for a walk with no tags.</summary>
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<TagEntity>> EmptyTags =
+        new Dictionary<string, IReadOnlyList<TagEntity>>(
+            OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// The state one walk shares across its levels and its worker threads. The builder
     /// itself is a singleton and so cannot hold any of this in a field.
@@ -528,7 +548,8 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
         SnapshotEntity snapshot,
         UserEntity user,
         IReadOnlySet<string>? flaggedPaths,
-        IReadOnlyDictionary<string, int>? ratingsByPath)
+        IReadOnlyDictionary<string, int>? ratingsByPath,
+        IReadOnlyDictionary<string, IReadOnlyList<TagEntity>>? tagsByPath)
     {
         private int _excludedEntryCount;
 
@@ -549,6 +570,18 @@ public sealed class FolderTreeBuilder : IFolderTreeBuilder
 
         /// <summary>The rating for a path, or 0 - unrated - when it has none.</summary>
         public int RatingFor(string path) => RatingsByPath.TryGetValue(path, out var rating) ? rating : 0;
+
+        /// <summary>Tags the user had put on each path when the walk started.</summary>
+        public IReadOnlyDictionary<string, IReadOnlyList<TagEntity>> TagsByPath { get; } = tagsByPath ?? EmptyTags;
+
+        /// <summary>
+        /// The tags on a path, as a fresh list. Fresh because each item owns its
+        /// own collection: the walk hands these to entities that are later
+        /// deduplicated by content, and a shared list would then be shared
+        /// between two items that are not the same item.
+        /// </summary>
+        public IList<TagEntity> TagsFor(string path) =>
+            TagsByPath.TryGetValue(path, out var tags) ? [.. tags] : [];
 
         public ConcurrentBag<PendingFile> PendingFiles { get; } = [];
 

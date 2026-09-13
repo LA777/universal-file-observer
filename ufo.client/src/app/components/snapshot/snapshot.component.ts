@@ -4,7 +4,7 @@ import { MatTree, MatTreeModule, MatTreeNestedDataSource } from '@angular/materi
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, ICellRendererParams, ValueFormatterParams } from 'ag-grid-community';
 import { Subscription } from 'rxjs';
-import { File, Folder, Snapshot } from '../../models/models';
+import { File, Folder, Snapshot, Tag } from '../../models/models';
 import { SnapshotService } from '../../services/snapshot.service';
 import { gridThemeFor } from '../../shared/grid-theme';
 import { ThemeService } from '../../services/theme.service';
@@ -43,34 +43,57 @@ export class SnapshotComponent implements OnInit, OnDestroy {
 
   readonly columnDefs: ColDef<File>[] = [
     {
-      // The flag as it stood when this snapshot was taken, not as it stands now.
-      // A snapshot is a record of a moment, and flagging something today does
-      // not change what a snapshot made yesterday says about it.
-      headerName: '',
-      colId: 'flag',
-      width: 34,
-      sortable: false,
-      resizable: false,
-      headerTooltip: 'Flagged when this snapshot was taken',
-      cellRenderer: (params: ICellRendererParams<File>) => this.renderFlagCell(params),
-    },
-    {
-      // The rating as at capture, like the flag beside it.
-      headerName: '',
-      colId: 'rating',
-      width: 44,
-      sortable: true,
-      resizable: false,
-      headerTooltip: 'Rating when this snapshot was taken',
-      valueGetter: (params) => params.data?.rating ?? 0,
-      cellRenderer: (params: ICellRendererParams<File>) => this.renderRatingCell(params),
-    },
-    {
       headerName: 'Name',
       field: 'name',
       flex: 1,
       minWidth: 220,
       cellRenderer: (params: ICellRendererParams<File>) => this.renderNameCell(params),
+    },
+    {
+      // The flag as it stood when this snapshot was taken, not as it stands now.
+      // A snapshot is a record of a moment, and flagging something today does
+      // not change what a snapshot made yesterday says about it.
+      headerName: 'Flag',
+      colId: 'flag',
+      width: 72,
+      sortable: true,
+      resizable: false,
+      headerTooltip: 'Flagged when this snapshot was taken',
+      // Without a value there is nothing to order by, and clicking the header
+      // would appear to do nothing at all: the cell is drawn by a renderer, so
+      // the column has no field of its own to sort on.
+      valueGetter: (params) => (params.data?.isFlagEnabled ? 1 : 0),
+      // Flagged first on the first click. Ascending would lead with everything
+      // the user did not mark, which is never what they opened the column for.
+      sortingOrder: ['desc', 'asc', null],
+      cellRenderer: (params: ICellRendererParams<File>) => this.renderFlagCell(params),
+    },
+    {
+      // The rating as at capture, like the flag beside it.
+      headerName: 'Rating',
+      colId: 'rating',
+      width: 86,
+      sortable: true,
+      resizable: false,
+      headerTooltip: 'Rating when this snapshot was taken',
+      // Unrated sorts as 0, so it gathers at the bottom of a descending sort
+      // rather than being scattered through it as a missing value would be.
+      valueGetter: (params) => params.data?.rating ?? 0,
+      sortingOrder: ['desc', 'asc', null],
+      cellRenderer: (params: ICellRendererParams<File>) => this.renderRatingCell(params),
+    },
+    {
+      headerName: 'Tags',
+      colId: 'tags',
+      width: 160,
+      sortable: true,
+      resizable: true,
+      headerTooltip: 'Tags when this snapshot was taken',
+      // Sorted on the joined names, so ordering by this column gathers rows
+      // carrying the same tags together instead of doing nothing at all.
+      valueGetter: (params) =>
+        (params.data?.tags ?? []).map((tag: Tag) => tag.name).sort().join(', '),
+      cellRenderer: (params: ICellRendererParams<File>) => this.renderTagsCell(params.data?.tags),
     },
     {
       headerName: 'Ext',
@@ -195,6 +218,44 @@ export class SnapshotComponent implements OnInit, OnDestroy {
     const value = document.createElement('span');
     value.textContent = String(rating);
     container.appendChild(value);
+
+    return container;
+  }
+
+
+  /**
+   * Tag chips: the colour, and the name when there is room.
+   *
+   * Sorted by name so a row's tags do not reorder between listings, and the
+   * column sorts on the joined names so tagging groups rows together.
+   */
+  private renderTagsCell(tags: Tag[] | undefined): HTMLElement {
+    const container = document.createElement('span');
+
+    if (!tags?.length) {
+      return container;
+    }
+
+    container.className = 'tag-chips';
+
+    for (const tag of tags) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.title = tag.name;
+
+      const swatch = document.createElement('span');
+      swatch.className = 'tag-chip-swatch';
+      swatch.style.backgroundColor = tag.colorHex;
+      chip.appendChild(swatch);
+
+      // textContent, never innerHTML: a tag name is the user's text and must
+      // never be parsed as markup on its way onto the page.
+      const label = document.createElement('span');
+      label.textContent = tag.name;
+      chip.appendChild(label);
+
+      container.appendChild(chip);
+    }
 
     return container;
   }

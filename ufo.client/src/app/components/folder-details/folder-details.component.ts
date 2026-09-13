@@ -4,6 +4,7 @@ import {
   CellEditingStoppedEvent,
   ColDef,
   EditableCallbackParams,
+  GetRowIdParams,
   GridApi,
   GridReadyEvent,
   ICellEditorParams,
@@ -13,12 +14,22 @@ import {
   RowHeightParams,
   RowSelectionOptions,
 } from 'ag-grid-community';
-import { FileNameRules, FsItemUi } from '../../models/models';
+import { FileNameRules, FsItemUi, Tag } from '../../models/models';
 import { gridThemeFor } from '../../shared/grid-theme';
 import { ThemeService } from '../../services/theme.service';
 import { NameCellEditorComponent, NameCellEditorParams } from '../name-cell-editor/name-cell-editor.component';
 import { STRICT_FILE_NAME_RULES } from '../../shared/file-name-validation';
 import { fullNameOf, isParentRow } from '../../shared/fs-item';
+
+/**
+ * The columns whose contents the panel can change without the folder changing.
+ *
+ * Named here rather than written into the refresh call, because that is how the
+ * tags column came to be missing from it: the column was added, the hand-kept
+ * list beside it was not, and the marker only appeared after a reload rebuilt
+ * the whole listing. A spec holds this against the grid's own columns.
+ */
+export const MARK_COLUMN_IDS: readonly string[] = ['flag', 'rating', 'tags'];
 
 /** A name the user typed over an existing entry's. */
 export interface RenameRequest {
@@ -74,6 +85,17 @@ export class FolderDetailsComponent implements OnChanges {
    * pinned row - which destroys the name box the user is typing into.
    */
   draftRows: FsItemUi[] = [];
+
+  /**
+   * How the grid recognises a row it has seen before.
+   *
+   * Without this, replacing the row data throws every row away and builds new
+   * ones, taking the selection with it - so setting a flag on three files left
+   * nothing selected. A path identifies a row within a folder, and it is stable
+   * across a re-read of the same folder, which is exactly when the selection
+   * must survive.
+   */
+  readonly getRowId = (params: GetRowIdParams<FsItemUi>) => params.data.fullPath;
 
   /**
    * Click to select, Ctrl and Shift to extend - what a file browser does, and
@@ -132,26 +154,48 @@ export class FolderDetailsComponent implements OnChanges {
       valueSetter: () => false,
     },
     {
-      // Narrow and first: a flag is a glance, not a value to read.
-      headerName: '',
+      headerName: 'Flag',
       colId: 'flag',
-      width: 34,
-      sortable: false,
+      width: 72,
+      sortable: true,
       resizable: false,
       headerTooltip: 'Flagged',
+      // Without a value there is nothing to order by, and clicking the header
+      // would appear to do nothing at all: the cell is drawn by a renderer, so
+      // the column has no field of its own to sort on.
+      valueGetter: (params) => (params.data?.isFlagEnabled ? 1 : 0),
+      // Flagged first on the first click. Ascending would lead with everything
+      // the user did not mark, which is never what they opened the column for.
+      sortingOrder: ['desc', 'asc', null],
       cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderFlagCell(params),
     },
     {
       // A number, not ten stars: ten glyphs a row is a wall of them, and the
       // value is what the user set and wants to read back.
-      headerName: '',
+      headerName: 'Rating',
       colId: 'rating',
-      width: 44,
+      width: 86,
       sortable: true,
       resizable: false,
       headerTooltip: 'Rating',
+      // Unrated sorts as 0, so it gathers at the bottom of a descending sort
+      // rather than being scattered through it as a missing value would be.
       valueGetter: (params) => params.data?.rating ?? 0,
+      sortingOrder: ['desc', 'asc', null],
       cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderRatingCell(params),
+    },
+    {
+      headerName: 'Tags',
+      colId: 'tags',
+      width: 160,
+      sortable: true,
+      resizable: true,
+      headerTooltip: 'Tags',
+      // Sorted on the joined names, so ordering by this column gathers rows
+      // carrying the same tags together instead of doing nothing at all.
+      valueGetter: (params) =>
+        (params.data?.tags ?? []).map((tag: Tag) => tag.name).sort().join(', '),
+      cellRenderer: (params: ICellRendererParams<FsItemUi>) => this.renderTagsCell(params.data?.tags),
     },
     {
       headerName: 'Ext',
@@ -183,6 +227,15 @@ export class FolderDetailsComponent implements OnChanges {
       this.gridApi?.resetRowHeights();
     }
 
+    // The row data was replaced. With getRowId the grid keeps whatever was
+    // selected, but the panel cleared its own copy when it rebuilt the listing -
+    // so the two are told to agree again, or the buttons sit disabled over rows
+    // that plainly look selected. Deferred because this runs inside a change
+    // detection pass and the panel updates a field in response.
+    if (changes['folderData'] && !changes['folderData'].firstChange) {
+      setTimeout(() => this.onSelectionChanged());
+    }
+
     // A blank row that is not being typed into is just an empty line the user has
     // to work out what to do with, so it opens its own name box the moment it
     // appears - after the grid has had a frame to actually put the row on screen.
@@ -204,6 +257,20 @@ export class FolderDetailsComponent implements OnChanges {
     if (event.data && !event.data.isDraft) {
       this.rowDoubleClick.emit(event.data as FsItemUi);
     }
+  }
+
+  /**
+   * Redraws only the Flag and Rating cells.
+   *
+   * Setting a mark does not change what is in the folder, so re-reading it would
+   * be work for nothing - and would cost the selection, the scroll position and
+   * the sort. The rows are already updated in place; this just tells the grid.
+   */
+  refreshMarkCells(): void {
+    // Only these columns, not every cell: the Name renderer builds thumbnails
+    // and video players in the media views, and redrawing those would restart
+    // them for a change that never touched the name.
+    this.gridApi?.refreshCells({ force: true, columns: [...MARK_COLUMN_IDS] });
   }
 
   onSelectionChanged(): void {
@@ -380,6 +447,44 @@ export class FolderDetailsComponent implements OnChanges {
     const value = document.createElement('span');
     value.textContent = String(item.rating);
     container.appendChild(value);
+
+    return container;
+  }
+
+
+  /**
+   * Tag chips: the colour, and the name when there is room.
+   *
+   * Sorted by name so a row's tags do not reorder between listings, and the
+   * column sorts on the joined names so tagging groups rows together.
+   */
+  private renderTagsCell(tags: Tag[] | undefined): HTMLElement {
+    const container = document.createElement('span');
+
+    if (!tags?.length) {
+      return container;
+    }
+
+    container.className = 'tag-chips';
+
+    for (const tag of tags) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.title = tag.name;
+
+      const swatch = document.createElement('span');
+      swatch.className = 'tag-chip-swatch';
+      swatch.style.backgroundColor = tag.colorHex;
+      chip.appendChild(swatch);
+
+      // textContent, never innerHTML: a tag name is the user's text and must
+      // never be parsed as markup on its way onto the page.
+      const label = document.createElement('span');
+      label.textContent = tag.name;
+      chip.appendChild(label);
+
+      container.appendChild(chip);
+    }
 
     return container;
   }

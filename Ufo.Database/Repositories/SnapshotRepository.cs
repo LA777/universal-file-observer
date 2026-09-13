@@ -187,6 +187,10 @@ public class SnapshotRepository : ISnapshotRepository
                     param: new { SnapshotId = snapshotId, UserId = userId },
                     splitOn: "SnapshotId, SnapshotId, Id");
 
+            // The snapshot's own id at both call sites, which is the snapshot being
+            // read either way.
+            await AttachSnapshotTagsAsync(sqLiteConnection, snapshotResult, userId, snapshotResult.Id);
+
             // Sort folders and files by name for consistent ordering
             SortFoldersAndFilesRecursively(snapshotResult.RootFolder!);
 
@@ -363,6 +367,10 @@ public class SnapshotRepository : ISnapshotRepository
                     param: new { SnapshotId = snapshotResult.Id, UserId = userId },
                     splitOn: "SnapshotId, SnapshotId, Id");
 
+            // The snapshot's own id at both call sites, which is the snapshot being
+            // read either way.
+            await AttachSnapshotTagsAsync(sqLiteConnection, snapshotResult, userId, snapshotResult.Id);
+
             // Sort folders and files by name for consistent ordering
             SortFoldersAndFilesRecursively(snapshotResult.RootFolder!);
 
@@ -468,6 +476,20 @@ public class SnapshotRepository : ISnapshotRepository
             {
                 return DatabaseActionResult.NotFound;
             }
+
+            // 0. Delete this snapshot's tag assignments. Before the associations
+            // they hang off, so nothing is briefly pointing at an association
+            // that has gone. The Tags themselves stay: they are the user's
+            // vocabulary and outlive any one snapshot.
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteTagsToSnapshotFilesBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            await sqLiteConnection.ExecuteAsync(
+                SqlScripts.DeleteTagsToSnapshotFoldersBySnapshotSql,
+                new { SnapshotId = snapshotId },
+                transaction);
+            _logger.LogInformation($"Deleted tag assignments for snapshot: {snapshotId}");
 
             // 1. Delete FilesToFolders entries for this snapshot
             await sqLiteConnection.ExecuteAsync(
@@ -888,6 +910,23 @@ public class SnapshotRepository : ISnapshotRepository
             .ToList();
 
         await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFoldersToFoldersIfMissingSql, bindingRows, transaction);
+
+        // A row per tag per binding. Flat-mapped rather than looped, so the whole
+        // lot goes in one statement however many tags are involved.
+        var tagRows = folderBindings
+            .SelectMany(folderBinding => folderBinding.ChildFolder.Tags.Select(tag => new
+            {
+                SnapshotId = snapshotEntity.Id,
+                ParentFolderId = folderBinding.ParentFolder?.Id,
+                ChildFolderId = folderBinding.ChildFolder.Id,
+                TagId = tag.Id
+            }))
+            .ToList();
+
+        if (tagRows.Count > 0)
+        {
+            await sqLiteConnection.ExecuteAsync(SqlScripts.InsertTagsToSnapshotFolderSql, tagRows, transaction);
+        }
     }
 
     private static async Task InsertFileBindingsAsync(IDbConnection sqLiteConnection, IReadOnlyList<FileBinding> fileBindings, SnapshotEntity snapshotEntity, DbTransaction transaction)
@@ -909,6 +948,21 @@ public class SnapshotRepository : ISnapshotRepository
             .ToList();
 
         await sqLiteConnection.ExecuteAsync(SqlScripts.InsertFilesToFoldersIfMissingSql, bindingRows, transaction);
+
+        var tagRows = fileBindings
+            .SelectMany(fileBinding => fileBinding.File.Tags.Select(tag => new
+            {
+                SnapshotId = snapshotEntity.Id,
+                FolderId = fileBinding.ParentFolder.Id,
+                FileId = fileBinding.File.Id,
+                TagId = tag.Id
+            }))
+            .ToList();
+
+        if (tagRows.Count > 0)
+        {
+            await sqLiteConnection.ExecuteAsync(SqlScripts.InsertTagsToSnapshotFileSql, tagRows, transaction);
+        }
     }
 
     /// <summary>
@@ -1041,6 +1095,113 @@ public class SnapshotRepository : ISnapshotRepository
             _logger.LogError(exception, "ERROR - AddLabelsAndAssighnToSnapshotAsync");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Reads one snapshot's tag assignments and hangs them on the tree that has
+    /// just been built.
+    /// </summary>
+    /// <remarks>
+    /// Two queries of its own rather than more joins on the tree read. That read
+    /// is already a four-way multi-map producing a row per file, and a
+    /// many-to-many bolted onto it would multiply every row by the number of tags
+    /// on it - so the cost of reading a snapshot would depend on how
+    /// enthusiastically it had been tagged. Read separately, the row count is
+    /// just the number of assignments.
+    /// </remarks>
+    private async Task AttachSnapshotTagsAsync(
+        IDbConnection sqLiteConnection,
+        SnapshotEntity snapshotResult,
+        Ulid userId,
+        Ulid snapshotId)
+    {
+        if (snapshotResult.RootFolder is null)
+        {
+            return;
+        }
+
+        var parameters = new { SnapshotId = snapshotId, UserId = userId };
+
+        // Keyed on the association, because that is what the tag was recorded
+        // against - an item's own row is shared by every identical copy of it.
+        var fileTags = (await sqLiteConnection.QueryAsync<SnapshotFileTagRow>(
+                SqlScripts.SelectSnapshotFileTagsSql, parameters))
+            .GroupBy(row => (row.FolderId, row.FileId))
+            .ToDictionary(group => group.Key, group => group.Select(row => row.ToTag()).ToList());
+
+        var folderTags = (await sqLiteConnection.QueryAsync<SnapshotFolderTagRow>(
+                SqlScripts.SelectSnapshotFolderTagsSql, parameters))
+            .GroupBy(row => (row.ParentFolderId, row.ChildFolderId))
+            .ToDictionary(group => group.Key, group => group.Select(row => row.ToTag()).ToList());
+
+        if (fileTags.Count == 0 && folderTags.Count == 0)
+        {
+            return;
+        }
+
+        // Walked iteratively: a deep snapshot would otherwise be a stack
+        // overflow, and that takes the process down rather than one request.
+        var pending = new Stack<(FolderEntity Folder, Ulid? ParentId)>();
+        pending.Push((snapshotResult.RootFolder, null));
+
+        while (pending.Count > 0)
+        {
+            var (folder, parentId) = pending.Pop();
+
+            if (folderTags.TryGetValue((parentId, folder.Id), out var tagsForFolder))
+            {
+                folder.Tags = tagsForFolder;
+            }
+
+            foreach (var file in folder.Files)
+            {
+                if (fileTags.TryGetValue((folder.Id, file.Id), out var tagsForFile))
+                {
+                    file.Tags = tagsForFile;
+                }
+            }
+
+            foreach (var childFolder in folder.ChildFolders)
+            {
+                pending.Push((childFolder, folder.Id));
+            }
+        }
+    }
+
+    /// <summary>One row of the file-tag read: which binding, and the tag itself.</summary>
+    private sealed class SnapshotFileTagRow
+    {
+        public Ulid FolderId { get; set; }
+
+        public Ulid FileId { get; set; }
+
+        public Ulid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string ColorHex { get; set; } = string.Empty;
+
+        public Ulid UserId { get; set; }
+
+        public TagEntity ToTag() => new() { Id = Id, Name = Name, ColorHex = ColorHex, UserId = UserId };
+    }
+
+    /// <summary>The same for folders, whose binding has a nullable parent.</summary>
+    private sealed class SnapshotFolderTagRow
+    {
+        public Ulid? ParentFolderId { get; set; }
+
+        public Ulid ChildFolderId { get; set; }
+
+        public Ulid Id { get; set; }
+
+        public string Name { get; set; } = string.Empty;
+
+        public string ColorHex { get; set; } = string.Empty;
+
+        public Ulid UserId { get; set; }
+
+        public TagEntity ToTag() => new() { Id = Id, Name = Name, ColorHex = ColorHex, UserId = UserId };
     }
 
     private void SortFoldersAndFilesRecursively(FolderEntity folderEntity)

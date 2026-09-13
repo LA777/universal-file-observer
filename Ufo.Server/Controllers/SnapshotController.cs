@@ -26,6 +26,7 @@ public class SnapshotController : ControllerBase
     private readonly IFolderTreeBuilder _folderTreeBuilder;
     private readonly IFsItemFlagsService _fsItemFlagsService;
     private readonly IFsItemRatingsService _fsItemRatingsService;
+    private readonly ITagsService _tagsService;
 
     public SnapshotController(
         ILogger<SnapshotController> logger,
@@ -35,7 +36,8 @@ public class SnapshotController : ControllerBase
         IPathGuard pathGuard,
         IFolderTreeBuilder folderTreeBuilder,
         IFsItemFlagsService fsItemFlagsService,
-        IFsItemRatingsService fsItemRatingsService)
+        IFsItemRatingsService fsItemRatingsService,
+        ITagsService tagsService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
@@ -45,6 +47,7 @@ public class SnapshotController : ControllerBase
         _folderTreeBuilder = folderTreeBuilder ?? throw new ArgumentNullException(nameof(folderTreeBuilder));
         _fsItemFlagsService = fsItemFlagsService ?? throw new ArgumentNullException(nameof(fsItemFlagsService));
         _fsItemRatingsService = fsItemRatingsService ?? throw new ArgumentNullException(nameof(fsItemRatingsService));
+        _tagsService = tagsService ?? throw new ArgumentNullException(nameof(tagsService));
     }
 
     [HttpGet("latest")]
@@ -126,8 +129,12 @@ public class SnapshotController : ControllerBase
         // into a snapshot taken today.
         var ratingsByPath = await _fsItemRatingsService.GetRatingsAsync(userId, cancellationToken);
 
+        // Read with the flags and ratings, and frozen at the same moment: tagging
+        // something tomorrow does not reach back into a snapshot taken today.
+        var tagsByPath = await _tagsService.GetTagsByPathAsync(userId, cancellationToken);
+
         var folderTree = await _folderTreeBuilder.BuildAsync(
-            snapshotRootPath, snapshot, user, flaggedPathSet, ratingsByPath, cancellationToken);
+            snapshotRootPath, snapshot, user, flaggedPathSet, ratingsByPath, tagsByPath, cancellationToken);
         snapshot.RootFolder = folderTree;
         _logger.LogInformation("Snapshot created");
         await _repository.AddSnapshotAsync(snapshot, userId, cancellationToken);

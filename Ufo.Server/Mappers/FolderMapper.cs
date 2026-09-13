@@ -25,7 +25,8 @@ public static class FolderMapper
             HasParent = entity.ParentFolders?.Count > 0,
             IsHidden = entity.IsHidden,
             IsFlagEnabled = entity.IsFlagEnabled,
-            Rating = entity.Rating
+            Rating = entity.Rating,
+            Tags = entity.Tags.ToDtos()
         };
 
         foreach (var folder in entity.ChildFolders) // TODO LA - Check this is tests
@@ -74,7 +75,8 @@ public static class FolderMapper
             HasParent = entity.ParentFolders?.Count > 0,
             IsHidden = entity.IsHidden,
             IsFlagEnabled = entity.IsFlagEnabled,
-            Rating = entity.Rating
+            Rating = entity.Rating,
+            Tags = entity.Tags.ToDtos()
         };
 
         return dto;
