@@ -59,6 +59,13 @@
   border-top: 1px solid var(--ufo-danger-border);
 }
 
+/* The last row deletes everything, so it is set apart from the single kinds
+   above it by a heavier rule. */
+.deletion-row.delete-all {
+  margin-top: 8px;
+  border-top-width: 2px;
+}
+
 .deletion-text {
   display: flex;
   flex-direction: column;

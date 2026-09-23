@@ -6,6 +6,7 @@ using Moq;
 using Ufo.Abstractions;
 using Ufo.Abstractions.Database;
 using Ufo.Abstractions.Database.Entities;
+using Ufo.Abstractions.Database.Repositories;
 using Ufo.Database;
 using Ufo.Database.Contexts;
 using Ufo.Database.Repositories;
@@ -77,13 +78,30 @@ public class UserDataRepositoryIntegrationTests : IAsyncLifetime
         var deletedSnapshots = await _userDataRepository.DeleteSnapshotsAsync(testUser.Id);
 
         deletedSnapshots.Should().Be(2);
-        foreach (var table in new[] { "Snapshots", "VolumeInfos", "Volumes", "StorageDrives", "Pcs", "Folders", "Files", "Labels" })
+        foreach (var table in new[] { "Snapshots", "VolumeInfos", "Volumes", "StorageDrives", "Pcs", "Folders", "Files" })
         {
             (await CountRowsAsync(table, testUser.Id)).Should().Be(0, $"{table} should hold nothing of the user's");
         }
         (await CountAllRowsAsync("FilesToFolders")).Should().Be(0);
         (await CountAllRowsAsync("FoldersToFolders")).Should().Be(0);
         (await CountAllRowsAsync("PcsToStorageDrives")).Should().Be(0);
+        (await CountAllRowsAsync("LabelsToSnapshots")).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeleteSnapshotsAsync_KeepsTheLabelsButNotTheirAssignments()
+    {
+        var snapshot = CreateSnapshotWithFiles(testUser.Id);
+        await _snapshotRepository.AddSnapshotAsync(snapshot, testUser.Id);
+        var labelId = await InsertLabelAsync(testUser.Id);
+        await _sqLiteConnection.ExecuteAsync(
+            "INSERT INTO LabelsToSnapshots (LabelId, SnapshotId) VALUES (@LabelId, @SnapshotId)",
+            new { LabelId = labelId, SnapshotId = snapshot.Id });
+
+        await _userDataRepository.DeleteSnapshotsAsync(testUser.Id);
+
+        // The vocabulary is kept for the next snapshots; only what was filed under it goes.
+        (await CountRowsAsync("Labels", testUser.Id)).Should().Be(1);
         (await CountAllRowsAsync("LabelsToSnapshots")).Should().Be(0);
     }
 
@@ -275,6 +293,105 @@ public class UserDataRepositoryIntegrationTests : IAsyncLifetime
         var deletedRows = await _userDataRepository.DeleteSettingsAsync(testUser.Id);
 
         deletedRows.Should().Be(0);
+    }
+
+    #endregion
+
+    #region DeleteAllAsync
+
+    [Fact]
+    public async Task DeleteAllAsync_RemovesEveryKindOfTheUsersDataAndCountsEach()
+    {
+        var snapshot = CreateSnapshotWithFiles(testUser.Id);
+        await _snapshotRepository.AddSnapshotAsync(snapshot, testUser.Id);
+        await InsertFileSystemDataAsync(testUser.Id);
+        await InsertSettingsAsync(testUser.Id);
+        var labelId = await InsertLabelAsync(testUser.Id);
+        await _sqLiteConnection.ExecuteAsync(
+            "INSERT INTO LabelsToSnapshots (LabelId, SnapshotId) VALUES (@LabelId, @SnapshotId)",
+            new { LabelId = labelId, SnapshotId = snapshot.Id });
+        // A snapshot copy of a tag, so the tag and the tree are tied together.
+        var tagId = await _sqLiteConnection.ExecuteScalarAsync<string>(
+            "SELECT Id FROM Tags WHERE UserId = @UserId", new { UserId = testUser.Id });
+        await _sqLiteConnection.ExecuteAsync(
+            "INSERT INTO TagsToSnapshotFiles (SnapshotId, FolderId, FileId, TagId) VALUES (@SnapshotId, @FolderId, @FileId, @TagId)",
+            new { SnapshotId = snapshot.Id, FolderId = snapshot.RootFolder!.Id, FileId = snapshot.RootFolder.Files[0].Id, TagId = tagId });
+
+        var counts = await _userDataRepository.DeleteAllAsync(testUser.Id);
+
+        counts.Should().Be(new UserDataDeletionCounts(Snapshots: 1, FileSystemItems: 3, Labels: 1, Settings: 3));
+        foreach (var table in new[]
+        {
+            "Snapshots", "VolumeInfos", "Volumes", "StorageDrives", "Pcs", "Folders", "Files",
+            "FsItemFlags", "FsItemRatings", "Tags", "Labels", "UserSettings", "UserKeyBindings", "FolderTabs"
+        })
+        {
+            (await CountRowsAsync(table, testUser.Id)).Should().Be(0, $"{table} should hold nothing of the user's");
+        }
+        foreach (var table in new[] { "FilesToFolders", "FoldersToFolders", "PcsToStorageDrives", "LabelsToSnapshots", "FsItemTags", "TagsToSnapshotFiles" })
+        {
+            (await CountAllRowsAsync(table)).Should().Be(0, $"{table} should be empty");
+        }
+    }
+
+    [Fact]
+    public async Task DeleteAllAsync_KeepsTheAccount()
+    {
+        await InsertSettingsAsync(testUser.Id);
+
+        await _userDataRepository.DeleteAllAsync(testUser.Id);
+
+        (await _sqLiteConnection.ExecuteScalarAsync<long>(
+            "SELECT COUNT(*) FROM Users WHERE Id = @Id", new { testUser.Id })).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DeleteAllAsync_LeavesAnotherUsersDataUntouched()
+    {
+        await _snapshotRepository.AddSnapshotAsync(CreateSnapshotWithFiles(testUser.Id), testUser.Id);
+        await InsertFileSystemDataAsync(testUser.Id);
+        await InsertSettingsAsync(testUser.Id);
+        await InsertLabelAsync(testUser.Id);
+        await _snapshotRepository.AddSnapshotAsync(CreateSnapshotWithFiles(otherUser.Id), otherUser.Id);
+        await InsertFileSystemDataAsync(otherUser.Id);
+        await InsertSettingsAsync(otherUser.Id);
+        await InsertLabelAsync(otherUser.Id);
+
+        await _userDataRepository.DeleteAllAsync(testUser.Id);
+
+        foreach (var table in new[] { "Snapshots", "Pcs", "Folders", "FsItemFlags", "FsItemRatings", "Tags", "Labels", "UserSettings", "UserKeyBindings", "FolderTabs" })
+        {
+            (await CountRowsAsync(table, otherUser.Id)).Should().BeGreaterThan(0, $"the other user's {table} should stay");
+        }
+        (await CountRowsAsync("Files", otherUser.Id)).Should().Be(3);
+        (await CountAllRowsAsync("FsItemTags")).Should().Be(1, "the other user's tag assignment stays");
+    }
+
+    [Fact]
+    public async Task DeleteAllAsync_RollsEverythingBackWhenAStepFails()
+    {
+        await _snapshotRepository.AddSnapshotAsync(CreateSnapshotWithFiles(testUser.Id), testUser.Id);
+        await InsertFileSystemDataAsync(testUser.Id);
+        await InsertSettingsAsync(testUser.Id);
+        // The settings step runs last; a trigger makes it fail after every earlier step has run.
+        await _sqLiteConnection.ExecuteAsync(
+            "CREATE TEMP TRIGGER FailSettingsDelete BEFORE DELETE ON UserSettings BEGIN SELECT RAISE(ABORT, 'refused'); END;");
+
+        var act = () => _userDataRepository.DeleteAllAsync(testUser.Id);
+
+        await act.Should().ThrowAsync<Exception>();
+        (await CountRowsAsync("Snapshots", testUser.Id)).Should().Be(1, "a failure in a later step undoes the earlier ones");
+        (await CountRowsAsync("FsItemFlags", testUser.Id)).Should().Be(1);
+        (await CountRowsAsync("UserKeyBindings", testUser.Id)).Should().Be(1);
+        (await CountRowsAsync("UserSettings", testUser.Id)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DeleteAllAsync_WhenThereIsNothing_AnswersZerosWithoutFailing()
+    {
+        var counts = await _userDataRepository.DeleteAllAsync(testUser.Id);
+
+        counts.Should().Be(new UserDataDeletionCounts(0, 0, 0, 0));
     }
 
     #endregion

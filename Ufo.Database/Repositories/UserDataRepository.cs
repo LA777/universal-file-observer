@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Ufo.Abstractions.Database;
@@ -20,13 +21,75 @@ public class UserDataRepository : IUserDataRepository
     {
         _logger.LogInformation("DeleteSnapshotsAsync - UserId: {UserId}", userId);
 
-        // Bindings before the rows they bind, shared rows only once unbound, the
-        // snapshots themselves last: the order DeleteSnapshotByIdAsync uses, run
-        // once over the user's whole set instead of once per snapshot.
-        var deletedSnapshots = await ExecuteInTransactionAsync(
+        var deletedSnapshots = await RunInTransactionAsync(
+            userId, nameof(DeleteSnapshotsAsync), DeleteSnapshotsStepAsync, cancellationToken);
+
+        _logger.LogInformation("Deleted {Count} snapshots for user: {UserId}", deletedSnapshots, userId);
+
+        return deletedSnapshots;
+    }
+
+    public async Task<int> DeleteFileSystemDataAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("DeleteFileSystemDataAsync - UserId: {UserId}", userId);
+
+        var deletedRows = await RunInTransactionAsync(
+            userId, nameof(DeleteFileSystemDataAsync), DeleteFileSystemDataStepAsync, cancellationToken);
+
+        _logger.LogInformation("Deleted {Count} flags, ratings and tags for user: {UserId}", deletedRows, userId);
+
+        return deletedRows;
+    }
+
+    public async Task<int> DeleteSettingsAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("DeleteSettingsAsync - UserId: {UserId}", userId);
+
+        var deletedRows = await RunInTransactionAsync(
+            userId, nameof(DeleteSettingsAsync), DeleteSettingsStepAsync, cancellationToken);
+
+        _logger.LogInformation("Deleted {Count} settings rows for user: {UserId}", deletedRows, userId);
+
+        return deletedRows;
+    }
+
+    public async Task<UserDataDeletionCounts> DeleteAllAsync(Ulid userId, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("DeleteAllAsync - UserId: {UserId}", userId);
+
+        // The same steps the single-kind deletes run, on one transaction, so a
+        // failure in the last leaves the first undone rather than half an
+        // account. File system data before snapshots: its tag assignments
+        // include the snapshot copies, which then no longer hold up the trees.
+        var counts = await RunInTransactionAsync(
             userId,
-            countedStatement: SqlScripts.DeleteSnapshotsByUserSql,
-            cancellationToken,
+            nameof(DeleteAllAsync),
+            async (connection, transaction, parameters) =>
+            {
+                var fileSystemItems = await DeleteFileSystemDataStepAsync(connection, transaction, parameters);
+                var snapshots = await DeleteSnapshotsStepAsync(connection, transaction, parameters);
+                var labels = await DeleteLabelsStepAsync(connection, transaction, parameters);
+                var settings = await DeleteSettingsStepAsync(connection, transaction, parameters);
+
+                return new UserDataDeletionCounts(snapshots, fileSystemItems, labels, settings);
+            },
+            cancellationToken);
+
+        _logger.LogInformation("Deleted all data for user: {UserId} - {Counts}", userId, counts);
+
+        return counts;
+    }
+
+    /// <summary>
+    /// Bindings before the rows they bind, shared rows only once unbound, the
+    /// snapshots themselves last: the order DeleteSnapshotByIdAsync uses, run
+    /// once over the user's whole set. Labels are left in place; only their
+    /// assignments to these snapshots go. Answers with the snapshots deleted.
+    /// </summary>
+    private static async Task<int> DeleteSnapshotsStepAsync(DbConnection connection, DbTransaction transaction, object parameters)
+    {
+        string[] statements =
+        [
             SqlScripts.DeleteTagsToSnapshotFilesByUserSql,
             SqlScripts.DeleteTagsToSnapshotFoldersByUserSql,
             SqlScripts.DeleteLabelsToSnapshotsByUserSql,
@@ -40,114 +103,76 @@ public class UserDataRepository : IUserDataRepository
             SqlScripts.DeleteVolumeInfosByUserSql,
             SqlScripts.DeleteUnboundVolumesByUserSql,
             SqlScripts.DeleteUnboundStorageDrivesByUserSql,
-            SqlScripts.DeleteLabelsByUserSql);
+        ];
 
-        _logger.LogInformation("Deleted {Count} snapshots for user: {UserId}", deletedSnapshots, userId);
+        foreach (var statement in statements)
+        {
+            await connection.ExecuteAsync(statement, parameters, transaction);
+        }
 
-        return deletedSnapshots;
+        return await connection.ExecuteAsync(SqlScripts.DeleteSnapshotsByUserSql, parameters, transaction);
     }
 
-    public async Task<int> DeleteFileSystemDataAsync(Ulid userId, CancellationToken cancellationToken = default)
+    /// <summary>Flags, ratings, then tags after their assignments. Answers with flags, ratings and tags deleted.</summary>
+    private static async Task<int> DeleteFileSystemDataStepAsync(DbConnection connection, DbTransaction transaction, object parameters)
     {
-        _logger.LogInformation("DeleteFileSystemDataAsync - UserId: {UserId}", userId);
+        var deletedFlags = await connection.ExecuteAsync(SqlScripts.DeleteFsItemFlagsByUserSql, parameters, transaction);
+        var deletedRatings = await connection.ExecuteAsync(SqlScripts.DeleteFsItemRatingsByUserSql, parameters, transaction);
 
-        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-        await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
+        // Assignments before the tags they name, so nothing is briefly
+        // pointing at a tag that has gone.
+        await connection.ExecuteAsync(SqlScripts.DeleteFsItemTagsByUserSql, parameters, transaction);
+        await connection.ExecuteAsync(SqlScripts.DeleteTagsToSnapshotFilesByTagOwnerSql, parameters, transaction);
+        await connection.ExecuteAsync(SqlScripts.DeleteTagsToSnapshotFoldersByTagOwnerSql, parameters, transaction);
+        var deletedTags = await connection.ExecuteAsync(SqlScripts.DeleteTagsByUserSql, parameters, transaction);
 
-        try
-        {
-            var parameters = new { UserId = userId };
-
-            var deletedFlags = await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteFsItemFlagsByUserSql, parameters, transaction);
-            var deletedRatings = await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteFsItemRatingsByUserSql, parameters, transaction);
-
-            // Assignments before the tags they name, so nothing is briefly
-            // pointing at a tag that has gone.
-            await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteFsItemTagsByUserSql, parameters, transaction);
-            await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteTagsToSnapshotFilesByTagOwnerSql, parameters, transaction);
-            await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteTagsToSnapshotFoldersByTagOwnerSql, parameters, transaction);
-            var deletedTags = await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteTagsByUserSql, parameters, transaction);
-
-            await transaction.CommitAsync(cancellationToken);
-
-            var deletedRows = deletedFlags + deletedRatings + deletedTags;
-            _logger.LogInformation(
-                "Deleted {Flags} flags, {Ratings} ratings and {Tags} tags for user: {UserId}",
-                deletedFlags, deletedRatings, deletedTags, userId);
-
-            return deletedRows;
-        }
-        catch (Exception exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            _logger.LogError(exception, "ERROR - DeleteFileSystemDataAsync");
-            throw;
-        }
+        return deletedFlags + deletedRatings + deletedTags;
     }
 
-    public async Task<int> DeleteSettingsAsync(Ulid userId, CancellationToken cancellationToken = default)
+    /// <summary>Labels, after any assignment still naming them. Answers with the labels deleted.</summary>
+    private static async Task<int> DeleteLabelsStepAsync(DbConnection connection, DbTransaction transaction, object parameters)
     {
-        _logger.LogInformation("DeleteSettingsAsync - UserId: {UserId}", userId);
+        await connection.ExecuteAsync(SqlScripts.DeleteLabelsToSnapshotsByLabelOwnerSql, parameters, transaction);
 
-        var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
-        await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
+        return await connection.ExecuteAsync(SqlScripts.DeleteLabelsByUserSql, parameters, transaction);
+    }
 
-        try
-        {
-            var parameters = new { UserId = userId };
+    /// <summary>Shortcuts, folder tabs and the settings row. Answers with the rows deleted.</summary>
+    private static async Task<int> DeleteSettingsStepAsync(DbConnection connection, DbTransaction transaction, object parameters)
+    {
+        var deletedRows = 0;
+        deletedRows += await connection.ExecuteAsync(SqlScripts.DeleteAllUserKeyBindingsSql, parameters, transaction);
+        deletedRows += await connection.ExecuteAsync(SqlScripts.DeleteFolderTabsByUserSql, parameters, transaction);
+        deletedRows += await connection.ExecuteAsync(SqlScripts.DeleteUserSettingsByUserSql, parameters, transaction);
 
-            var deletedRows = 0;
-            deletedRows += await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteAllUserKeyBindingsSql, parameters, transaction);
-            deletedRows += await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteFolderTabsByUserSql, parameters, transaction);
-            deletedRows += await sqLiteConnection.ExecuteAsync(SqlScripts.DeleteUserSettingsByUserSql, parameters, transaction);
-
-            await transaction.CommitAsync(cancellationToken);
-
-            _logger.LogInformation("Deleted {Count} settings rows for user: {UserId}", deletedRows, userId);
-
-            return deletedRows;
-        }
-        catch (Exception exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            _logger.LogError(exception, "ERROR - DeleteSettingsAsync");
-            throw;
-        }
+        return deletedRows;
     }
 
     /// <summary>
-    /// Runs <paramref name="statements"/> in order, then
-    /// <paramref name="countedStatement"/>, all in one transaction, and answers
-    /// with the rows the last one affected.
+    /// Runs <paramref name="work"/> on one transaction scoped to the user,
+    /// committing only if all of it succeeds.
     /// </summary>
-    private async Task<int> ExecuteInTransactionAsync(
+    private async Task<TResult> RunInTransactionAsync<TResult>(
         Ulid userId,
-        string countedStatement,
-        CancellationToken cancellationToken,
-        params string[] statements)
+        string operationName,
+        Func<DbConnection, DbTransaction, object, Task<TResult>> work,
+        CancellationToken cancellationToken)
     {
         var sqLiteConnection = await _dbConnectionFactory.GetSqliteConnectionAsync(cancellationToken);
         await using var transaction = await sqLiteConnection.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            var parameters = new { UserId = userId };
-
-            foreach (var statement in statements)
-            {
-                await sqLiteConnection.ExecuteAsync(statement, parameters, transaction);
-            }
-
-            var affectedRows = await sqLiteConnection.ExecuteAsync(countedStatement, parameters, transaction);
+            var result = await work(sqLiteConnection, transaction, new { UserId = userId });
 
             await transaction.CommitAsync(cancellationToken);
 
-            return affectedRows;
+            return result;
         }
         catch (Exception exception)
         {
             await transaction.RollbackAsync(cancellationToken);
-            _logger.LogError(exception, "ERROR - user data deletion rolled back");
+            _logger.LogError(exception, "ERROR - {Operation} rolled back", operationName);
             throw;
         }
     }

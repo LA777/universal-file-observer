@@ -10,7 +10,7 @@ namespace Ufo.Server.Services;
 /// </summary>
 public interface IUserDataService
 {
-    /// <summary>Every snapshot, its tree and machine identity, and the labels.</summary>
+    /// <summary>Every snapshot with its tree and machine identity. Labels stay.</summary>
     Task<ServerResult> DeleteSnapshotsAsync(Ulid userId, CancellationToken cancellationToken);
 
     /// <summary>Every flag, rating and tag the user has put on paths on disk.</summary>
@@ -18,6 +18,9 @@ public interface IUserDataService
 
     /// <summary>The theme, the rebound shortcuts and the locked folder tabs.</summary>
     Task<ServerResult> DeleteSettingsAsync(Ulid userId, CancellationToken cancellationToken);
+
+    /// <summary>All of the above and the labels, in one transaction. The account remains.</summary>
+    Task<ServerResult> DeleteAllAsync(Ulid userId, CancellationToken cancellationToken);
 }
 
 public class UserDataService : IUserDataService
@@ -56,6 +59,18 @@ public class UserDataService : IUserDataService
         var deletedRows = await _userDataRepository.DeleteSettingsAsync(userId, cancellationToken);
 
         return Succeeded("Deleting Settings.", $"Deleted {deletedRows} setting(s).");
+    }
+
+    public async Task<ServerResult> DeleteAllAsync(Ulid userId, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("DeleteAllAsync - UserId: {UserId}", userId);
+
+        var counts = await _userDataRepository.DeleteAllAsync(userId, cancellationToken);
+
+        return Succeeded(
+            "Deleting All Data.",
+            $"Deleted {counts.Snapshots} snapshot(s), {counts.FileSystemItems} flag(s), rating(s) and tag(s), " +
+            $"{counts.Labels} label(s) and {counts.Settings} setting(s).");
     }
 
     // Nothing to delete is still success: the state the user asked for is the

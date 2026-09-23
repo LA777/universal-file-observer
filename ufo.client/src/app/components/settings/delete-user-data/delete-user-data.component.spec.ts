@@ -23,7 +23,8 @@ describe('DeleteUserDataComponent', () => {
   const URLS: Record<UserDataKind, string> = {
     snapshots: '/api/userdata/snapshots',
     filesystem: '/api/userdata/filesystem',
-    settings: '/api/userdata/settings'
+    settings: '/api/userdata/settings',
+    all: '/api/userdata/all'
   };
 
   beforeEach(() => {
@@ -52,8 +53,26 @@ describe('DeleteUserDataComponent', () => {
 
   const deletionOf = (kind: UserDataKind) => component.deletions.find(deletion => deletion.kind === kind)!;
 
-  it('offers exactly the three deletions, in the order of the page', () => {
-    expect(component.deletions.map(deletion => deletion.kind)).toEqual(['snapshots', 'filesystem', 'settings']);
+  it('offers the three single kinds and then Delete all data, in the order of the page', () => {
+    expect(component.deletions.map(deletion => deletion.kind)).toEqual(['snapshots', 'filesystem', 'settings', 'all']);
+    expect(deletionOf('all').label).toBe('Delete all data');
+  });
+
+  it('tells the user that deleting snapshots keeps their labels', () => {
+    const snapshots = deletionOf('snapshots');
+
+    expect(snapshots.description).toContain('labels stay');
+    expect(snapshots.confirmMessage).not.toContain('label');
+    expect(snapshots.confirmHint).toContain('labels are kept');
+  });
+
+  it('sets Delete all data apart from the single kinds', () => {
+    fixture.detectChanges();
+
+    const rows = fixture.nativeElement.querySelectorAll('li.deletion-row') as NodeListOf<HTMLElement>;
+    expect(rows.length).toBe(4);
+    expect(rows[3].classList).toContain('delete-all');
+    expect(rows[0].classList).not.toContain('delete-all');
   });
 
   it('asks before deleting and marks the question as destructive', () => {
@@ -78,7 +97,7 @@ describe('DeleteUserDataComponent', () => {
     httpMock.verify();
   });
 
-  (['snapshots', 'filesystem', 'settings'] as UserDataKind[]).forEach(kind => {
+  (['snapshots', 'filesystem', 'settings', 'all'] as UserDataKind[]).forEach(kind => {
     it(`deletes ${kind} with DELETE ${URLS[kind]} once confirmed`, () => {
       component.requestDeletion(deletionOf(kind));
 
@@ -172,6 +191,48 @@ describe('DeleteUserDataComponent', () => {
     const reload = httpMock.expectOne('/api/settings/shortcuts');
     reload.flush([{ actionId: 'files.copy', label: 'Copy', group: 'File operations', primaryKey: 'F5', secondaryKey: '', defaultPrimaryKey: 'F5', defaultSecondaryKey: '', isDefault: true }]);
     expect(keyBindingsService.keyBindings()[0].primaryKey).toBe('F5');
+    httpMock.verify();
+  });
+
+  it('forgets every cache, resets the theme, re-reads the shortcuts and says so after deleting all data', () => {
+    const flags = TestBed.inject(FsItemFlagsService);
+    const ratings = TestBed.inject(FsItemRatingsService);
+    const tags = TestBed.inject(TagsService);
+    const themeService = TestBed.inject(ThemeService);
+    flags.flaggedPaths.set(new Set(['/data/report.pdf']));
+    ratings.ratingsByPath.set(new Map([['/data/report.pdf', 7]]));
+    tags.tags.set([{ id: 't1', name: 'Important', colorHex: '#00ff00' }]);
+    themeService.applyTheme('light');
+    let announced = 0;
+    component.settingsDeleted.subscribe(() => announced++);
+
+    component.requestDeletion(deletionOf('all'));
+    httpMock.expectOne(URLS.all).flush({ message: 'Deleted 1 snapshot(s).' });
+
+    expect(flags.flaggedPaths().size).toBe(0);
+    expect(ratings.ratingsByPath().size).toBe(0);
+    expect(tags.tags().length).toBe(0);
+    expect(themeService.currentTheme).toBe('dark');
+    expect(announced).toBe(1);
+    httpMock.expectOne('/api/settings/shortcuts').flush([]);
+    expect(component.message).toBe('All data deleted. Deleted 1 snapshot(s).');
+    httpMock.verify();
+  });
+
+  it('keeps every cache and the theme when deleting all data fails', () => {
+    const flags = TestBed.inject(FsItemFlagsService);
+    const themeService = TestBed.inject(ThemeService);
+    flags.flaggedPaths.set(new Set(['/data/report.pdf']));
+    themeService.applyTheme('light');
+
+    component.requestDeletion(deletionOf('all'));
+    httpMock.expectOne(URLS.all).flush('boom', { status: 500, statusText: 'Server Error' });
+
+    // The server rolled everything back, so the client forgets nothing.
+    expect(flags.flaggedPaths().size).toBe(1);
+    expect(themeService.currentTheme).toBe('light');
+    expect(component.errorMessage).not.toBe('');
+    httpMock.expectNone('/api/settings/shortcuts');
     httpMock.verify();
   });
 

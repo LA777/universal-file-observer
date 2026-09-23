@@ -160,6 +160,7 @@ public class UserDataControllerFunctionalTests : IDisposable
     private const string SnapshotsEndpoint = "/api/userdata/snapshots";
     private const string FileSystemEndpoint = "/api/userdata/filesystem";
     private const string SettingsEndpoint = "/api/userdata/settings";
+    private const string AllEndpoint = "/api/userdata/all";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -192,6 +193,7 @@ public class UserDataControllerFunctionalTests : IDisposable
     [InlineData(SnapshotsEndpoint)]
     [InlineData(FileSystemEndpoint)]
     [InlineData(SettingsEndpoint)]
+    [InlineData(AllEndpoint)]
     public async Task Delete_WithoutAToken_IsUnauthorized(string endpoint)
     {
         var client = _factory.CreateUnauthenticatedClient();
@@ -206,7 +208,7 @@ public class UserDataControllerFunctionalTests : IDisposable
     #region DELETE /api/userdata/snapshots
 
     [Fact]
-    public async Task DeleteSnapshots_RemovesEverySnapshotAndLabelOfTheCaller()
+    public async Task DeleteSnapshots_RemovesEverySnapshotButKeepsTheLabels()
     {
         var (client, userId) = await _factory.CreateAuthenticatedClientAsync();
         await CreateSnapshotAsync(client);
@@ -222,12 +224,15 @@ public class UserDataControllerFunctionalTests : IDisposable
         Assert.Contains("2 snapshot", serverResult.Message);
 
         Assert.Empty(await GetSnapshotSummariesAsync(client));
-        // The label list answers 404 rather than an empty list when there are none.
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/label")).StatusCode);
-        foreach (var table in new[] { "Snapshots", "Folders", "Files", "Pcs", "StorageDrives", "Volumes", "VolumeInfos", "Labels" })
+        foreach (var table in new[] { "Snapshots", "Folders", "Files", "Pcs", "StorageDrives", "Volumes", "VolumeInfos" })
         {
             Assert.Equal(0, await _factory.CountRowsAsync(table, userId));
         }
+
+        // The label is still there to file the next snapshots under.
+        var label = Assert.Single((await ReadAsync<List<LabelDto>>(await client.GetAsync("/api/label")))!);
+        Assert.Equal("keep", label.Name);
+        Assert.Empty(label.SnapshotIds);
     }
 
     [Fact]
@@ -382,6 +387,81 @@ public class UserDataControllerFunctionalTests : IDisposable
         Assert.Single(await GetSnapshotSummariesAsync(client));
         Assert.Single((await ReadAsync<List<string>>(await client.GetAsync("/api/fsitemflags")))!);
         Assert.Single((await ReadAsync<FsItemTagsDto>(await client.GetAsync("/api/tags")))!.Tags);
+    }
+
+    #endregion
+
+    #region DELETE /api/userdata/all
+
+    [Fact]
+    public async Task DeleteAll_RemovesEverythingOfTheCallerAndKeepsTheAccount()
+    {
+        var (client, userId) = await _factory.CreateAuthenticatedClientAsync();
+        await CreateSnapshotAsync(client);
+        await CreateLabelAsync(client, "keep");
+        await MarkFileSystemAsync(client);
+        await ArrangeSettingsAsync(client);
+
+        var response = await client.DeleteAsync(AllEndpoint);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var serverResult = await ReadAsync<ServerResult>(response);
+        Assert.Equal(Result.Success, serverResult!.Result);
+        Assert.Contains("1 snapshot", serverResult.Message);
+        Assert.Contains("1 label", serverResult.Message);
+
+        Assert.Empty(await GetSnapshotSummariesAsync(client));
+        // The label list answers 404 rather than an empty list when there are none.
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/label")).StatusCode);
+        Assert.Empty((await ReadAsync<List<string>>(await client.GetAsync("/api/fsitemflags")))!);
+        Assert.Empty((await ReadAsync<Dictionary<string, int>>(await client.GetAsync("/api/fsitemratings")))!);
+        Assert.Empty((await ReadAsync<FsItemTagsDto>(await client.GetAsync("/api/tags")))!.Tags);
+        Assert.Equal(UiThemes.Default, (await ReadAsync<UserSettingsDto>(await client.GetAsync("/api/settings")))!.Theme);
+        var copy = CopyBinding(await GetShortcutsAsync(client));
+        Assert.Equal(copy.DefaultPrimaryKey, copy.PrimaryKey);
+        Assert.Empty((await ReadAsync<List<FolderTabDto>>(await client.GetAsync("/api/foldertabs")))!);
+        foreach (var table in new[] { "Snapshots", "Folders", "Files", "Pcs", "Labels", "Tags", "FsItemFlags", "FsItemRatings", "UserSettings", "UserKeyBindings", "FolderTabs" })
+        {
+            Assert.Equal(0, await _factory.CountRowsAsync(table, userId));
+        }
+
+        // Still signed in: the same token keeps working, because the account was not deleted.
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/settings")).StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteAll_LeavesAnotherUsersDataAlone()
+    {
+        var (client, _) = await _factory.CreateAuthenticatedClientAsync();
+        var (otherClient, _) = await _factory.CreateAuthenticatedClientAsync();
+        foreach (var arrangedClient in new[] { client, otherClient })
+        {
+            await CreateSnapshotAsync(arrangedClient);
+            await CreateLabelAsync(arrangedClient, "keep");
+            await MarkFileSystemAsync(arrangedClient);
+            await ArrangeSettingsAsync(arrangedClient);
+        }
+
+        await client.DeleteAsync(AllEndpoint);
+
+        Assert.Single(await GetSnapshotSummariesAsync(otherClient));
+        Assert.Single((await ReadAsync<List<LabelDto>>(await otherClient.GetAsync("/api/label")))!);
+        Assert.Single((await ReadAsync<List<string>>(await otherClient.GetAsync("/api/fsitemflags")))!);
+        Assert.Single((await ReadAsync<FsItemTagsDto>(await otherClient.GetAsync("/api/tags")))!.Tags);
+        Assert.Equal(UiThemes.Light, (await ReadAsync<UserSettingsDto>(await otherClient.GetAsync("/api/settings")))!.Theme);
+        Assert.Equal("F9", CopyBinding(await GetShortcutsAsync(otherClient)).PrimaryKey);
+        Assert.Single((await ReadAsync<List<FolderTabDto>>(await otherClient.GetAsync("/api/foldertabs")))!);
+    }
+
+    [Fact]
+    public async Task DeleteAll_WhenThereIsNothing_StillSucceeds()
+    {
+        var (client, _) = await _factory.CreateAuthenticatedClientAsync();
+
+        var response = await client.DeleteAsync(AllEndpoint);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Result.Success, (await ReadAsync<ServerResult>(response))!.Result);
     }
 
     #endregion

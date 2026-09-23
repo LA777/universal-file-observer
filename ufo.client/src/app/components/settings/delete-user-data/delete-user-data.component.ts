@@ -14,8 +14,8 @@ import { FolderTabsService } from '../../../services/folder-tabs.service';
 import { KeyBindingsService } from '../../../services/key-bindings.service';
 import { ThemeService } from '../../../services/theme.service';
 
-/** The three kinds of data a user can delete, each behind its own button. */
-export type UserDataKind = 'snapshots' | 'filesystem' | 'settings';
+/** What a user can delete, each behind its own button; 'all' is every other kind plus the labels. */
+export type UserDataKind = 'snapshots' | 'filesystem' | 'settings' | 'all';
 
 /** One button of the danger zone: what it deletes and how it asks. */
 export interface UserDataDeletion {
@@ -31,8 +31,8 @@ export interface UserDataDeletion {
 }
 
 /**
- * The danger zone at the foot of the Settings page: three buttons, each
- * deleting one kind of the user's data for good.
+ * The danger zone at the foot of the Settings page: one button per kind of
+ * the user's data, and a last one deleting all of it, each for good.
  *
  * Its own component so the destructive part of the page is one block with one
  * style, and so SettingsComponent does not have to know which caches go stale
@@ -52,10 +52,10 @@ export class DeleteUserDataComponent {
     {
       kind: 'snapshots',
       label: 'Delete snapshots',
-      description: 'Every snapshot you have taken, with its folder tree and file hashes, and every label.',
+      description: 'Every snapshot you have taken, with its folder tree and file hashes. Your labels stay.',
       confirmTitle: 'Delete all snapshots?',
-      confirmMessage: 'Every snapshot and every label will be deleted. This cannot be undone.',
-      confirmHint: 'The files and folders on disk are not touched.',
+      confirmMessage: 'Every snapshot will be deleted. This cannot be undone.',
+      confirmHint: 'Your labels are kept for future snapshots. The files and folders on disk are not touched.',
       successMessage: 'Snapshots deleted.'
     },
     {
@@ -75,6 +75,15 @@ export class DeleteUserDataComponent {
       confirmMessage: 'Your theme, keyboard shortcuts and locked folder tabs will be put back to the defaults. This cannot be undone.',
       confirmHint: 'Snapshots and file system data are not affected.',
       successMessage: 'Settings deleted. Everything is back to the defaults.'
+    },
+    {
+      kind: 'all',
+      label: 'Delete all data',
+      description: 'Everything above and your labels, in one go. Your account stays, so you remain signed in.',
+      confirmTitle: 'Delete all of your data?',
+      confirmMessage: 'Every snapshot, label, flag, rating and tag will be deleted, and your settings put back to the defaults. This cannot be undone.',
+      confirmHint: 'Your account is kept. The files and folders on disk are not touched.',
+      successMessage: 'All data deleted.'
     }
   ];
 
@@ -155,6 +164,8 @@ export class DeleteUserDataComponent {
         return this.userDataService.deleteFileSystemData();
       case 'settings':
         return this.userDataService.deleteSettings();
+      case 'all':
+        return this.userDataService.deleteAll();
     }
   }
 
@@ -164,21 +175,21 @@ export class DeleteUserDataComponent {
    * The marks and the settings are cached for the session - the panes consult
    * them on every render - and a cache that outlives the rows behind it would
    * keep drawing flags the server no longer knows about until a reload.
-   * Snapshots are read fresh on each visit to their tab, so nothing is held.
+   * Snapshots and labels are read fresh on each visit to their tab, so
+   * nothing is held for them.
    */
   private forgetDeleted(kind: UserDataKind): void {
-    switch (kind) {
-      case 'filesystem':
-        this.fsItemFlagsService.reset();
-        this.fsItemRatingsService.reset();
-        this.tagsService.reset();
-        break;
-      case 'settings':
-        this.folderTabsService.reset();
-        this.keyBindingsService.reload();
-        this.themeService.resetToDefault();
-        this.settingsDeleted.emit();
-        break;
+    if (kind === 'filesystem' || kind === 'all') {
+      this.fsItemFlagsService.reset();
+      this.fsItemRatingsService.reset();
+      this.tagsService.reset();
+    }
+
+    if (kind === 'settings' || kind === 'all') {
+      this.folderTabsService.reset();
+      this.keyBindingsService.reload();
+      this.themeService.resetToDefault();
+      this.settingsDeleted.emit();
     }
   }
 }

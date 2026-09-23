@@ -118,4 +118,45 @@ public class UserDataServiceTests : BaseTest
     }
 
     #endregion
+
+    #region DeleteAllAsync
+
+    [Fact]
+    public async Task DeleteAllAsync_ScopesTheDeleteToTheCallingUserAndReportsEveryCount()
+    {
+        _userDataRepositoryMock
+            .Setup(repository => repository.DeleteAllAsync(_userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new UserDataDeletionCounts(Snapshots: 2, FileSystemItems: 5, Labels: 3, Settings: 4));
+
+        var result = await CreateSut().DeleteAllAsync(_userId, CancellationToken.None);
+
+        result.Result.Should().Be(Result.Success);
+        result.Message.Should().Contain("2 snapshot")
+            .And.Contain("5 flag")
+            .And.Contain("3 label")
+            .And.Contain("4 setting");
+        _userDataRepositoryMock.Verify(
+            repository => repository.DeleteAllAsync(_userId, It.IsAny<CancellationToken>()), Times.Once);
+        // One transaction on the repository, not the three single-kind deletes run in turn.
+        _userDataRepositoryMock.Verify(
+            repository => repository.DeleteSnapshotsAsync(It.IsAny<Ulid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _userDataRepositoryMock.Verify(
+            repository => repository.DeleteFileSystemDataAsync(It.IsAny<Ulid>(), It.IsAny<CancellationToken>()), Times.Never);
+        _userDataRepositoryMock.Verify(
+            repository => repository.DeleteSettingsAsync(It.IsAny<Ulid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAllAsync_PassesARepositoryFailureOn()
+    {
+        _userDataRepositoryMock
+            .Setup(repository => repository.DeleteAllAsync(_userId, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("database locked"));
+
+        var act = () => CreateSut().DeleteAllAsync(_userId, CancellationToken.None);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    #endregion
 }

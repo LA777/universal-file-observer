@@ -8,12 +8,12 @@ using Ufo.Server.Services;
 namespace Ufo.Server.Controllers;
 
 /// <summary>
-/// Wholesale deletion of the calling user's data, one kind at a time - the
-/// endpoints behind the Settings page's danger zone.
+/// Wholesale deletion of the calling user's data, one kind at a time or all of
+/// it - the endpoints behind the Settings page's danger zone.
 /// </summary>
 /// <remarks>
 /// Its own controller rather than more routes on <see cref="SettingsController"/>:
-/// two of the three things deleted here are not settings, and a route that
+/// most of what is deleted here is not settings, and a route that
 /// deletes every snapshot does not belong under a path that otherwise saves a
 /// theme. Everything is scoped to the user in the token; there is no admin
 /// variant that reaches into another account.
@@ -34,8 +34,8 @@ public class UserDataController : ControllerBase
     }
 
     /// <summary>
-    /// Deletes every snapshot the user has, together with the labels, which
-    /// exist only to be put on snapshots.
+    /// Deletes every snapshot the user has. The labels stay, ready for the next
+    /// snapshots; only Delete all data removes them.
     /// </summary>
     [HttpDelete("snapshots")]
     [ProducesResponseType(typeof(ServerResult), StatusCodes.Status200OK)]
@@ -73,5 +73,20 @@ public class UserDataController : ControllerBase
         var userId = HttpContext.GetUserIdAsUlid();
 
         return Ok(await _userDataService.DeleteSettingsAsync(userId, cancellationToken));
+    }
+
+    /// <summary>
+    /// Deletes all of the user's data in one transaction: snapshots, file system
+    /// data, labels and settings. The account itself remains, so the caller is
+    /// still signed in afterwards.
+    /// </summary>
+    [HttpDelete("all")]
+    [ProducesResponseType(typeof(ServerResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteAllAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("DeleteAllAsync");
+        var userId = HttpContext.GetUserIdAsUlid();
+
+        return Ok(await _userDataService.DeleteAllAsync(userId, cancellationToken));
     }
 }

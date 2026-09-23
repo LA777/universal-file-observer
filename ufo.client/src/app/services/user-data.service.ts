@@ -9,7 +9,7 @@ export interface UserDataDeletionResult {
 
 /**
  * The Settings page's danger zone: deleting one kind of the user's data at a
- * time. Every call is scoped by the server to the signed-in user.
+ * time, or all of it. Every call is scoped by the server to the signed-in user.
  */
 @Injectable({ providedIn: 'root' })
 export class UserDataService {
@@ -17,7 +17,7 @@ export class UserDataService {
 
   constructor(private http: HttpClient) {}
 
-  /** Every snapshot, its tree and machine identity, and the labels. */
+  /** Every snapshot with its tree and machine identity. Labels stay. */
   deleteSnapshots(): Observable<UserDataDeletionResult> {
     return this.http.delete<UserDataDeletionResult>(`${this.apiUrl}/snapshots`);
   }
@@ -30,5 +30,10 @@ export class UserDataService {
   /** The theme, the rebound shortcuts and the locked folder tabs. */
   deleteSettings(): Observable<UserDataDeletionResult> {
     return this.http.delete<UserDataDeletionResult>(`${this.apiUrl}/settings`);
+  }
+
+  /** Everything above and the labels, in one transaction. The account remains. */
+  deleteAll(): Observable<UserDataDeletionResult> {
+    return this.http.delete<UserDataDeletionResult>(`${this.apiUrl}/all`);
   }
 }

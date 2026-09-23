@@ -978,8 +978,8 @@ public class SqlScripts
 
     #region User data deletion
 
-    // The three wholesale deletions behind the Settings page's danger zone. Each
-    // clears one kind of data for one user and nothing of anyone else's, so
+    // The wholesale deletions behind the Settings page's danger zone. Each clears
+    // one kind of data for one user, or all of it, and nothing of anyone else's, so
     // every statement is scoped by UserId - directly where the table carries
     // one, and through the owning row where it does not.
     //
@@ -1022,8 +1022,12 @@ public class SqlScripts
     public const string DeleteUnboundPcsByUserSql =
         "DELETE FROM Pcs WHERE UserId = @UserId " +
         "AND NOT EXISTS (SELECT 1 FROM PcsToStorageDrives WHERE PcId = Pcs.Id);";
-    // Labels go with the snapshots: they exist to be put on snapshots and on
-    // nothing else, so a vocabulary with nothing left to label is a leftover.
+    // Labels are not deleted with the snapshots. They are the user's vocabulary
+    // and are kept to file the next snapshots under, the way Tags outlive any
+    // one snapshot. Only Delete all data removes them. Assignments are cleared
+    // by owning label as well as by snapshot, so the delete stands on its own.
+    public const string DeleteLabelsToSnapshotsByLabelOwnerSql =
+        "DELETE FROM LabelsToSnapshots WHERE LabelId IN (SELECT Id FROM Labels WHERE UserId = @UserId);";
     public const string DeleteLabelsByUserSql =
         "DELETE FROM Labels WHERE UserId = @UserId;";
     public const string DeleteSnapshotsByUserSql =

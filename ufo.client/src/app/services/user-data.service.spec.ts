@@ -44,6 +44,14 @@ describe('UserDataService', () => {
     request.flush({});
   });
 
+  it('deletes all data with DELETE /api/userdata/all', () => {
+    service.deleteAll().subscribe();
+
+    const request = httpMock.expectOne('/api/userdata/all');
+    expect(request.request.method).toBe('DELETE');
+    request.flush({});
+  });
+
   it('passes a failed deletion on to the caller', () => {
     let status = 0;
     service.deleteSettings().subscribe({ error: error => (status = error.status) });

@@ -4,12 +4,12 @@
     Danger zone
   </h2>
   <p class="section-hint">
-    Delete user data. Each button below removes one kind of data from your account for good; there
-    is no undo and no recycle bin. Nothing on disk is touched.
+    Delete user data. Each button below removes data from your account for good; there is no undo
+    and no recycle bin. Nothing on disk is touched.
   </p>
 
   <ul class="deletion-list">
-    <li class="deletion-row" *ngFor="let deletion of deletions">
+    <li class="deletion-row" *ngFor="let deletion of deletions" [class.delete-all]="deletion.kind === 'all'">
       <div class="deletion-text">
         <span class="deletion-label">{{ deletion.label }}</span>
         <span class="deletion-description">{{ deletion.description }}</span>
