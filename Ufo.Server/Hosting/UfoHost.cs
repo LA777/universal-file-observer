@@ -202,6 +202,9 @@ public static class UfoHost
         builder.Services.AddScoped<ISearchService, SearchService>();
         builder.Services.AddScoped<ISnapshotService, SnapshotService>();
         builder.Services.AddScoped<IUserDataService, UserDataService>();
+        builder.Services.AddScoped<IExportService, ExportService>();
+        // The clock behind the export file names; a test swaps it for a fixed one.
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IPathGuard, PathGuard>();
         // Both read the host's own rules once and hold no per-request state, so
         // they are shared for the same reason the path guard is.

@@ -1,0 +1,36 @@
+<section class="settings-section" aria-labelledby="export-data-title">
+  <h2 class="section-title" id="export-data-title">Export data</h2>
+  <p class="section-hint">
+    Download your data as a JSON file inside a zip archive. The file is named with the moment it
+    was taken, so exports never overwrite one another.
+  </p>
+
+  <ul class="export-list">
+    <li class="export-row" *ngFor="let choice of choices">
+      <div class="export-text">
+        <span class="export-label">{{ choice.label }}</span>
+        <span class="export-description">{{ choice.description }}</span>
+      </div>
+      <button
+        type="button"
+        class="export-button"
+        [attr.data-scope]="choice.scope"
+        [disabled]="isWorking"
+        [matTooltip]="'Download a zip archive with ' + choice.description.toLowerCase()"
+        (click)="requestExport(choice)">
+        <mat-icon>download</mat-icon>
+        {{ workingScope === choice.scope ? 'Preparing…' : choice.label }}
+      </button>
+    </li>
+  </ul>
+
+  <div class="status-row saved" *ngIf="message">
+    <mat-icon>check_circle</mat-icon>
+    <span>{{ message }}</span>
+  </div>
+
+  <div class="status-row error" *ngIf="errorMessage">
+    <mat-icon>error_outline</mat-icon>
+    <span>{{ errorMessage }}</span>
+  </div>
+</section>

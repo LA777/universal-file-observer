@@ -8,6 +8,7 @@ import { AdminSettingsDividerComponent } from './admin-settings-divider/admin-se
 import { ServerCertificateComponent } from './server-certificate/server-certificate.component';
 import { KeyboardShortcutsComponent } from './keyboard-shortcuts/keyboard-shortcuts.component';
 import { DeleteUserDataComponent } from './delete-user-data/delete-user-data.component';
+import { ExportDataComponent } from './export-data/export-data.component';
 import { Theme } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { ThemeService } from '../../services/theme.service';
@@ -30,6 +31,7 @@ interface ThemeChoice {
     AdminSettingsDividerComponent,
     ServerCertificateComponent,
     KeyboardShortcutsComponent,
+    ExportDataComponent,
     DeleteUserDataComponent
   ],
   templateUrl: './settings.component.html',
